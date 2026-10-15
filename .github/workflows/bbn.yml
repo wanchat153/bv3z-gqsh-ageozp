@@ -90,6 +90,7 @@ jobs:
     needs: [plan, render]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - uses: actions/download-artifact@v4
         with: { path: parts, pattern: 'part-*' }
@@ -116,5 +117,18 @@ jobs:
           for r in rows:
               print(f"| {r['i']} | {r['f0']}-{r['f1']} | {r['got_frames']} | {r['render_s']} | {r['s_per_frame']} | {r['setup_s']} |")
           PY
+      - name: Thai male voice-over (edge-tts)
+        continue-on-error: true
+        run: |
+          python3 -m pip install --quiet --break-system-packages edge-tts
+          python3 -m edge_tts --voice th-TH-NiwatNeural --rate=-5% --text "ยินดีต้อนรับสู่ห้องเซิร์ฟเวอร์" --write-media voice.mp3
+          ffprobe -v error -show_entries format=duration -of csv=p=0 voice.mp3
+      - name: ambience + mux
+        run: |
+          V=none; [ -s voice.mp3 ] && V=voice.mp3
+          bash bbn-test/audio.sh $V audio.m4a ${{ inputs.seconds }}
+          ffmpeg -v error -y -i out.mp4 -i audio.m4a -c:v copy -c:a copy -t ${{ inputs.seconds }} -movflags +faststart final.mp4
+          echo "- audio: voice-over file = $V (none means voice failed, ambience only)" >> $GITHUB_STEP_SUMMARY
+          ffprobe -v error -show_entries stream=codec_type,duration -of csv=p=0 final.mp4
       - uses: actions/upload-artifact@v4
-        with: { name: bbn-video, path: out.mp4, retention-days: 3 }
+        with: { name: bbn-video, path: final.mp4, retention-days: 3 }
