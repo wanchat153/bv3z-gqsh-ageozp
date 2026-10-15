@@ -1,0 +1,37 @@
+name: bbn-voices
+# Thai voice samples (edge-tts) for choosing a narrator; mp3s are pushed to the `voices` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: 'sample narration', default: 'ห้องเซิร์ฟเวอร์ คือหัวใจของโลกออนไลน์ เครื่องนับพันทำงานตลอดยี่สิบสี่ชั่วโมง' }
+permissions:
+  contents: write
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    env:
+      TEXT: ${{ inputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --quiet --break-system-packages edge-tts
+      - name: generate samples
+        run: |
+          mkdir -p out
+          python3 -m edge_tts --list-voices | grep -i "th-TH" > out/voices.txt || true
+          cat out/voices.txt
+          for v in $(awk '{print $1}' out/voices.txt | grep '^th-TH'); do
+            for preset in "doc:-8%:+0Hz" "calm:-12%:-6Hz"; do
+              IFS=: read n r p <<< "$preset"
+              python3 -m edge_tts --voice "$v" --rate="$r" --pitch="$p" --text "$TEXT" --write-media "out/${v}_${n}.mp3" || echo "FAILED $v $n"
+            done
+          done
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          for f in out/*.mp3; do echo "$f $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")"; done | tee out/durations.txt
+      - name: push samples to voices branch
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          git add -f out
+          git commit -q -m "voice samples"
+          git push -q -f origin voices
