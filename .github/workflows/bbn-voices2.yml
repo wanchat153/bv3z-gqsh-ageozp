@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: khanom, py: '3.10', pkgs: 'pythaitts coqui-tts "transformers>=4.48,<5"', script: khanom.py }
+          - { name: khanom, py: '3.10', pkgs: 'pythaitts "coqui-tts[codec]" "transformers>=4.48,<5"', script: khanom.py }
           - { name: mms, py: '3.11', pkgs: 'transformers scipy', script: mms.py }
     env:
       TEXT: ${{ inputs.text }}
