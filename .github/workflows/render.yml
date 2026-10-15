@@ -52,6 +52,6 @@ jobs:
       - run: |
           # sort parts numerically: rename part-N -> part-000N
           for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
-          bash tools/finish.sh parts episode/audio.wav out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
+          bash tools/finish.sh parts episode/audio.flac out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
       - uses: actions/upload-artifact@v4
         with: { name: video, path: out.mp4, retention-days: 14 }
