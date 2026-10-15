@@ -3,10 +3,15 @@
 import { C, F, clamp, ease, el, seg } from './kit'
 import type { LineCue, Theme, TypeLayout } from './types'
 
-interface Word { span: HTMLSpanElement; at: number; pen: boolean }
+interface Char { span: HTMLSpanElement; at: number }
+interface Word { span: HTMLSpanElement; at: number; pen: boolean; chars: Char[] }
 interface Built { box: HTMLDivElement; words: Word[] }
 
 const segmenter = new Intl.Segmenter('th', { granularity: 'word' })
+const graphemes = new Intl.Segmenter('th', { granularity: 'grapheme' }) // Thai vowel/tone marks stay attached to their consonant
+// smooth spring pop: 0 -> overshoots ~1.1 -> settles at 1 (deterministic, safe to seek backwards)
+const spring = (k: number) => (k <= 0 ? 0 : k >= 1 ? 1 : 1 - Math.exp(-6.5 * k) * Math.cos(k * Math.PI * 1.9))
+const CHAR_POP = 0.38 // seconds for one letter to pop in
 // loanwords ICU's Thai dictionary splits mid-word (e.g. บอต -> บอ|ต...); kept whole
 const KEEP = /(บอต|เอไอ|โทเคน|เฟิร์สต์|ไลน์|อีเมล|ออฟฟิศ|เบนซ์|สัมมนา|รับทราบ)/
 const thaiWords = (s: string) => s.split(KEEP).flatMap((c, i) => (i % 2 ? [c] : [...segmenter.segment(c)].map(x => x.segment)))
@@ -47,16 +52,24 @@ export class Typo {
       else if (pieces[j].text === ')' && j > 0) { pieces[j - 1].text += ')'; pieces.splice(j, 1) }
     }
     const words: Word[] = []
-    const n = pieces.filter(p => p.text.trim()).length
-    let i = 0
+    const chunks = pieces.filter(p => p.text.trim()).map(p => (p.pen ? [p.text] : [...graphemes.segment(p.text)].map(x => x.segment)))
+    const total = chunks.reduce((a, c) => a + c.length, 0) // one reveal slot per letter (a backing vocal counts as one)
+    let u = 0, wi = 0
     const span = Math.max(0.6, (line.end - line.start) * 0.82)
     for (const p of pieces) {
       if (!p.text.trim()) { box.append(p.text); continue }
       const s = el('span', p.pen
         ? `display:inline-block;font:400 ${size * 0.62}px/1.3 ${F.pen};color:${C.red};transform-origin:50% 60%`
-        : 'display:inline-block;transform-origin:50% 70%', box)
-      s.textContent = p.text
-      words.push({ span: s, at: line.start + (i++ / n) * span, pen: p.pen })
+        : 'display:inline-block', box)
+      const letters = chunks[wi++]
+      const w: Word = { span: s, at: line.start + (u / total) * span, pen: p.pen, chars: [] }
+      if (p.pen) { s.textContent = p.text; u++ }
+      else for (const g of letters) {
+        const c = el('span', 'display:inline-block;transform-origin:50% 80%;white-space:pre', s)
+        c.textContent = g
+        w.chars.push({ span: c, at: line.start + (u++ / total) * span })
+      }
+      words.push(w)
     }
     return { box, words }
   }
@@ -74,15 +87,21 @@ export class Typo {
     b.box.style.opacity = String(1 - out)
     b.words.forEach((w, i) => {
       const nextAt = b!.words[i + 1]?.at ?? line.end
-      const k = seg(t, w.at, w.at + 0.16)
       const active = t >= w.at && t < nextAt
-      w.span.style.opacity = String(clamp(k * 1.4))
-      const pop = w.pen ? ease.elastic(k) : ease.back(k)
-      w.span.style.transform = `translateY(${(1 - pop) * 26}px) scale(${0.86 + 0.14 * pop}) rotate(${w.pen ? -4 : 0}deg)`
-      if (!w.pen) {
-        w.span.style.color = active ? accent : color
-        w.span.style.textShadow = active && theme !== 'paper' ? `0 0 28px ${accent}66` : 'none'
+      if (w.pen) {
+        const k = seg(t, w.at, w.at + 0.16)
+        w.span.style.opacity = String(clamp(k * 1.4))
+        w.span.style.transform = `translateY(${(1 - ease.elastic(k)) * 26}px) scale(${0.86 + 0.14 * ease.elastic(k)}) rotate(-4deg)`
+        return
       }
+      for (const c of w.chars) {
+        const k = seg(t, c.at, c.at + CHAR_POP)
+        const pop = spring(k)
+        c.span.style.opacity = String(clamp(k * 4))
+        c.span.style.transform = `translateY(${(1 - pop) * 70}px) scale(${0.25 + 0.75 * pop})`
+      }
+      w.span.style.color = active ? accent : color
+      w.span.style.textShadow = active && theme !== 'paper' ? `0 0 28px ${accent}66` : 'none'
     })
   }
 
