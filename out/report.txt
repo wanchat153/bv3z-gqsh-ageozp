@@ -1,0 +1,2 @@
+run 43s: SPEAKERS ['Linda'] OK ['Linda'] 
+khanom_Linda 9.247347s
