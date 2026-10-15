@@ -6,11 +6,11 @@ import type { SceneDef } from '../types'
 const dot = (col: string) => `<span style="display:inline-block;width:38px;height:38px;border-radius:50%;background:${col};box-shadow:0 0 26px ${col};margin-right:26px;vertical-align:-6px"></span>`
 export default {
   theme: 'dark',
-  type: { pos: 'bottom', size: 46, width: 1560 },
+  type: { pos: 'bottom', size: 54, width: 1560 },
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 48; cam.updateProjectionMatrix()
-    const room = buildRoom(ctx, { ledScale: 1.9, gain: 1.6 }), fade = frameOverlay(ctx.dom)
+    const room = buildRoom(ctx, { ledScale: 1.5, gain: 1.3 }), fade = frameOverlay(ctx.dom)
     const row = (col: string, txt: string) => el('div', `opacity:0;margin-bottom:26px;font:700 56px/1.2 ${F.display};color:${C.white}`, panel, dot(col) + txt)
     const panel = el('div', 'position:absolute;right:130px;top:250px;padding:34px 46px 18px;border-radius:22px;background:rgba(12,14,19,.78)', ctx.dom)
     const rows = [row('#3CFF8F', 'เขียว  ปกติ'), row('#FFB020', 'เหลือง  เตือน'), row('#FF4D52', 'แดง  มีปัญหา')]

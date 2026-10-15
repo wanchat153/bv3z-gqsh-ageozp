@@ -5,7 +5,7 @@ import type { SceneDef } from '../types'
 
 export default {
   theme: 'dark',
-  type: { pos: 'bottom', size: 46, width: 1560 },
+  type: { pos: 'bottom', size: 54, width: 1560 },
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 62; cam.updateProjectionMatrix()
@@ -17,7 +17,7 @@ export default {
            <div style="position:absolute;right:-18px;top:24px;width:12px;height:30px;background:${C.white};border-radius:3px"></div></div>
          <div style="font:800 60px ${F.display};color:${C.white}">แบตเตอรี่สำรอง</div></div>`)
     const fill = bat.querySelector('#bfill') as HTMLElement
-    const out = el('div', `position:absolute;left:0;right:0;top:420px;text-align:center;font:800 120px ${F.display};color:${C.red};opacity:0;text-shadow:0 0 40px #FF4D52`, ctx.dom, 'ไฟดับ')
+    const out = el('div', `position:absolute;left:0;right:0;top:260px;text-align:center;font:800 120px ${F.display};color:${C.red};opacity:0;text-shadow:0 0 40px #FF4D52`, ctx.dom, 'ไฟดับ')
     const run = el('div', `position:absolute;right:120px;top:130px;opacity:0;font:700 54px ${F.display};color:#3CFF8F;text-shadow:0 0 24px #3CFF8F`, ctx.dom, 'เครื่องยังทำงานอยู่')
     return {
       update(f) {

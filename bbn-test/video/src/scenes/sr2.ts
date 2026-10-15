@@ -7,7 +7,7 @@ import type { SceneDef } from '../types'
 const K = 12, RZ = rackZ(K), U = 5
 export default {
   theme: 'dark',
-  type: { pos: 'bottom', size: 46, width: 1560 },
+  type: { pos: 'bottom', size: 54, width: 1560 },
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 58; cam.updateProjectionMatrix()
@@ -32,7 +32,7 @@ export default {
         bobbed(cam, t, -0.4, 1.55, z, 1.6, 1.3, lerp(z - 4, RZ, seg(t, 0, f.dur)), seg(t, 0, 0.8))
         room.update(f.t)
         place(cam, tRack, pRack, ease.out(seg(t, 1.0, 1.5)), -80, -6)
-        place(cam, tUnit, pUnit, ease.out(seg(t, 2.6, 3.1)), 40, -6)
+        place(cam, tUnit, pUnit, ease.out(seg(t, 2.6, 3.1)), -10, -6)
         big.style.opacity = String(ease.out(seg(f.p, 0.68, 0.8)))
         fade(t, f.t)
       },

@@ -15,7 +15,7 @@ const PAL: [number, number, number][] = [[0.24, 1.0, 0.56], [0.36, 0.55, 1.0], [
 export type Mix = [number, number, number]
 export const NORMAL_MIX: Mix = [0.45, 0.75, 0.93]
 
-export interface RoomOpts { ceiling?: boolean; fog?: boolean; ledScale?: number; gain?: number; bodyOpacity?: number }
+export interface RoomOpts { ceiling?: boolean; fog?: boolean; ledScale?: number; gain?: number; bodyOpacity?: number; bodyColor?: number; glow?: boolean }
 
 export function buildRoom(ctx: SceneCtx, o: RoomOpts = {}) {
   const { stage, root } = ctx
@@ -32,9 +32,10 @@ export function buildRoom(ctx: SceneCtx, o: RoomOpts = {}) {
   // ---- racks, faceplates, LEDs ----
   const racks: { s: number; z: number }[] = []
   for (const s of [-1, 1]) for (let k = 0; k < N; k++) if (!GAPS.has(k)) racks.push({ s, z: rackZ(k) })
-  const bodyMat = basic(0x0b0e14, o.bodyOpacity !== undefined ? { transparent: true, opacity: o.bodyOpacity, depthWrite: false } : {})
+  const bodyMat = basic(o.bodyColor ?? 0x0b0e14, o.bodyOpacity !== undefined ? { transparent: true, opacity: o.bodyOpacity, depthWrite: false } : {})
   const bodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.0, 2.4, 0.78), bodyMat, racks.length)
-  const plates = new THREE.InstancedMesh(new THREE.BoxGeometry(0.022, 0.17, 0.7), basic(0xffffff), racks.length * UNITS)
+  const platesMat = basic(0xffffff)
+  const plates = new THREE.InstancedMesh(new THREE.BoxGeometry(0.022, 0.17, 0.7), platesMat, racks.length * UNITS)
   plates.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(racks.length * UNITS * 3), 3)
   const LED_N = racks.length * UNITS * 3
   const ledGeo = new THREE.BoxGeometry(0.012, 0.026 * sc, 0.034 * sc)
@@ -50,7 +51,7 @@ export function buildRoom(ctx: SceneCtx, o: RoomOpts = {}) {
     for (let u = 0; u < UNITS; u++) {
       const y = unitY(u)
       dummy.position.set(r.s * (AISLE - 0.012), y, r.z); dummy.updateMatrix(); plates.setMatrixAt(pi, dummy.matrix)
-      const g = 0.05 + R() * 0.07
+      const g = 0.012 + R() * 0.03
       plates.instanceColor!.setXYZ(pi++, g, g * 1.04, g * 1.12)
       for (let j = 0; j < 3; j++) {
         dummy.position.set(r.s * (AISLE - 0.027), y, r.z + [-0.28, -0.2, 0.28][j]); dummy.updateMatrix(); leds.setMatrixAt(li, dummy.matrix)
@@ -92,7 +93,7 @@ export function buildRoom(ctx: SceneCtx, o: RoomOpts = {}) {
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(LEN, 3.2), basic(0x0a0d13))
     wall.rotation.y = Math.PI / 2; wall.position.set(s * 7, 1.6, (Z_NEAR + Z_FAR) / 2); root.add(wall)
     if (o.ceiling !== false) box(0.35, 0.06, LEN - 10, basic(0x1a2030), s * 2.1, 2.65, -28)
-    for (const k of GAPS) {
+    if (o.glow !== false) for (const k of GAPS) {
       const gl = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), basic(new THREE.Color(0.14, 0.3, 0.7)))
       gl.rotation.y = Math.PI / 2; gl.position.set(s * 6.95, 1.4, rackZ(k)); root.add(gl)
     }
@@ -118,6 +119,7 @@ export function buildRoom(ctx: SceneCtx, o: RoomOpts = {}) {
     setPower(k: number) {
       stripMat.color.copy(stripCol).multiplyScalar(k)
       floorMat.color.setScalar(0.18 + 0.82 * k)
+      platesMat.color.setScalar(0.3 + 0.7 * k)
     },
     /** blink the LEDs for time t; `mix` decides how many are green/blue/amber/red (amber/red pulse) */
     update(t: number, mix: Mix = NORMAL_MIX) {
@@ -140,7 +142,7 @@ export type Room = ReturnType<typeof buildRoom>
 /** Glowing data packets streaming along the ceiling, out of the room (towards +z). */
 export function addPackets(root: THREE.Group, count = 70) {
   const R = rng(21), span = 76
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.07, 0.28), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 1.7, 1.7) }), count)
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.055, 0.055, 0.24), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.45, 1.2, 1.2) }), count)
   mesh.frustumCulled = false
   const x = new Float32Array(count), y = new Float32Array(count), off = new Float32Array(count), sp = new Float32Array(count)
   for (let i = 0; i < count; i++) { x[i] = (R() - 0.5) * 3.4; y[i] = 2.3 + R() * 0.5; off[i] = R() * span; sp[i] = 5 + R() * 5 }
@@ -171,6 +173,7 @@ export function tag(parent: HTMLElement, text: string, color: string = C.accent,
 const _v = new THREE.Vector3()
 /** pin a DOM element above a 3D point (screen is 1920x1080); `op` is its opacity */
 export function place(cam: THREE.Camera, d: HTMLElement, p: THREE.Vector3, op: number, dx = 0, dy = 0) {
+  cam.updateMatrixWorld()
   _v.copy(p).project(cam)
   const behind = _v.z > 1
   d.style.opacity = String(behind ? 0 : clamp(op))

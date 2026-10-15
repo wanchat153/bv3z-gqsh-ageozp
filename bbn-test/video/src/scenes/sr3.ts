@@ -7,11 +7,11 @@ import type { SceneDef } from '../types'
 const COUNT = 260, RZ = rackZ(6)
 export default {
   theme: 'dark',
-  type: { pos: 'bottom', size: 46, width: 1560 },
+  type: { pos: 'bottom', size: 54, width: 1560 },
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 50; cam.updateProjectionMatrix()
-    const room = buildRoom(ctx, { ceiling: false, fog: false, bodyOpacity: 0.4 }), fade = frameOverlay(ctx.dom)
+    const room = buildRoom(ctx, { ceiling: false, fog: false, bodyOpacity: 0.6, bodyColor: 0x2a3446, glow: false }), fade = frameOverlay(ctx.dom)
     const tint = (x0: number, x1: number, col: THREE.Color, op: number) => {
       const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, 60), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthWrite: false }))
       m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.02, RZ); m.renderOrder = 3; ctx.root.add(m)

@@ -5,7 +5,7 @@ import type { SceneDef } from '../types'
 
 export default {
   theme: 'dark',
-  type: { pos: 'bottom', size: 46, width: 1560 },
+  type: { pos: 'bottom', size: 54, width: 1560 },
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 64; cam.updateProjectionMatrix()
