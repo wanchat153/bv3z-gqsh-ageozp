@@ -1,246 +1,312 @@
 'use strict';
-// ================= "ห้องสมุดห้ามเสียงดัง" — full 150 s timeline (pure function of t) =================
-const DUR = 150, PIVX = 170;
+// ================= "ดารุมะล้มไม่ลุก... ไม่ได้" — full 150 s timeline (pure function of t) =================
+const DUR = 150, RD = 140, DX0 = 745, CUSH = 430, PI = Math.PI;
 const ss = (a, b, x) => { const q = clamp((x - a) / (b - a)); return q * q * (3 - 2 * q); };
 function K(keys, t) { if (t <= keys[0][0]) return keys[0].slice(1); for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) { const a = keys[i - 1], b = keys[i], q = ss(a[0], b[0], t); return a.slice(1).map((v, j) => v + (b[j + 1] - v) * q); } return keys[keys.length - 1].slice(1); }
 const k1 = (keys, t) => K(keys, t)[0];
 const imp = (t, t0, a, tau) => (t < t0 ? 0 : a * Math.exp(-(t - t0) / tau) * ss(t0, t0 + 0.04, t));
 const arc = (t, t0, h, d) => (t > t0 && t < t0 + d ? h * Math.sin(Math.PI * (t - t0) / d) : 0);
-const lerpA = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const lerp2 = (a, b, q) => [a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q];
+const wnd = (a, b, t, e = 0.25) => ss(a, a + e, t) * (1 - ss(b - e, b, t));
 
-// ---------- alert / shadow from events ----------
-function flashAt(t) { let m = 0; for (const [te, , f] of EV) { if (f <= 0 || t < te) continue; const d = t - te, v = f * (d < 0.35 ? 1 : Math.exp(-(d - 0.35) / 0.4)); if (v > m) m = v; } return m; }
-function shockAt(t) { let m = 0; for (const [te, , f] of EV) { if (f < 0.5 || t < te) continue; const d = t - te; if (d > 3) continue; const v = f * Math.exp(-d / 1.1) * ss(te, te + 0.05, t); if (v > m) m = v; } return m; }
+// ---------- shock from events ----------
+function shockAt(t) { let m = 0; for (const [te, , f] of EV) { if (f < 0.25 || t < te) continue; const d = t - te; if (d > 2.5) continue; const v = f * Math.exp(-d / 0.9) * ss(te, te + 0.05, t); if (v > m) m = v; } return m; }
+const SHOCKS = EV.filter((e) => e[2] >= 0.25);
 
-// ---------- giant hand ----------
-const POSE = { open: [[0, 0, 0, 0, 0], 1, 0.8, 410], point: [[0.9, 0, 1.1, 1.1, 1.1], 0.2, 0.1, 400], pinch: [[0.55, 0.65, 0.2, 0.2, 0.2], 0.3, 0.2, 370], fist: [[0.9, 1.1, 1.1, 1.1, 1.1], 0, 0, 250] };
-const PI = Math.PI;
-const HSEG = [
-  { a: 14.8, b: 21.8, s: 1.5, alert: 1, pose: [[14.8, 'point']], tip: [[14.8, 1100, -250], [16.6, 660, 770], [20.4, 660, 770], [21.8, 1100, -250]], ang: [[14.8, PI * 0.72]], wag: [17.2, 20.6, 0.16, 2.6] },
-  { a: 33.0, b: 41.2, s: 1.35, alert: 1, pose: [[33, 'point']], tip: [[33, 700, -250], [34.0, 230, 840], [34.4, 230, 840], [35.4, 560, 850], [38.2, 560, 850], [41.2, 1000, -250]], ang: [[33, PI * 0.72], [35.4, PI * 0.76]], wag: [35.4, 38.4, 0.16, 2.6] },
-  { a: 45.8, b: 57.2, s: 1.5, alert: 1, pose: [[45.8, 'point'], [48.0, 'point'], [48.6, 'fist'], [55.0, 'fist'], [55.8, 'open']], tip: [[45.8, 560, -300], [47.0, 640, 700], [48.0, 640, 700], [49.0, 'S', -145], [54.6, 'S', -145], [55.4, 'S', -190], [57.2, 560, -400]], ang: [[45.8, PI / 2]], stick: true },
-  { a: 82.6, b: 88.4, s: 2.1, alert: 1, pose: [[82.6, 'open']], tip: [[82.6, 560, -500], [84.5, 560, 720], [87.0, 560, 720], [88.4, 560, -500]], ang: [[82.6, PI / 2]], sway: [84.5, 87, 0.04, 1.4] },
-  { a: 89.5, b: 104.4, s: 1.4, alert: 0.3, pose: [[89.5, 'pinch'], [99.8, 'pinch'], [100.1, 'point'], [100.6, 'point'], [101.2, 'open']],
-    tip: [[89.5, 820, -300], [91.0, 685, 1330], [91.9, 685, 1340], [92.6, 800, 1280], [93.0, 800, 1300], [93.6, 790, 1180], [94.2, 735, 1370], [94.7, 735, 1380], [95.5, 800, 1280], [95.9, 800, 1300], [96.5, 600, 1150], [97.2, 250, 1370], [97.7, 250, 1360], [98.6, 790, 1260], [99.0, 800, 1290], [99.6, 480, 1060], [100.0, 440, 1060], [100.9, 380, 1100], [101.4, 450, 1000], [104.4, 900, -300]], ang: [[89.5, PI * 0.5], [96, PI * 0.6], [100, PI * 0.55]] },
-  { a: 128.2, b: 143.2, s: 1.9, alert: 1, pose: [[128.2, 'fist'], [142.0, 'fist'], [143.2, 'open']], tip: [[128.2, 900, -400], [130.4, 540, 780], [139.2, 540, 790], [139.8, 540, 790], [140.1, 540, 1130], [143.2, 540, 1000]], ang: [[128.2, PI / 2]], shake: [131, 139.4, 5] },
-  { a: 143.2, b: 149.4, s: 1.4, alert: 0, pose: [[143.2, 'open']], tip: [[143.2, 820, -300], [144.0, 'S', -150], [147.4, 'S', -150], [149.4, 820, -300]], ang: [[143.2, PI / 2]], pat: [144.0, 147.2] },
-];
-function lerpPose(keys, t) {
-  let a = keys[0], b = keys[0], q = 0; for (let i = 1; i < keys.length; i++) { if (t >= keys[i][0]) { a = keys[i]; b = keys[i]; } else { a = keys[i - 1]; b = keys[i]; q = ss(a[0], b[0], t); break; } }
-  const A = POSE[a[1]], B = POSE[b[1]]; return { f: lerpA(A[0], B[0], q), spread: A[1] + (B[1] - A[1]) * q, thumbOut: A[2] + (B[2] - A[2]) * q, L: A[3] + (B[3] - A[3]) * q };
+// ---------- big daruma ----------
+function rockOne(r, t) { const t0 = r[0], type = r[1], a = r[2], tau = r[3], w = r[4]; if (t < t0) return 0; const d = t - t0, e = Math.exp(-d / tau); return type === 'k' ? a * e * Math.sin(w * d) * ss(t0, t0 + 0.03, t) : a * e * Math.cos(w * d); }
+function dTheta(t) { let cut = -1; for (const h of HOLD) { if (t >= h[0] && t < h[1]) return h[2] * ss(h[0], h[0] + h[3], t); if (t >= h[1]) cut = Math.max(cut, h[1] - 1e-6); } let s = 0; for (const r of ROCK) { if (r[0] < cut) continue; s += rockOne(r, t); } return s; }
+const DHOP = [[27.45, 14, 0.3], [37.0, 200, 0.95], [77.55, 70, 0.5], [84.45, 22, 0.3], [125.2, 24, 0.35]];
+const DSQ = [[0, 0], [21.7, 0], [21.86, 0.55], [22.5, 0.5], [22.62, 0], [76.34, 0], [76.46, 1], [77.35, 1], [77.55, -0.25], [77.95, 0], [101.9, 0], [102.35, 0.3], [102.7, 0], [150, 0]];
+const DSPIN = [[0, 0], [37.0, 0], [37.95, 2 * PI], [150, 2 * PI]];
+function dState(t) {
+  const th = dTheta(t); let hop = 0; for (const h of DHOP) hop += arc(t, h[0], h[1], h[2]); for (const h of HOLD) hop += arc(t, h[1], 24, 0.32);
+  const sq = k1(DSQ, t), sy = 1 - 0.4 * sq, sx = 1 + 0.32 * sq, spin = k1(DSPIN, t) % (2 * PI);
+  return { x: DX0 + RD * th, y: FL - RD * sy - hop, th: th + spin, sx, sy, sq, hop, th0: th };
 }
-function handAt(t, sam) {
-  for (const g of HSEG) {
-    if (t < g.a || t > g.b) continue;
-    const P = lerpPose(g.pose, t); let tx, ty;
-    const ks = g.tip.map((k) => [k[0], k[1] === 'S' ? sam.x : k[1], k[2] < 0 && k[1] === 'S' ? sam.y + k[2] : k[2]]); [tx, ty] = K(ks, t);
-    if (g.pat && t > g.pat[0] && t < g.pat[1]) ty += 26 * Math.abs(Math.sin((t - g.pat[0]) * 2 * PI * 0.85)) * -1 + 26;
-    if (g.shake && t > g.shake[0] && t < g.shake[1]) { tx += g.shake[2] * Math.sin(t * 52); ty += g.shake[2] * 0.6 * Math.sin(t * 41 + 1); }
-    let ang = k1(g.ang, t); if (g.wag && t > g.wag[0] && t < g.wag[1]) ang += g.wag[2] * Math.sin((t - g.wag[0]) * 2 * PI * g.wag[3] * 0.5) * ss(g.wag[0], g.wag[0] + 0.3, t) * ss(g.wag[1], g.wag[1] - 0.3, t);
-    if (g.sway && t > g.sway[0] && t < g.sway[1]) ang += g.sway[2] * Math.sin(t * g.sway[3]);
-    const d = [Math.cos(ang), Math.sin(ang)], L = P.L * g.s;
-    return { x: tx - d[0] * L, y: ty - d[1] * L, ang, s: g.s, f: P.f, spread: P.spread, thumbOut: P.thumbOut, tip: [tx, ty], alert: g.alert * ss(g.a, g.a + 1.2, t) * ss(g.b + 0.2, g.b - 1.2, t), seg: g };
-  }
-  return null;
+const dPt = (D, ang, f = 1) => [D.x + RD * f * D.sx * Math.cos(ang + D.th), D.y + RD * f * D.sy * Math.sin(ang + D.th)];
+
+// ---------- little daruma (shelf) ----------
+const MINI = [{ x: 745, r: 40 }, { x: 825, r: 36 }, { x: 897, r: 32 }, { x: 959, r: 28 }, { x: 1013, r: 24 }], BOARD = 1010;
+function mTheta(i, t) {
+  for (const h of MHOLD) if (h[0] === i && t >= h[1] && t < h[2]) return h[3] * ss(h[1], h[1] + h[4], t);
+  let cut = -1; for (const h of MHOLD) if (h[0] === i && t >= h[2]) cut = Math.max(cut, h[2] - 1e-6);
+  let s = 0; for (const r of MROCK) { if (r[0] !== i || r[1] < cut) continue; s += rockOne(r.slice(1), t); } return s;
 }
+function miniState(i, t) { const m = MINI[i], th = mTheta(i, t); return { x: m.x + m.r * th, y: BOARD - m.r, r: m.r, th }; }
+const RING_BIG = EV.filter((e) => e[1] === 'ting'), RING_MINI = [0, 1, 2, 3, 4].map((i) => EV.filter((e) => e[1] === 'mini' + i));
+function ringK(list, t, dur = 0.5) { let k = -1; for (const e of list) { const d = t - e[0]; if (d >= 0 && d < dur) k = d / dur; } return k; }
 
 // ---------- samurai ----------
-const SX = [[0, -170], [5, 470], [26, 470], [26.3, 470], [27.6, 100], [33.4, 100], [34.2, 100], [35.2, 470], [43, 470], [58, 470], [60, 520], [80, 520], [81, 520], [101, 520], [101.3, 120], [104.5, 120], [106.2, 300], [120, 300], [121.5, 170], [124, 170], [126, 300], [150, 300]];
-const ROTK = [[0, 0], [58, 0], [60, 0.04], [62, 0.14], [75.9, 0.16], [76.1, 0], [150, 0]];
-const IMPS = [[14.0, -0.2, 0.5], [31.7, -0.08, 0.3], [44.3, -0.15, 0.5], [76.0, -0.3, 0.6], [80.5, -0.4, 0.8], [101.2, -0.3, 0.3], [120.5, -0.45, 0.45], [125.8, -0.2, 0.5], [140.0, 0.12, 0.5]];
-const HOPS = [[14.0, 36, 0.4], [30.4, 14, 0.25], [31.7, 14, 0.25], [33.1, 26, 0.35], [44.3, 50, 0.45], [80.5, 70, 0.55], [92.9, 18, 0.3], [95.8, 26, 0.3], [98.9, 18, 0.3], [100.2, 30, 0.35], [120.5, 40, 0.4], [125.8, 50, 0.45]];
+const SX = [[0, -250], [2.7, CUSH], [12.0, CUSH], [13.0, 520], [14.0, 520], [14.6, 470], [15.0, 470], [15.35, -290], [15.9, -290], [16.9, 330], [19.2, 330], [19.5, -290], [20.2, -290], [21.4, 520], [23.0, 520], [23.2, 420], [23.55, 420], [23.9, -290], [24.5, -290], [25.4, 340], [25.9, 300], [27.0, 300], [27.4, 470], [29.3, 470], [30.0, 470], [30.3, -290], [30.9, -290], [31.8, 440], [33.8, 440], [34.0, 490], [45.0, 490], [45.3, -290], [45.85, -290], [46.9, 560], [47.9, 560], [48.5, 745], [51.8, 745], [53.3, CUSH], [57.5, CUSH], [57.8, -290], [58.4, -290], [59.2, 460], [72.0, 460], [77.5, 470], [78.0, 470], [78.5, 250], [79.1, 380], [79.6, 290], [80.1, 330], [84.0, 330], [84.2, 380], [84.45, 480], [85.0, 440], [87.0, 440], [89.2, 480], [120.5, 480]];
+const SX2 = [[119.5, 500], [120.0, 880], [121.4, 880], [121.7, 940], [123.2, 940], [123.4, 960], [124.6, 960], [125.0, 640], [125.7, 500], [128.6, 500], [129.0, 470], [135.0, 470], [137.0, 470], [138.0, 520], [141.0, 520], [142.4, 450], [150, 450]];
+// full path = SX until 119.5, SX2 afterwards. Acts 7-8 extra keys:
+const SX3 = [[87.0, 440], [89.2, 480], [106.2, 480], [107.1, 880], [107.4, 880], [110.4, 500], [119.5, 500]];
+function sxAt(t) { if (t >= 119.5) return k1(SX2, t); if (t >= 87.0) return k1(SX3, t); return k1(SX, t); }
+const SITW = [[3.0, 12.0], [27.7, 29.3], [48.6, 51.8], [53.3, 55.8], [70.2, 72.0], [89.3, 93.9], [111.2, 119.4], [137.0, 150]];
+const sitK = (t) => { let m = 0; for (const [a, b] of SITW) m = Math.max(m, ss(a, a + 0.45, t) * (1 - ss(b, b + 0.45, t))); return m; };
+const SLEEPW = [[4.0, 7.0], [8.7, 10.0], [55.4, 56.3], [91.8, 93.9], [143.0, 150]];
+const ROTK = [[0, 0], [90.3, 0], [91.0, 0.13], [93.9, 0.13], [94.45, -1.45], [98.2, -1.45], [99.4, 0], [150, 0]];
+const FLY = [{ a: 47.9, b: 48.5, p0: [560, FL], p1: [745, null], h: 90, spin: 0 }, { a: 51.8, b: 53.3, p0: [745, null], p1: [CUSH, FL - 20], h: 480, spin: -4 * PI }];
 function samAt(t) {
-  const x0 = k1(SX, t), sp = (k1(SX, t + 0.05) - k1(SX, t - 0.05)) / 0.1, mov = Math.abs(sp) > 8;
-  const lift = k1([[0, 0], [49.4, 0], [51.5, 360], [53.7, 360], [54.9, 0]], t);
-  let hop = 0; for (const h of HOPS) hop += arc(t, h[0], h[1], h[2]);
-  if (mov && lift < 1) hop += 7 + 6 * Math.abs(Math.sin(x0 * 0.045));
+  const x0 = sxAt(t), sp = (sxAt(t + 0.05) - sxAt(t - 0.05)) / 0.1, mov = Math.abs(sp) > 8;
+  const sit = sitK(t), Dd = SAMS * 1.58;
+  // pancake squash (stone lands on him) and re-inflate
+  const pan = ss(80.15, 80.24, t) * (1 - ss(82.0, 83.3, t)), wob = t > 83.3 ? 0.14 * Math.exp(-(t - 83.3) / 0.5) * Math.sin((t - 83.3) * 20) : 0;
   const sh = shockAt(t);
-  let rot = k1(ROTK, t); for (const i of IMPS) rot += imp(t, i[0], i[1], i[2]);
-  // sneeze build: head back, then forward lurch
-  const sn = ss(117.4, 120.4, t) * (t < 120.5 ? 1 : 0); rot += -0.12 * sn * 1 + 0.03 * Math.sin(t * 38) * sn;
-  const sit = k1([[0, 0], [105.8, 0], [106.8, 1], [117.0, 1], [118, 0.2], [150, 0]], t);
-  const burst = t > 120.5 ? Math.exp(-(t - 120.5) / 0.3) : 0;
-  const sy = 1 - 0.17 * sit + 0.1 * sn - 0.2 * burst - 0.06 * sh + 0.012 * Math.sin(t * 2.1), sx = 1 + 0.1 * sit - 0.08 * sn + 0.18 * burst + 0.05 * sh;
-  const Dd = SAMS * 1.58 * sy, strain = ss(60, 62, t) * (1 - ss(75.9, 76.1, t)) + 0.5 * sn;
-  const shake = strain * 3 * Math.sin(t * 34) + (t > 125.8 && t < 128 ? 3 * Math.sin(t * 40) : 0) + (t > 131 && t < 140 ? 2.5 * Math.sin(t * 36) : 0) * 0.5;
-  const walk = lift > 1 ? t * 9 : (mov ? x0 * 0.045 : null);
-  const x = x0 + shake + Dd * Math.sin(rot), y = FL - Dd * Math.cos(rot) - hop - lift;
-  const wob = 0;
-  return { x, y, ground: FL - lift, S: SAMS, face: -1, sx, sy, rot, wob: 0.01, sw: { mode: 'none' }, band: { a: 1, wind: 0.25 + 0.7 * sh + 0.4 * strain + (mov ? 0.5 : 0) }, a: 1, walk, w: Math.max(sh * 0.9, burst * 1, sn * 0.6, strain * 0.2), sneeze: 0, kick: 0, cold: 0, sad: 0, sweat: Math.min(1, 0.7 * sh + 0.6 * strain), strain, shock: sh, sit, sn, burst, lift, x0 };
+  let hop = 0; for (const e of SHOCKS) hop += arc(t, e[0], 14 + 26 * e[2], 0.34);
+  hop += arc(t, 85.1, 40, 0.34) + arc(t, 85.5, 40, 0.34) + arc(t, 85.9, 40, 0.34) + arc(t, 120.0, 150, 0.5) + arc(t, 121.7, 150, 0.5) + arc(t, 123.3, 160, 0.5);
+  hop += arc(t, 76.6, 46, 0.36) + arc(t, 84.2, 12, 0.25);
+  let rot = k1(ROTK, t); for (const e of SHOCKS) rot += imp(t, e[0], -0.2 * e[2], 0.5);
+  for (const [a, b] of SLEEPW) rot += 0.11 * wnd(a, b, t, 0.4) * (1 + 0.2 * Math.sin(t * 1.7));
+  rot += 0.16 * wnd(111.8, 119.2, t, 0.5) * 0;   // resting beside the cat
+  const strain = wnd(25.6, 27.0, t, 0.3) + 0.8 * wnd(20.4, 21.5, t, 0.3) + 0.8 * wnd(46.0, 47.0, t, 0.3) + 0.6 * wnd(72.3, 73.5, t, 0.3) + wnd(129.0, 134.3, t, 0.4) * 0.6;
+  // lift (what he stands/sits on)
+  let gy = FL; const cr = crateAt(t); if (t >= 48.5 && t < 51.8 && cr) gy = cr.bot - 360 + 8; else if (sit > 0.3 && x0 > 330 && x0 < 570) gy = FL - 20 * sit;
+  const sy = (1 - 0.17 * sit + 0.04 * Math.sin(t * 2.1)) * (1 - 0.86 * pan) + wob, sx = (1 + 0.1 * sit) * (1 + 0.8 * pan) - wob * 0.5;
+  const D2 = Dd * (1 - 0.17 * sit) * (1 - 0.86 * pan);
+  let x = x0 + D2 * Math.sin(rot), y = gy - D2 * Math.cos(rot) - hop, rr = rot;
+  // jitter while straining
+  x += strain * 2.5 * Math.sin(t * 34);
+  // flights (jump onto the crate, rodeo launch)
+  const Dsit = Dd * (1 - 0.17 * sit);
+  if (t >= 47.9 && t <= 48.5) { const q = ss(0, 1, (t - 47.9) / 0.6), gnd = FL + (FL - 360 + 8 - FL) * q; x = 560 + 185 * q; y = gnd - Dsit - 90 * Math.sin(PI * q); }
+  if (t >= 51.8 && t <= 53.3) { const c0 = crateAt(51.8), q = (t - 51.8) / 1.5, g0 = c0.bot - 360 + 8, g1 = FL - 20, e = ss(0, 1, q); x = 745 + (CUSH - 745) * e; y = g0 + (g1 - g0) * e - Dsit - 480 * Math.sin(PI * q); rr = -4 * PI * e; }
+  // rodeo sway on the crate
+  if (t >= 48.6 && t < 51.8 && cr) { const en = wnd(48.7, 51.7, t, 0.3); rr += (0.07 + 0.09 * ss(49.5, 51.5, t)) * Math.sin(t * 11) * en; x = cr.x + 14 * Math.sin(t * 9) * en; }
+  const walk = mov ? x0 * 0.045 : null;
+  const sweat = Math.min(1, 0.7 * sh + 0.6 * Math.min(1, strain));
+  return { x, y, ground: y + D2 * Math.cos(rr), S: SAMS, face: -1, sx, sy, rot: rr, wob: 0.01, sw: { mode: 'none' }, band: { a: 1, wind: 0.25 + 0.6 * sh + 0.4 * Math.min(1, strain) + (mov ? 0.6 : 0) }, a: 1, walk, w: 0, sneeze: 0, kick: 0, cold: 0, sad: 0, sweat, strain: Math.min(1, strain), shock: sh, sit, x0, pan, gy };
 }
+// mouth opening windows [a, b, peak]
+const MOUTHW = [[1.5, 2.5, 0.9], [20.4, 21.4, 0.4], [23.1, 23.9, 0.9], [27.4, 28.0, 0.9], [37.0, 38.0, 1], [50.4, 51.4, 1], [51.8, 53.0, 1], [66.9, 67.4, 0.8], [76.4, 77.2, 0.8], [80.2, 80.9, 1], [84.6, 86.2, 0.9], [94.3, 95.0, 1], [99.0, 100.2, 1], [120.0, 124.0, 0.8], [129.5, 131.5, 0.8], [141.0, 142.0, 0.8]];
+const mouthAt = (t) => { let m = 0; for (const [a, b, p] of MOUTHW) if (t > a && t < b) m = Math.max(m, p * Math.sin(PI * (t - a) / (b - a))); return m; };
 
-// ---------- props & world state ----------
-const BOOK0 = { fall0: 13.0, land: 14.0, x: 685, y: FL - 14 };
-const FB = [ // shelf books that fall: [landing t, shelf-local start (x,y), floor x, rot]
-  { te: 60.8, sx: 70, sy: 560, fx: 140, r: 0.3 }, { te: 62.3, sx: 120, sy: 780, fx: 215, r: -0.4 }, { te: 64.0, sx: 205, sy: 330, fx: 290, r: 0.5 }, { te: 66.1, sx: 255, sy: 1000, fx: 95, r: -0.25 }];
-const TILT = [[0, 0], [58, 0], [60.5, -0.03], [66, -0.09], [75.9, -0.12], [76.2, -0.12], [76.8, 0.045], [77.6, -0.02], [78.3, 0.01], [79.2, 0], [150, 0]];
-function tiltAt(t) { let a = k1(TILT, t); if (t > 62 && t < 76) a += 0.004 * Math.sin(t * 30); return a; }
-function shelfPt(lx, ly, tilt) { const dx = lx - PIVX, dy = ly - FL, c = Math.cos(tilt), s = Math.sin(tilt); return [PIVX + dx * c - dy * s, FL + dx * s + dy * c]; }
-const GONG_REST = [250, FL - 46];
-function gongAt(t, tilt) { // returns {x,y,rot,onShelf}
-  const top = shelfPt(170, 196, tilt);
-  if (t < 79.8) { const tee = ss(77.0, 79.6, t); const wob = t > 77.0 ? 0.18 * Math.sin((t - 77) * 6) * ss(77, 78, t) : 0; return { x: top[0] + 130 * tee * 0.55, y: top[1], rot: wob + tilt, onShelf: true, tee }; }
-  const e = shelfPt(170, 196, 0); const sx = e[0] + 130 * 0.55, sy = e[1];
-  if (t < 80.5) { const q = (t - 79.8) / 0.7, q2 = q * q; return { x: sx + (GONG_REST[0] - sx) * q, y: sy + (GONG_REST[1] - sy) * q2, rot: 6 * q, onShelf: false }; }
-  const d = t - 80.5, bounce = d < 0.9 ? 24 * Math.abs(Math.sin(d * 3.4)) * Math.exp(-d * 2.2) : 0;
-  return { x: GONG_REST[0] + 70 * ss(80.5, 81.4, t), y: GONG_REST[1] - bounce, rot: 6 + 0.1 * Math.sin(d * 18) * Math.exp(-d * 1.6), onShelf: false, rolling: d < 1.2 };
+// ---------- eyes ----------
+const SEW = [ // [a, b, props, look]
+  [4.0, 6.95, { closed: 1, squeeze: 0.2 }], [8.7, 9.95, { closed: 1, squeeze: 0.2 }], [7.8, 8.6, { open: 0.5 }], [10.1, 10.8, { wide: 0.9 }], [11.0, 13.1, { angry: 0.7, open: 0.55 }],
+  [13.7, 14.8, { happy: 0.8 }], [18.9, 19.5, { angry: 0.4, open: 0.6 }], [27.6, 29.0, { open: 0.45, dizzy: 1 }], [34.0, 35.4, { angry: 0.4, open: 0.65 }], [38.0, 40.5, { open: 0.5 }], [43.6, 44.9, { open: 0.45 }],
+  [55.2, 56.3, { closed: 1, squeeze: 0.3 }], [56.3, 57.4, { angry: 0.6, open: 0.6 }], [76.6, 77.4, { happy: 0.9 }], [91.8, 93.8, { closed: 1, squeeze: 0.3 }], [96.2, 98.0, { open: 0.4 }], [131.0, 134.5, { closed: 1, squeeze: 1 }], [143.0, 150, { closed: 1, squeeze: 0.3 }], [139.0, 142.5, { happy: 0.5 }],
+];
+function samEyesAt(t, sam, g, D, C) {
+  const P = [g.X(-0.16, 0.26), g.X(0.46, 0.26)];
+  let tg = [D.x, D.y - 40];
+  if ((t >= 6.5 && t < 7.5) || (t >= 9.5 && t < 10.5) || (t >= 28 && t < 29) || (t >= 55.5 && t < 57) || (t >= 93.5 && t < 95)) tg = [C.x, C.y - 60];
+  if (t >= 73.6 && t < 76.4) tg = [sam.x + 40 * Math.sin(t), -300]; if (t >= 77.6 && t < 80.2) tg = [sam.x, -300];
+  if (t >= 59.4 && t < 66) { const b = ballAt(t); tg = [b.x, b.y]; }
+  if (t >= 100.5 && t < 107) tg = [C.x, C.y - 100]; if (t >= 107.0 && t < 111) tg = [C.x, C.y]; if (t >= 116.3 && t < 129) tg = [870, BOARD - 60];
+  if (t >= 111 && t < 116.2) tg = [C.x, C.y - 40];
+  let ov = {}; for (const [a, b, o] of SEW) if (t >= a && t < b) ov = Object.assign({}, ov, o);
+  return P.map((p) => { const dx = tg[0] - p[0], dy = tg[1] - p[1], l = Math.hypot(dx, dy) || 1;
+    return Object.assign({ open: 0.9 - 0.05 * Math.sin(t * 3), wide: 0.4 + 0.55 * sam.shock, sad: 0.5 * sam.strain, look: [clamp(dx / l * 1.05, -1, 1), clamp(dy / l * 1.05, -1, 1)], closed: 0, squeeze: Math.min(1, sam.strain * 1.1), happy: 0, angry: 0 }, ov); });
 }
-function hornAt(t) { // desk top -> floor, bounces; carried by the hand 94.2-95.9 into the box
-  const x0 = 790, y0 = FL - 74 - 26;
-  if (t < 43.2) return { x: x0, y: y0, r: 0, sq: 0, vis: 1 };
-  if (t < 44.3) { const q = (t - 43.2) / 1.1; const px = x0 + (735 - x0) * ss(0, 1, q); const py = q < 0.2 ? y0 : y0 + (FL + 14 - y0) * Math.pow((q - 0.2) / 0.8, 2); return { x: px, y: py, r: -2.6 * q, sq: 0, vis: 1 }; }
-  if (t < 94.2) { const d = t - 44.3; let by = 0, sq = 0; if (d < 0.45) { by = 60 * Math.sin(Math.PI * d / 0.45); sq = d < 0.08 ? 1 - d / 0.08 : 0; } else if (d < 0.8) { by = 28 * Math.sin(Math.PI * (d - 0.45) / 0.35); } return { x: 735 + 14 * ss(0, 0.8, d), y: FL + 14 - by, r: -2.6 + 0.1 * Math.min(d, 0.8), sq: (d < 0.1 ? 0.5 : 0) + (Math.abs(d - 0.45) < 0.05 ? 0.4 : 0), vis: 1 }; }
-  return { x: 749, y: FL + 14, r: -2.52, sq: 0, vis: 1, hand: true };
-}
-const CARRY = { book: [[91.2, 92.9, 685, FL - 14, 800, FL - 30]], horn: [[94.5, 95.9, 749, FL + 14, 800, FL - 30]], gong: [[97.3, 98.9, GONG_REST[0], GONG_REST[1], 800, FL - 50]] };
-function carried(t, name, hand) { for (const [a, b] of CARRY[name].map((c) => [c[0], c[1]])) { if (t >= a && t <= b && hand) return hand.tip; } return null; }
-function boxX(t) { return 800 + 600 * (1 - ss(88.8, 89.8, t)); }
 
 // ---------- cat ----------
-function catAt(t) {
-  let x = 880, y = FL - 90, rot = 0, wide = 0.12, sleep = 0, look = [0.3, 0.1];
-  const swat = ss(42.9, 43.15, t) * (1 - ss(43.15, 43.7, t)); x -= 26 * swat; rot -= 0.08 * swat;
-  if (t > 43.2 && t < 47.5) { wide = 0.25; look = [-0.4, 0.8]; }
-  if (t >= 124.4) { const q = ss(124.4, 125.8, t); const b = boxX(t); const pk = Math.sin(Math.PI * clamp((t - 124.4) / 1.4)) * 190; x = 880 + (b + 10 - 880) * q; y = (FL - 90) + (FL - 8 - 8 - (FL - 90)) * q - pk; }
-  if (t > 125.8) { wide = 0.6 * Math.exp(-(t - 125.8) / 2); look = [0, -0.6]; }
-  if (t > 128.5 && t < 143) wide = 0.9;
-  if (t >= 147) sleep = ss(147, 148.6, t);
-  const gaze = (t < 100 || t > 120) ? look : [-0.5, 0.5];
-  return { x, y, rot, wide, sleep, look: gaze };
+const CX = [[0, 1000], [13.1, 1000], [13.45, 1035], [14.7, 1035], [15.0, 1000], [40.6, 1000], [41.0, 965], [43.6, 965], [44.0, 1000], [150, 1000]];
+const CATLEAP = [[13.1, 45, 0.35], [14.7, 20, 0.3], [40.6, 40, 0.4], [43.6, 40, 0.4], [53.0, 90, 0.45], [76.4, 40, 0.3], [94.4, 24, 0.3]];
+const SWAT = [6.9, 9.9, 28.6, 41.2, 41.5, 41.8, 42.1, 42.4, 56.0, 60.5, 61.2, 62.8, 64.6, 93.95];
+function swatAt(t) { let k = 0; for (const t0 of SWAT) { const wind = ss(t0 - 0.45, t0 - 0.08, t) * (1 - ss(t0 - 0.08, t0 - 0.02, t)) * -0.25, hit = ss(t0 - 0.08, t0 + 0.06, t) * (1 - ss(t0 + 0.12, t0 + 0.55, t)); k += wind + hit; } return clamp(k, -0.3, 1); }
+function catAt(t, D, sam) {
+  let x = k1(CX, t), up = 0, rot = 0, sleep = 0, wide = 0.12, sqx = 1, sqy = 1, tail = 0.12;
+  for (const l of CATLEAP) up += arc(t, l[0], l[1], l[2]);
+  const sw = swatAt(t);
+  x -= 22 * Math.max(0, sw); rot -= 0.07 * Math.max(0, sw);
+  let y = FL; let ridden = false;
+  if (t >= 100.9 && t < 101.6) { const q = ss(100.9, 101.5, t); sqy = 1 - 0.22 * q; sqx = 1 + 0.12 * q; }
+  if (t >= 101.6 && t < 102.3) { const q = (t - 101.6) / 0.7, top = dPt(dState(102.3), -PI / 2, 0.97); x = 1000 + (top[0] - 1000) * ss(0, 1, q); y = FL + (top[1] - FL) * ss(0, 1, q) - 150 * Math.sin(PI * q); rot = -0.5 * (1 - q); sqy = 1.12; sqx = 0.92; ridden = true; }
+  if (t >= 102.3 && t < 106.4) { const top = dPt(D, -PI / 2, 0.97); x = top[0]; y = top[1] + 16; rot = D.th * 0.85; ridden = true; wide = 0.4; }
+  if (t >= 106.4 && t < 107.2) { const q = (t - 106.4) / 0.8, a = dPt(dState(106.4), -PI / 2, 0.97), b = [880, FL - 190]; x = a[0] + (b[0] - a[0]) * ss(0, 1, q); y = a[1] + (b[1] - a[1]) * ss(0, 1, q) - 70 * Math.sin(PI * q) + 110 * q * q; rot = 0.8 * q; ridden = true; wide = 0.9; }
+  if (t >= 107.2 && t < 110.8) { x = sam.x + 128; y = sam.y + 150 + 3 * Math.sin(t * 5); rot = 0.12; ridden = true; sleep = ss(107.4, 108.2, t); wide = 0.1; }
+  if (t >= 110.8) { x = CUSH - 85; y = FL - 20; sleep = 1; ridden = true; sqy = 1 - 0.02 * Math.sin(t * 2.2); }
+  if (t >= 125.4 && t < 138.6) { sleep = 1 - ss(125.4, 125.9, t); wide = 0.7 * ss(125.4, 126.2, t); }
+  if (t >= 138.6) sleep = ss(138.6, 139.8, t);
+  if (!ridden) { y = FL - up; if (t > 44.0 && t < 100.9 || true) { } }
+  let look = [-0.7, 0.1];
+  if (t >= 59 && t < 66.5) { const b = ballAt(t); look = [clamp((b.x - x) / 200, -1, 1), clamp((b.y - y) / 200, -1, 1) + 0.2]; }
+  if (t > 72 && t < 90) wide = 0.3; if (t >= 76.2 && t < 82) wide = 0.7; if (t >= 12.5 && t < 15.5) wide = 0.6; if (t >= 36.8 && t < 38.5) wide = 0.8; if (t >= 52.8 && t < 54) wide = 0.9;
+  return { x, y, rot, sleep, wide, look, sw, sqx, sqy, tail };
 }
+const CATY = -2;   // pose origin -> floor calibration (checked on stills)
 
-// ---------- drawing: props ----------
-function inkRect(c, x, y, w, h, fill, r = 0) { c.beginPath(); if (r) { c.roundRect(x, y, w, h, r); } else c.rect(x, y, w, h); c.fillStyle = fill; c.fill(); c.strokeStyle = INKC; c.lineWidth = 4.5; c.lineJoin = 'round'; c.stroke(); }
-function drawBook(c, x, y, rot, open, flap, sc = 1) {
-  c.save(); c.translate(x, y); c.rotate(rot); c.scale(sc, sc);
-  if (open) {
-    c.fillStyle = '#7A3B2E'; c.strokeStyle = INKC; c.lineWidth = 4.5; c.lineJoin = 'round'; c.beginPath(); c.rect(-84, -52, 168, 108); c.fill(); c.stroke();
-    c.fillStyle = '#F3EAD6'; c.beginPath(); c.moveTo(0, -46); c.lineTo(-76, -42); c.lineTo(-76, 48); c.lineTo(0, 52); c.closePath(); c.fill(); c.stroke();
-    c.beginPath(); c.moveTo(0, -46); c.lineTo(76, -42); c.lineTo(76, 48); c.lineTo(0, 52); c.closePath(); c.fill(); c.stroke();
-    c.strokeStyle = 'rgba(40,30,20,0.35)'; c.lineWidth = 3; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-64, -26 + i * 18); c.lineTo(-12, -24 + i * 18); c.moveTo(12, -24 + i * 18); c.lineTo(64, -26 + i * 18); c.stroke(); }
-    if (flap > 0.01) { const a = flap * Math.PI; const px = 76 * Math.cos(a); c.fillStyle = '#FBF4E2'; c.strokeStyle = INKC; c.lineWidth = 4; c.beginPath(); c.moveTo(0, -46); c.lineTo(px, -42 - 26 * Math.sin(a)); c.lineTo(px, 48 - 26 * Math.sin(a)); c.lineTo(0, 52); c.closePath(); c.fill(); c.stroke(); }
-  } else {
-    inkRect(c, -60, -20, 120, 40, '#8C3B2E', 3); c.fillStyle = '#F3EAD6'; c.fillRect(-52, -8, 104, 5); c.fillRect(-52, 4, 104, 5);
-  }
-  c.restore();
+// ---------- props ----------
+function crateAt(t) {
+  if (t < 47.1 || t > 53.3) return null;
+  if (t < 47.5) { const x0 = sxAt(47.1), q = ss(47.1, 47.5, t); return { x: x0 + (745 - x0) * q, bot: (FL - 330) + 330 * q * q, rot: 0.25 * (1 - q), air: 1 }; }
+  if (t < 51.8) { const hop = arc(t, 48.9, 40, 0.4) + arc(t, 50.3, 90, 0.55) + arc(t, 51.6, 170, 0.5); const tilt = 0.05 * Math.sin(t * 13) * (hop > 1 ? 1 : 0) + 0.2 * (t > 51.6 ? Math.sin(PI * (t - 51.6) / 0.5) : 0); return { x: 745, bot: FL - hop, rot: tilt, air: 0 }; }
+  const q = (t - 51.8) / 1.5; return { x: 745 + 900 * q, bot: FL - 380 * Math.sin(PI * Math.min(1, q) * 0.9) + 90 * q * q, rot: 7 * q, air: 1 };
 }
-function drawBell(c, x, y, rot, swing) {
-  c.save(); c.translate(x, y); c.rotate(rot);
-  inkRect(c, -9, 12, 18, 52, '#7A5A3A', 6); c.beginPath(); c.moveTo(-44, 14); c.quadraticCurveTo(-40, -44, 0, -50); c.quadraticCurveTo(40, -44, 44, 14); c.closePath(); c.fillStyle = '#C9A24A'; c.fill(); c.strokeStyle = INKC; c.lineWidth = 4.5; c.stroke();
-  c.fillStyle = 'rgba(255,240,190,0.6)'; c.beginPath(); c.ellipse(-16, -14, 6, 14, 0.4, 0, 7); c.fill();
-  c.fillStyle = INKC; c.beginPath(); c.arc(swing * 14, 24, 8, 0, 7); c.fill(); c.restore();
+function drawCrate(c, x, bot, rot) {
+  c.save(); c.translate(x, bot); c.rotate(rot); const w = 390, h = 360;
+  c.fillStyle = '#A57B4A'; c.fillRect(-w / 2, -h, w, h); c.strokeStyle = INKC; c.lineWidth = 6; c.strokeRect(-w / 2, -h, w, h);
+  c.fillStyle = '#8A6038'; c.fillRect(-w / 2, -h, w, 34); c.strokeRect(-w / 2, -h, w, 34);
+  c.strokeStyle = 'rgba(60,38,20,0.6)'; c.lineWidth = 4; for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(-w / 2, -h + 34 + (h - 34) * i / 4); c.lineTo(w / 2, -h + 34 + (h - 34) * i / 4); c.stroke(); }
+  c.lineWidth = 7; c.beginPath(); c.moveTo(-w / 2 + 14, -h + 40); c.lineTo(w / 2 - 14, -14); c.moveTo(w / 2 - 14, -h + 40); c.lineTo(-w / 2 + 14, -14); c.stroke();
+  c.fillStyle = '#3A2A1C'; for (const [px, py] of [[-170, -h + 17], [170, -h + 17], [-170, -22], [170, -22]]) { c.beginPath(); c.arc(px, py, 7, 0, 7); c.fill(); } c.restore();
 }
-function drawHorn(c, x, y, rot, sq) {
-  c.save(); c.translate(x, y); c.rotate(rot); c.scale(1 + 0.25 * sq, 1 - 0.3 * sq);
-  c.beginPath(); c.moveTo(-14, -6); c.lineTo(66, -34); c.lineTo(66, 34); c.lineTo(-14, 6); c.closePath(); c.fillStyle = '#C9A24A'; c.fill(); c.strokeStyle = INKC; c.lineWidth = 4.5; c.stroke();
-  c.beginPath(); c.ellipse(-30, 0, 34, 28, 0, 0, 7); c.fillStyle = REDC2; c.fill(); c.stroke(); c.fillStyle = 'rgba(255,220,210,0.55)'; c.beginPath(); c.ellipse(-40, -10, 8, 12, 0.5, 0, 7); c.fill(); c.restore();
+const BALL = [ // [t0, t1, x0, y0, x1, y1, h]
+  [59.4, 60.5, 520, FL - 38, 950, FL - 38, 0], [60.5, 61.2, 950, FL - 38, 950, FL - 38, 0], [61.2, 61.75, 950, FL - 38, 905, FL - 60, 6], [61.75, 62.5, 905, FL - 60, 955, FL - 38, 30], [62.5, 62.8, 955, FL - 38, 955, FL - 38, 0],
+  [62.8, 63.35, 955, FL - 38, 905, FL - 110, 18], [63.35, 64.5, 905, FL - 110, 950, FL - 38, 60], [64.5, 64.6, 950, FL - 38, 950, FL - 38, 0], [64.6, 65.05, 950, FL - 38, 900, FL - 160, 10], [65.05, 66.0, 900, FL - 160, 800, 1050, 140], [66.0, 66.9, 800, 1050, 470, 1018, 120],
+  [66.9, 67.6, 470, 1018, 320, FL - 38, 90], [67.6, 68.6, 320, FL - 38, 250, FL - 38, 0], [68.6, 200, 250, FL - 38, 250, FL - 38, 0]];
+function ballAt(t) {
+  if (t < 59.4) return { x: sxAt(t) + 95, y: FL - 150, rot: 0, vis: t >= 58.9 };
+  for (const b of BALL) if (t >= b[0] && t < b[1]) { const q = (t - b[0]) / (b[1] - b[0]); return { x: b[2] + (b[4] - b[2]) * q, y: b[3] + (b[5] - b[3]) * q - b[6] * Math.sin(PI * q) * 1.4, rot: q * 5 + b[0] * 3, vis: true }; }
+  return { x: 250, y: FL - 38, rot: 0, vis: true };
 }
-function drawGong(c, x, y, rot, stand) {
-  c.save(); c.translate(x, y); c.rotate(rot);
-  if (stand) { c.strokeStyle = INKC; c.fillStyle = '#6B4F33'; c.lineWidth = 4.5; c.fillRect(-4, 0, 8, 56); c.strokeRect(-4, 0, 8, 56); }
-  const g = c.createRadialGradient(-12, -14, 4, 0, 0, 50); g.addColorStop(0, '#F2D98A'); g.addColorStop(1, '#B08A35'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 48, 0, 7); c.fill(); c.strokeStyle = INKC; c.lineWidth = 5; c.stroke();
-  c.strokeStyle = 'rgba(90,60,20,0.55)'; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 32, 0, 7); c.stroke(); c.fillStyle = '#8A6A25'; c.beginPath(); c.arc(0, 0, 11, 0, 7); c.fill(); c.stroke(); c.restore();
+function threadPts(t) { const b = ballAt(t), a0 = [985, FL - 14], pts = [], dist = Math.hypot(b.x - a0[0], b.y - a0[1]); for (let i = 0; i <= 16; i++) { const u = i / 16; pts.push([a0[0] + (b.x - a0[0]) * u, Math.min(FL - 6, a0[1] + (b.y - a0[1]) * u + (40 + 0.12 * dist) * Math.sin(PI * u))]); } return pts; }
+const sandCapK = (t) => k1([[0, 0], [37.3, 0], [37.8, 1], [40.2, 1], [40.8, 0], [42.6, 0], [43.0, 1], [44.9, 1], [45.2, 0], [150, 0]], t);
+
+// ---------- hands ----------
+function handsAt(t, sam, g, D, C) {
+  const rel = (dx, dy) => [sam.x + dx, sam.y + dy], R0 = g.X(-1.36, 0.88), L0 = g.X(1.36, 0.88), q = (a, b) => ss(a, b, t);
+  let L = null, R = null;
+  if (t >= 12.6 && t < 14.1) { const tp = ss(12.6, 13.1, t); R = lerp2(R0, dPt(D, -2.55, 0.92), tp); L = lerp2(L0, dPt(D, -2.1, 0.96), tp); if (t > 13.9) { const b = ss(13.9, 14.1, t); R = lerp2(R, rel(40, 20), b); L = lerp2(L, rel(52, 22), b); } }
+  else if (t >= 14.0 && t < 14.6) { const p = Math.abs(Math.sin((t - 14.0) * 18)); R = rel(40 + 22 * p, 22); L = rel(86 - 18 * p, 22); }
+  if (t >= 16.0 && t < 17.0) { R = rel(-95, -75); L = rel(95, -75); } else if (t >= 17.0 && t < 17.5) { R = rel(150, -120); L = rel(115, -145); }
+  if (t >= 20.3 && t < 21.4) { R = rel(-105, -75); L = rel(105, -75); } else if (t >= 21.4 && t < 21.9) { R = rel(150, -120); L = rel(110, -140); }
+  if (t >= 24.6 && t < 25.5) { R = rel(120, 30); L = rel(90, 40); }
+  if (t >= 25.5 && t < 27.4) { const pull = q(25.6, 26.2); R = rel(110 - 10 * pull, 10); L = rel(80 - 10 * pull, 30); }
+  if (t >= 27.4 && t < 28.0) { R = rel(120, 10); L = rel(100, 30); }
+  if (t >= 31.0 && t < 32.0) { R = rel(125, 40); L = rel(95, 55); } else if (t >= 32.0 && t < 32.6) { const sw_ = q(32.0, 32.3); R = rel(125 + 30 * sw_, 40 - 90 * sw_); L = rel(95 + 30 * sw_, 55 - 80 * sw_); }
+  if (t >= 33.9 && t < 36.2) { const pt = Math.max(0, Math.sin((t - 34.2) * 2 * PI / 0.4)); const m = [DX0 - 95, FL - 70]; R = [m[0] + 10, m[1] - 30 - 40 * pt]; L = [m[0] - 60, m[1] + 10 - 30 * pt]; }
+  if (t >= 36.2 && t < 37.0) { R = rel(60, 60); L = rel(40, 70); }
+  if (t >= 45.9 && t < 47.1) { R = rel(-105, -75); L = rel(105, -75); } else if (t >= 47.1 && t < 47.6) { R = rel(150, -110); L = rel(110, -130); }
+  if (t >= 49.2 && t < 51.8) { const wv = Math.sin(t * 10); R = rel(-70, -95 + 6 * wv); L = rel(110 + 20 * wv, -150 - 40 * Math.abs(wv)); }
+  if (t >= 51.8 && t < 53.3) { R = rel(-120, -120); L = rel(120, -130); }
+  if (t >= 58.5 && t < 59.5) { R = rel(120, 55); L = rel(88, 70); } else if (t >= 59.5 && t < 60.0) { R = rel(150, 80); L = rel(110, 90); }
+  if (t >= 66.8 && t < 69.9) { R = rel(95, 5 + 6 * Math.sin(t * 25)); L = rel(100, 40 + 5 * Math.sin(t * 23)); }
+  if (t >= 72.4 && t < 73.1) { R = rel(-105, -75); L = rel(105, -75); } else if (t >= 73.1 && t < 73.8) { const u = q(73.1, 73.6); R = rel(-105, -75 - 10 * u); L = rel(105, -75 - 10 * u); } else if (t >= 73.8 && t < 74.3) { R = rel(-60, -190); L = rel(60, -190); }
+  if (t >= 76.5 && t < 77.4) { const cheer = Math.abs(Math.sin((t - 76.5) * 9)); R = rel(-90, -120 - 30 * cheer); L = rel(90, -120 - 30 * cheer); }
+  if (t >= 80.6 && t < 81.0) { R = rel(-130, -100); L = rel(130, -100); }
+  if (t >= 84.0 && t < 84.45) { R = rel(-110, 30); L = rel(110, 30); } if (t >= 84.6 && t < 86.4) { R = rel(-30, 150); L = rel(40, 100); }
+  if (t >= 90.3 && t < 93.9) { R = rel(-120, 80); L = rel(120, 70); }
+  if (t >= 94.5 && t < 98.0) { const a = q(95.2, 95.8) * (1 - q(97.0, 97.5)); R = rel(-130 - 30 * a, 60 - 190 * a); L = rel(130, 60); }
+  if (t >= 100.5 && t < 106.4) { const wv = Math.sin(t * 7); R = rel(-130, -20 + 15 * wv); L = rel(130, -20 - 15 * wv); }
+  if (t >= 106.4 && t < 107.2) { R = rel(-130, 30); L = rel(150, 60); } if (t >= 107.2 && t < 110.8) { R = rel(70, 60); L = rel(30, 70); }
+  if (t >= 110.8 && t < 116.0) { const u = q(110.8, 111.4); R = lerp2(rel(70, 60), R0, u); L = lerp2(rel(30, 70), L0, u); }
+  if (t >= 116.0 && t < 119.8) { R = rel(-115, 30); L = rel(115, 30); } if (t >= 119.8 && t < 125.0) { const j = Math.max(arc(t, 120.0, 1, 0.5), arc(t, 121.7, 1, 0.5), arc(t, 123.3, 1, 0.5)); R = rel(-150, 40 - 280 * j); L = rel(150, 40 - 280 * j); }
+  if (t >= 125.0 && t < 129.0) { R = dPt(D, -2.7, 0.9); L = dPt(D, -2.2, 0.95); }
+  if (t >= 129.0 && t < 134.4) { R = rel(-70, -130); L = rel(70, -130); }
+  if (t >= 138.0 && t < 140.4) { const u = q(138.2, 139.1) * (1 - q(139.6, 140.2)); L = lerp2(L0, [DX0 - 38, D.y - 48], u); }
+  return [L, R];
 }
-function drawBox(c, x, y, t, items) {
-  const jig = (t > 125.8 && t < 128 ? 4 * Math.sin(t * 50) * Math.exp(-(t - 125.8) / 1.0) : 0);
-  c.save(); c.translate(x + jig, y);
-  if (items.book) drawBook(c, -40, -48, 0.15, false, 0); if (items.horn) drawHorn(c, 40, -44 - (jig ? 8 : 0), -0.4, 0); if (items.gong) drawGong(c, 0, -62, 0.1, false);
-  inkRect(c, -115, -36, 230, 112, '#9A7448', 4); c.strokeStyle = 'rgba(60,38,20,0.5)'; c.lineWidth = 3; for (const yy of [-6, 22, 50]) { c.beginPath(); c.moveTo(-112, yy); c.lineTo(112, yy); c.stroke(); }
-  c.fillStyle = '#6B4F33'; c.fillRect(-115, -36, 230, 12); c.strokeRect(-115, -36, 230, 12); c.restore();
-}
-function drawChest(c, t) {
-  const ex = k1([[0, 0], [34.9, 0], [36.1, 1], [37.0, 1], [37.5, 0]], t), cx = 620, cy = FL - 52;
-  c.save(); c.translate(cx, cy);
-  inkRect(c, -76, -52, 152, 104, '#9A7448', 3);
-  c.fillStyle = '#3A2A1C'; if (ex > 0.02) c.fillRect(-64, -40, 128, 26 + 8 * ex);
-  const dh = 40 + 18 * ex, dyy = 2 + 12 * ex, dw = 136 + 16 * ex; inkRect(c, -dw / 2, dyy, dw, dh, '#B08A58', 3); c.fillStyle = INKC; c.beginPath(); c.arc(0, dyy + dh / 2, 6, 0, 7); c.fill(); c.restore();
-}
-function drawRope(c, p0, p1, slack) { const mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2 + slack; c.save(); c.strokeStyle = '#7A5A3A'; c.lineWidth = 8; c.lineCap = 'round'; c.beginPath(); c.moveTo(p0[0], p0[1]); c.quadraticCurveTo(mx, my, p1[0], p1[1]); c.stroke(); c.strokeStyle = INKC; c.lineWidth = 2.5; c.setLineDash([8, 6]); c.beginPath(); c.moveTo(p0[0], p0[1]); c.quadraticCurveTo(mx, my, p1[0], p1[1]); c.stroke(); c.restore(); }
-function dust(c, x, y, k, a = 1, r = 14) { if (k <= 0 || k >= 1) return; c.save(); for (let i = 0; i < 6; i++) { const dir = i < 3 ? -1 : 1, d = k * (30 + 16 * (i % 3)) , px = x + dir * d * (0.8 + 0.3 * (i % 3)), py = y - 8 * (i % 3) - k * 20, rr = r * (0.7 + k * 1.2 + 0.2 * (i % 3)); c.fillStyle = `rgba(250,246,236,${0.7 * a * (1 - k)})`; c.beginPath(); c.arc(px, py, rr, 0, 7); c.fill(); } c.restore(); }
-const DUSTS = [[14.0, 685, FL - 6], [44.3, 735, FL + 20], [54.9, 470, FL + 8], [61, 140, FL], [62.5, 215, FL], [64.2, 290, FL], [66.3, 95, FL], [80.5, 250, FL], [92.9, 800, FL - 10], [122.4, 420, FL + 4], [125.8, 800, FL - 10]];
-function motes(c, t) { c.save(); c.globalCompositeOperation = 'lighter'; for (let i = 0; i < 16; i++) { const x = 300 + 480 * hash(i, 1) + 30 * Math.sin(t * 0.4 + i), y = 500 + 760 * ((hash(i, 2) + t * 0.01 * (0.4 + hash(i, 3))) % 1), a = 0.25 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 2)); c.fillStyle = `rgba(255,236,190,${a})`; c.beginPath(); c.arc(x, y, 2.5 + 2 * hash(i, 4), 0, 7); c.fill(); } c.restore(); }
 
 // ---------- render ----------
-function drawShelfAndGong(c, t, tilt, gong) {
-  c.save(); c.translate(PIVX, FL); c.rotate(tilt); c.translate(-PIVX, -FL); bookshelf(c, -20, 240, 360, FL - 240, 1);
-  c.fillStyle = '#3A2A1C'; for (const b of FB) if (t > b.te - 0.78) c.fillRect(b.sx - 2, b.sy, 30, 112);
-  if (gong.onShelf && gong.tee === 0) drawGong(c, 170, 196, 0, true);
-  c.restore();
-  if (gong.onShelf && gong.tee > 0) drawGong(c, gong.x, gong.y, gong.rot, false);
-}
+function ringsAt(c, x, y, k, big = 1) { tingRings(c, x, y, k, big); }
+function dustAt(c, t) { for (const [td, x, y] of [[13.7, 840, FL - 8], [22.62, 560, FL - 6], [27.45, 600, FL - 8], [47.5, 745, FL - 8], [53.3, 430, FL - 10], [80.2, 330, FL - 8], [94.5, 300, FL - 8], [53.0, 1000, FL - 8]]) dust(c, x, y, (t - td) / 0.6, 1); }
 function renderStory(t) {
-  const sam = samAt(t), tilt = tiltAt(t), gong = gongAt(t, tilt), HND = handAt(t, sam), horn = hornAt(t), cat = catAt(t), flash = flashAt(t);
-  const alert = Math.max(flash, HND ? HND.alert : 0), shadow = Math.min(1, Math.max(HND ? 0.55 * HND.alert : 0, 0.5 * flash, k1([[0, 0], [79.9, 0], [80.6, 0.9], [86, 0.9], [89, 0.2], [90, 0]], t)));
-  const g = samGeom(sam, t), SHR = g.X(-0.85, 0.5), SHLf = g.X(0.85, 0.5);
-  const reach = (sh, h, mx = 1.15 * SAMS) => { const dx = h[0] - sh[0], dy = h[1] - sh[1], l = Math.hypot(dx, dy); return l > mx ? [sh[0] + dx / l * mx, sh[1] + dy / l * mx] : h; };
-  // ---- grips ----
-  let R = g.X(-1.36, 0.88), Lh = g.X(1.36, 0.88), item = null, itemR = 0;   // R = screen-right hand (face=-1 mirrors g.X)
-  const ig = [sam.x + 175, sam.y + 20];
-  // book reading (act 1)
-  if (t >= 5.6 && t < 13.0) { const pop = ss(5.6, 6.2, t), sh = 12.4 < t ? 3 * Math.sin(t * 40) * ss(12.4, 12.8, t) : 0; R = [ig[0] + sh, ig[1] + 22 + 40 * (1 - pop) + sh]; item = ['book', { open: 1, flap: t > 7.8 && t < 8.4 ? ss(7.8, 8.3, t) : 0, sc: pop }]; }
-  // bell
-  if (t >= 27.3 && t < 36.9) { const wipe = t > 28.0 && t < 30.2 ? Math.sin((t - 28) * 18) * 14 : 0, ring = (t > 30.4 && t < 31.3) ? 1 : (t > 31.7 && t < 32.6) ? 1 : 0, pk = ss(27.3, 28, t); R = [ig[0] + (t < 34 ? 0 : 0), ig[1] - 40 * pk + wipe * 0.6]; item = ['bell', { rot: 0.05 * Math.sin((t - 30.4) * 30) * ring + 0.12 * (wipe / 14), swing: Math.sin(t * 30) * ring }];
-    if (t > 34.2 && t < 35.3) R[1] -= 10 * Math.abs(Math.sin(t * 20)); if (t > 35.2 && t < 36.9) R = [sam.x + 190, sam.y + 55]; }
-  // drawer push (hand at the drawer front while it closes)
-  if (t >= 37.0 && t < 37.8) { R = [sam.x + 190, sam.y + 62]; }
-  // horn carry etc. handled by hand
-  // rope (act 5-6): left hand holds the rope end
-  const ropeOn = t >= 58.8 && t < 76.0;
-  const shTop = shelfPt(335, 262, tilt);
-  if (ropeOn) { Lh = reach(SHLf, [sam.x - 170, sam.y + 20 + 8 * Math.sin(t * 34) * ss(62, 64, t)]); }
-  // sneeze lurch and reading book (act 8)
-  let reading = false;
-  if (t >= 106.4 && t < 121.2) { reading = true; const pop = ss(106.4, 107.1, t); R = [sam.x + 170, sam.y + 24 + 40 * (1 - pop)]; item = ['book', { open: 1, flap: (t > 110.8 && t < 111.4) ? ss(110.8, 111.3, t) : (t > 113.8 && t < 114.4) ? ss(113.8, 114.3, t) : 0, sc: pop }]; }
-  R = reach(SHR, R); Lh = reach(SHLf, Lh);
-  // eyes
-  const eyeP = [g.X(-0.16, 0.26), g.X(0.46, 0.26)];
-  let tg = [540, 700]; if (t < 5) tg = [540, 700]; else if (t < 12) tg = (t > 8 && t < 11) ? [560, 700] : [sam.x + 170, sam.y + 20]; else if (t > 13 && t < 14.9) tg = [BOOK0.x, BOOK0.y];
-  if (HND) tg = HND.tip; else if (t > 43.1 && t < 46) tg = [horn.x, horn.y]; else if (t >= 24 && t < 26) tg = [BOOK0.x, BOOK0.y]; else if (t >= 106 && t < 121) tg = [sam.x + 170, sam.y + 30]; else if (t >= 76 && t < 80.3) tg = [gong.x, gong.y]; else if (t >= 80.3 && t < 82.5) tg = [GONG_REST[0], GONG_REST[1]]; else if (t >= 125 && t < 128) tg = [cat.x, cat.y];
-  else if (t >= 58 && t < 76) tg = shTop; else if (t >= 15 && t < 33) tg = [540, 700];
-  const eyes = eyeP.map((p) => { const dx = tg[0] - p[0], dy = tg[1] - p[1], l = Math.hypot(dx, dy) || 1; const happy = t > 145.4 ? ss(145.4, 146.4, t) : 0; const closed = (sam.strain > 0.55 && sam.shock < 0.1) ? 1 : 0; const sneezeClose = (t > 120.3 && t < 121.0) ? 1 : 0; return { open: 0.9 - 0.3 * sam.sn, wide: 0.4 + 0.55 * sam.shock, sad: 0.5 * Math.min(1, sam.strain), look: [clamp(dx / l * 1.05, -1, 1), clamp(dy / l * 1.05, -1, 1)], closed: Math.max(closed, sneezeClose), squeeze: Math.min(1, sam.strain * 1.1 + (t > 120.3 && t < 121 ? 1 : 0)), happy }; });
-  const CAMC = [540, 960, 1];
-  const takeBook = (t >= 91.2 && t <= 92.9), takeHorn = (t >= 94.2 && t <= 95.9), takeGong = (t >= 97.2 && t <= 98.9);
-  const hit = HND ? HND.tip : null;
-  composeFrame(CAMC, {
+  const D = dState(t), sam = samAt(t), g = samGeom(sam, t), C = catAt(t, D, sam), cr = crateAt(t);
+  const H = handsAt(t, sam, g, D, C), eyes = samEyesAt(t, sam, g, D, C);
+  const SHR = g.X(-0.85, 0.5), SHL = g.X(0.85, 0.5), reach = (sh, h, mx = 1.15 * SAMS) => { if (!h) return h; const dx = h[0] - sh[0], dy = h[1] - sh[1], l = Math.hypot(dx, dy); return l > mx ? [sh[0] + dx / l * mx, sh[1] + dy / l * mx] : h; };
+  let Lh = H[0] ? reach(SHL, H[0]) : null, Rh = H[1] ? reach(SHR, H[1]) : null;
+  const hands = (Lh || Rh) ? [Lh || g.X(1.36, 0.88), Rh || g.X(-1.36, 0.88)] : null;
+  // ---- daruma face ----
+  const dEx = { lx: 0, ly: 0, brow: 0, mad: 0, mouth: 0.35, o: 0, squeeze: 0, dizzy: 0, sleepy: 0, eyeL: ss(139.2, 139.7, t), blink: 0 };
+  { let tg = [sam.x, sam.y - 60]; if (t >= 6.4 && t < 7.6 || t >= 9.4 && t < 10.6 || t >= 28.3 && t < 29.3 || t >= 55.8 && t < 57) tg = [C.x, C.y - 60]; if (t >= 59.4 && t < 66.5) { const b = ballAt(t); tg = [b.x, b.y]; } if (t >= 73.4 && t < 76.4) tg = [D.x, -300]; if (t >= 77.5 && t < 80.2) tg = [sam.x, sam.y]; if (t >= 116.3 && t < 129) tg = [870, BOARD - 60];
+    const vx = tg[0] - D.x, vy = tg[1] - D.y, l = Math.hypot(vx, vy) || 1, ux = vx / l, uy = vy / l, cth = Math.cos(D.th), sth = Math.sin(D.th); dEx.lx = ux * cth + uy * sth; dEx.ly = -ux * sth + uy * cth; }
+  if (Math.abs(D.th0) > 0.75 && !(t >= 129 && t < 134.5)) dEx.squeeze = 1; if (D.sq > 0.3) dEx.squeeze = 1;
+  if (t >= 6.9 && t < 8.2) { dEx.brow = 0.5; dEx.mouth = 0.8; } if (t >= 9.9 && t < 11.4) { dEx.brow = 0.5; dEx.mouth = 1; }
+  if (t >= 14.4 && t < 16.0) { dEx.mouth = 1; dEx.brow = 0.6; } if (t >= 18.9 && t < 20.2) { dEx.mad = 1; dEx.brow = -0.2; dEx.mouth = -0.6; dEx.squeeze = 0; }
+  if (t >= 22.6 && t < 24) { dEx.mouth = 1; dEx.brow = 0.6; } if (t >= 27.4 && t < 29.5) { dEx.mouth = 1; dEx.brow = 0.6; dEx.squeeze = 0; } if (t >= 33.0 && t < 36.5) { dEx.mad = 0.6; dEx.mouth = -0.3; } if (t >= 36.2 && t < 37.0) dEx.squeeze = 1;
+  if (t >= 37.8 && t < 39.2) { dEx.dizzy = 1; dEx.mouth = 0.8; } if (t >= 51.9 && t < 53.4) { dEx.mouth = 1; dEx.brow = 0.8; } if (t >= 55.6 && t < 57.3) { dEx.mad = 0.7; dEx.mouth = -0.2; dEx.squeeze = 0; }
+  if (t >= 66.9 && t < 69) { dEx.mouth = 1; dEx.brow = 0.5; } if (t >= 73.5 && t < 76.4) { dEx.o = 1; dEx.brow = 1; dEx.mouth = 0; } if (t >= 77.55 && t < 79) { dEx.mouth = 1; dEx.brow = 0.8; dEx.squeeze = 0; dEx.o = 0; }
+  if (t >= 80.2 && t < 84) { dEx.mouth = 1; dEx.brow = 0.7; } if (t >= 84.5 && t < 86.5) { dEx.mouth = 1; dEx.brow = 0.6; } if (t >= 94.0 && t < 96) { dEx.mouth = 1; dEx.brow = 0.5; }
+  if (t >= 101.6 && t < 106.4) { dEx.mouth = 0.8; dEx.o = 0; } if (t >= 116.2 && t < 129) { dEx.mouth = 0.6; dEx.brow = 0.4; } if (t >= 129 && t < 134.5) { dEx.mad = 1; dEx.brow = -0.3; dEx.mouth = -0.5; dEx.o = 0; dEx.squeeze = 0; }
+  if (t >= 134.5 && t < 139.2) { dEx.mouth = 0.2; dEx.brow = 0.3; } if (t >= 139.6) { dEx.mouth = 1; } if (t >= 141.2) dEx.sleepy = ss(141.2, 142.4, t);
+  const bp = (t * 0.31 + 0.13) % 1; if (bp < 0.035) dEx.blink = Math.sin(bp / 0.035 * PI);
+  const Dd = Object.assign({ r: RD }, D, { ex: dEx });
+  const flashBlanket = t >= 17.5 && t < 18.7 ? 1 : 0;
+
+  composeFrame([540, 960, 1], {
     noHalo: true,
     pre: (cx) => {
-      wallBG(cx, t); floorBG(cx); drawShelfAndGong(cx, t, tilt, gong); readingDesk(cx, 880, FL + 6); drawChest(cx, t); motes(cx, t);
-      noiseSign(cx, 540, 700, 66, alert, t);
-      paperShadow(cx, sam.x0 ?? sam.x, FL + 8, 150, 0.6 * (sam.lift > 5 ? 0.3 : 1));
-      // floor objects
-      if (!(t >= 5.6 && t < 13.0)) { /* none */ }
-      if (t >= 14.0 && !takeBook && t < 91.2) drawBook(cx, BOOK0.x, BOOK0.y, 0.12, true, 0, 0.6);
-      else if (t >= 13.0 && t < 14.0) { const q = (t - 13.0), y = sam.y + 20 + (BOOK0.y - sam.y - 20) * q * q; drawBook(cx, sam.x + 175 + (BOOK0.x - sam.x - 175) * q, y, 0.12 * q + 0.8 * (1 - q) * 0, true, 0, 0.6 + 0.4 * (1 - q)); }
-      if (t < 27.3) drawBell(cx, 250, FL - 24, 0, 0);
-      // fallen shelf books on the floor
-      FB.forEach((b, i) => { if (t < b.te) return; if (i === 0 && t >= 106.4 && t < 121.2) return; if (i === 0 && t >= 121.2) { const q = clamp((t - 121.2) / 1.2); if (q < 1) drawBook(cx, sam.x + 170 + (420 - sam.x - 170) * q, sam.y + 24 - 260 * Math.sin(Math.PI * q) + (FL - 14 - sam.y - 24) * q * q, b.r + 6 * q, true, 0, 0.6); else drawBook(cx, 420, FL - 14, 0.2, true, 0, 0.6); return; } drawBook(cx, b.fx, FL - 12, b.r, false, 0, 1); });
-      // box and its items
-      const bx = boxX(t); if (bx < 1300) drawBox(cx, bx, FL + 55, t, { book: t > 92.9, horn: t > 95.9, gong: t > 98.9 });
-      // gong on the floor / falling, horn
-      if (!gong.onShelf && !takeGong && !(t > 98.9)) drawGong(cx, gong.x, gong.y, gong.rot, false);
-      if (!takeHorn && t < 95.9) drawHorn(cx, horn.x, horn.y, horn.r, horn.sq);
-      // falling shelf books
-      FB.forEach((b) => { const d = b.te - t; if (d > 0 && d < 0.78) { const q = 1 - d / 0.78, p0 = shelfPt(b.sx, b.sy, tilt), x = p0[0] + (b.fx - p0[0]) * q, y = p0[1] + (FL - 12 - p0[1]) * q * q; drawBook(cx, x, y, b.r * q * 6, false, 0, 1); } });
-      DUSTS.forEach(([td, x, y]) => dust(cx, x, y, (t - td) / 0.6, 1));
+      wallBG(cx, t); floorBG(cx); sunbeam(cx); motes(cx, t);
+      // floor shadows
+      paperShadow(cx, D.x, FL + 6, RD * 1.1, 0.5 * (1 - Math.min(1, D.hop / 120)));
+      paperShadow(cx, sam.x0, FL + 8, 150, sam.pan > 0.5 ? 0.5 : 0.55 * (sam.y > FL - 120 ? 1 : 0.4));
+      if (t < 107.2 || t > 110.8) paperShadow(cx, C.x, FL + 8, 110, 0.5 * (C.y > FL - 10 ? 1 : 0.3));
+      cushion(cx, CUSH, FL + 4, sam.sit > 0.3 && sam.x0 > 330 && sam.x0 < 570 ? sam.sit : (t >= 110.8 ? 0.35 : 0));
+      // blanket heap
+      if (t >= 19.4 && t < 22) blanketFlat(cx, 870, FL + 2, 0.08, 0.7);
+      // shadow of the dropped stone
+      if (t >= 74.6 && t < 76.4) { const k = ss(74.6, 76.4, t); cx.save(); cx.globalCompositeOperation = 'multiply'; cx.fillStyle = `rgba(60,42,28,${0.55 * k})`; cx.beginPath(); cx.ellipse(DX0, FL + 10, 30 + 150 * k, 10 + 24 * k, 0, 0, 7); cx.fill(); cx.restore(); }
+      if (t >= 78.3 && t < 80.2) { const k = ss(78.3, 80.15, t), sx_ = k1([[78.3, DX0], [78.7, 520], [79.6, 290], [80.15, 330]], t); cx.save(); cx.globalCompositeOperation = 'multiply'; cx.fillStyle = `rgba(60,42,28,${0.55 * k})`; cx.beginPath(); cx.ellipse(sx_, FL + 10, 30 + 140 * k, 10 + 22 * k, 0, 0, 7); cx.fill(); cx.restore(); }
+      // little daruma on the shelf
+      for (let i = 0; i < 5; i++) { const m = miniState(i, t); const sing = t >= 116.3 && t < 134.6; const sl = t >= 141.2 ? ss(141.2, 143, t) : 0;
+        daruma(cx, { x: m.x, y: m.y, r: m.r, th: m.th, ex: { lx: -0.5, ly: 0.3, mouth: 0.5, o: sing && ringK(RING_MINI[i], t, 0.3) >= 0 ? 0.7 : 0, eyeL: 1, sleepy: sl, mad: t >= 129 && t < 134.5 ? 0.8 : 0, brow: t >= 116.3 && t < 129 ? 0.4 : 0 } }, t); }
+      for (let i = 0; i < 5; i++) { const m = miniState(i, t), k = ringK(RING_MINI[i], t, 0.4); if (k >= 0) tingRings(cx, m.x + m.r * 0.8, m.y - m.r * 0.9, k, 0.5); }
     },
     ink: () => {},
     chars: (cx) => {
-      drawCat(cx, Object.assign(mochi(cat.x, cat.y, 1.6, t, cat.wide), { rot: cat.rot, e: { sleep: cat.sleep, open: 1, wide: cat.wide, look: cat.look, dil: 0.4 + 0.5 * cat.wide, sparkle: 1 } }), t);
+      // ----- daruma (+ things covering it) -----
+      const covered = (t >= 47.45 && t < 51.8);
+      daruma(cx, Dd, t);
+      { const kb = ringK(RING_BIG, t, 0.5); if (kb >= 0 && !covered) tingRings(cx, D.x + RD * 0.8, D.y - RD * 0.95, kb, 1); }
+      // rope loop on the belly (act 2)
+      if (t >= 25.5 && t < 30.0) { const bp_ = dPt(D, PI * 0.95, 0.98), hand = (hands ? hands[1] : g.X(-1.36, 0.88)); const slack = t < 27.0 ? 6 : 50; rope(cx, bp_, t < 27.4 ? [hand[0], hand[1]] : [sam.x + 100, FL - 30], slack);
+        cx.save(); cx.translate(D.x, D.y); cx.rotate(D.th); cx.strokeStyle = '#7A5A3A'; cx.lineWidth = 11; cx.beginPath(); cx.ellipse(0, RD * 0.38, RD * 0.97, RD * 0.2, 0, 0.05, PI - 0.05); cx.stroke(); cx.strokeStyle = INKC; cx.lineWidth = 2.5; cx.setLineDash([8, 6]); cx.stroke(); cx.restore(); }
+      // blanket draped over the daruma
+      if (t >= 17.5 && t < 18.7) blanket(cx, D.x, D.y + 6, RD, D.th, 0.5 + 0.4 * Math.sin(t * 25) * (t > 17.9 ? 1 : 0));
+      else if (t >= 18.7 && t < 19.4) { const q = ss(18.7, 19.4, t); blanket(cx, D.x + 125 * q, D.y + 6 + 22 * q * q * 5, RD, D.th + 0.9 * q, 0.5, 1 - 0.0 * q); }
+      // sand mound (act 3)
+      { const h = t < 37.0 ? k1([[32.3, 0], [34.0, 100]], t) * (t > 36.2 ? 1 + 0.03 * Math.sin(t * 40) : 1) : (t < 41.0 ? 22 : (t < 49 ? 22 : 0)); if (h > 1) sandMound(cx, DX0 + (t > 36.2 && t < 37.0 ? 4 * Math.sin(t * 50) : 0), FL + 4, h, 150 + (h - 22) * 0.4); }
+      // crate (act 4)
+      if (cr && !(t < 47.1)) drawCrate(cx, cr.x, cr.bot, cr.rot);
+      // ----- cat (drawn after the samurai while he carries her) -----
+      const carried = t >= 107.2 && t < 110.8;
+      const drawMochi = () => { cx.save(); if (C.sqx !== 1 || C.sqy !== 1) { cx.translate(C.x, C.y + CATY); cx.scale(C.sqx, C.sqy); cx.translate(-C.x, -(C.y + CATY)); }
+        drawCat(cx, Object.assign(mochi(C.x, C.y + CATY, 1.6, t, { rot: C.rot, swat: C.sw, sleep: C.sleep, wide: C.wide, look: C.look, tail: C.tail }), {}), t); cx.restore(); };
+      if (!carried) drawMochi();
+      // ----- ball and thread (act 5) -----
+      if (t >= 58.9 && t < 72) { const b = ballAt(t), fade = 1 - ss(71, 72, t); cx.save(); cx.globalAlpha = fade; if (t >= 59.4) thread(cx, threadPts(t)); yarnBallD(cx, b.x, b.y, b.rot); cx.restore(); }
+      // ----- samurai -----
       samLegs(cx, sam, t); samInk(cx, sam, t, 0.5); samOver(cx, Object.assign({}, sam, { band: { a: 0 }, e: { a: 0 }, sweat: 0, a: 0.28 }), t);
       samBand(cx, sam, t); samEyes(cx, sam, t, eyes[0], eyes[1]);
-      if (sam.w > 0.08) { const m = g.X(0.16, 0.74), o = 0.3 + 0.9 * sam.w; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.12, SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#5A1410'; cx.beginPath(); cx.ellipse(0, SAMS * 0.012, SAMS * 0.092, SAMS * 0.078 * o, 0, 0, 7); cx.fill(); cx.restore(); }
-      samArms(cx, sam, t, [Lh, R], 0.17);
-      // held item
-      if (item) { const [n, o] = item; const px = R[0] + 8, py = R[1] - 30; if (n === 'book') drawBook(cx, px, py - 6, -0.06, true, o.flap, o.sc); else if (n === 'bell') drawBell(cx, px, py - 10, o.rot, o.swing); }
-      if (ropeOn) drawRope(cx, shTop, Lh, 14 * (1 - ss(62, 63, t)));
-      if (t >= 76.0 && t < 77.6) { const w = Math.exp(-(t - 76) / 0.3) * 40; cx.save(); cx.strokeStyle = '#7A5A3A'; cx.lineWidth = 8; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(Lh[0], Lh[1]); cx.quadraticCurveTo(Lh[0] - 30, Lh[1] - 40 - w, Lh[0] - 60, Lh[1] - 90 + w * Math.sin(t * 30)); cx.stroke(); cx.beginPath(); cx.moveTo(shTop[0], shTop[1]); cx.quadraticCurveTo(shTop[0] + 10, shTop[1] + 80, shTop[0] + 20 * Math.sin(t * 14), shTop[1] + 160); cx.stroke(); cx.restore(); }
-      // items carried by the giant hand
-      if (hit) { if (takeBook) drawBook(cx, hit[0], hit[1], 0.2, true, 0, 0.6); if (takeHorn) drawHorn(cx, hit[0], hit[1], -0.5, t > 95.5 ? 0.4 : 0); if (takeGong) drawGong(cx, hit[0], hit[1], 0.3, false); }
+      const mw = mouthAt(t); if (mw > 0.08) { const m = g.X(0.16, 0.74), o = 0.3 + 0.9 * mw; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.12, SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#5A1410'; cx.beginPath(); cx.ellipse(0, SAMS * 0.012, SAMS * 0.092, SAMS * 0.078 * o, 0, 0, 7); cx.fill(); cx.restore(); }
+      if (carried) drawMochi();
+      // tangled in the yarn (act 5): red turns around the body and a taut thread to the daruma
+      if (t >= 67.6 && t < 70.0) { const a_ = ss(67.6, 68.0, t), j = 3 * Math.sin(t * 28); cx.save(); cx.globalAlpha = a_; for (const [dx, dy, ex_, ey] of [[-125, 20, 125, -24], [-120, -10, 122, 36], [-110, 50, 115, 4]]) thread(cx, [[sam.x + dx, sam.y + dy + j], [sam.x + ex_, sam.y + ey - j]], REDC2, 5); thread(cx, [[sam.x + 118, sam.y + 4], dPt(D, PI * 0.93, 0.98)], REDC2, 5); cx.restore(); }
+      samArms(cx, sam, t, hands, 0.17);
+      // sleep bubble from the face
+      { const m = g.X(0.62, 0.44); let br = 0; if (t >= 4.2 && t < 7.0) br = 8 + 50 * ss(4.2, 6.9, t) + 3 * Math.sin(t * 2.4); else if (t >= 9.0 && t < 10.0) br = 8 + 44 * ss(9.0, 9.95, t); else if (t >= 55.0 && t < 56.1) br = 6 + 36 * ss(55.0, 56.0, t); else if (t >= 92.0 && t < 93.9) br = 8 + 40 * ss(92.0, 93.8, t); else if (t >= 143.4 && t < 149.0) br = 8 + 40 * ss(143.4, 148.6, t) + 3 * Math.sin(t * 2.4);
+        bubble(cx, m[0] - 20 - br * 1.05, m[1] - br * 0.45, br); const popT = [7.0, 10.0, 56.1, 93.9, 149.0].find((p) => t >= p && t < p + 0.35); if (popT) { const k = (t - popT) / 0.35; cx.save(); cx.strokeStyle = INKC; cx.lineWidth = 4; cx.globalAlpha = 1 - k; for (let a = 0; a < 8; a++) { const an = a * PI / 4, r0 = 40 + 30 * k, r1 = r0 + 14; cx.beginPath(); cx.moveTo(m[0] - 80 + Math.cos(an) * r0, m[1] - 40 + Math.sin(an) * r0); cx.lineTo(m[0] - 80 + Math.cos(an) * r1, m[1] - 40 + Math.sin(an) * r1); cx.stroke(); } cx.restore(); } }
+      // sand on his head
+      { const sk = sandCapK(t); if (sk > 0.02) { const top = g.X(0.0, -1.12); cx.save(); cx.globalAlpha = sk; cx.fillStyle = '#D8C38A'; cx.strokeStyle = INKC; cx.lineWidth = 4; cx.beginPath(); cx.ellipse(top[0], top[1] - 6, 70, 34 * sk, 0, PI, 0); cx.lineTo(top[0] + 70, top[1] + 4); cx.lineTo(top[0] - 70, top[1] + 4); cx.closePath(); cx.fill(); cx.stroke(); cx.fillStyle = 'rgba(216,195,138,0.9)'; for (let i = 0; i < 9; i++) { cx.beginPath(); cx.arc(sam.x + (hash(i, 31) - 0.5) * 220, sam.y - 60 + hash(i, 32) * 200, 3 + 3 * hash(i, 33), 0, 7); cx.fill(); } cx.restore(); } }
+      // held props
+      const hC = (hands && hands[1]) ? hands[1] : null;
+      if (t >= 16.0 && t < 17.0) blanketFlat(cx, sam.x, sam.y - 140, 0, 1);
+      if (t >= 17.0 && t < 17.5) { const q = (t - 17.0) / 0.5, a = [sam.x + 40, sam.y - 150], b = [D.x, D.y - 20], p = lerp2(a, b, ss(0, 1, q)); blanketFlat(cx, p[0], p[1] - 80 * Math.sin(PI * q) + 30, q * 3, 1 - 0.0 - q); }
+      if (t >= 20.2 && t < 21.4) stone(cx, sam.x, sam.y - 118, 0, 0.0);
+      if (t >= 21.4 && t < 21.86) { const q = (t - 21.4) / 0.46, a = [sam.x + 40, sam.y - 130], b = [D.x, D.y - RD * 0.95 + 40], p = lerp2(a, b, ss(0, 1, q)); stone(cx, p[0], p[1] - 90 * Math.sin(PI * q) + 20, q * 2, 0); }
+      if (t >= 21.86 && t < 22.6) stone(cx, D.x + 3 * Math.sin(t * 40), D.y - RD * D.sy - 6 + 60, 0, 0.0);
+      if (t >= 22.6 && t < 23.1) { const q = (t - 22.6) / 0.5, a = [D.x - 30, D.y - RD * D.sy + 60], b = [545, FL], p = lerp2(a, b, q); stone(cx, p[0], p[1] - 130 * Math.sin(PI * q) * 0 + 130 * 0, -5 * q, 0); }
+      if (t >= 23.1 && t < 23.6) stone(cx, 545, FL, -5, 0);
+      if (t >= 24.5 && t < 25.5) { cx.save(); cx.strokeStyle = '#7A5A3A'; cx.lineWidth = 10; cx.beginPath(); cx.arc(sam.x + 100, sam.y + 50, 28, 0, 7); cx.stroke(); cx.restore(); }
+      if (t >= 30.9 && t < 32.7) { const tl = ss(32.0, 32.3, t) * 0.9 * (1 - ss(32.5, 32.7, t)); bucket(cx, sam.x + 125 + 40 * tl, sam.y + 150 - 90 * tl, tl * 1.2, 1 - ss(32.2, 32.6, t)); }
+      if (t >= 32.2 && t < 34.2) sandSpray(cx, sam.x + 170, sam.y - 20, (t - 32.2) / 1.5, 0.9, 16);
+      if (t >= 32.7 && t < 34.0) { const q = (t - 32.7) / 1.3; bucket(cx, sam.x - 60 - 600 * q, sam.y + 150 - 420 * Math.sin(PI * Math.min(1, q)) + 400 * q * q, q * 7, 0); }
+      if (t >= 45.85 && t < 47.1) drawCrate(cx, sam.x, sam.y - 118, 0);
+      if (t >= 58.9 && t < 59.4) yarnBallD(cx, sam.x + 100, sam.y + 60, t * 2);
+      if (t >= 72.0 && t < 73.8) stone(cx, sam.x, t < 72.9 ? sam.y - 118 : sam.y - 118 - 8 * ss(72.9, 73.6, t), 0, 0);
+      if (t >= 73.8 && t < 76.4) { const q = (t - 73.8) / 0.55; if (q < 1) stone(cx, sam.x, sam.y - 118 - 1300 * q * (2 - q), 0, 0); else { const f = (t - 74.35) / (76.4 - 74.35); stone(cx, DX0, -300 + (D.y - RD * D.sy + 70 + 300) * f * f, f * 3, 0); } }
+      if (t >= 76.4 && t < 77.5) stone(cx, D.x, D.y - RD * D.sy + 74 - 44 * Math.max(0, (t - 77.2) / 0.3), 0.06, 0);
+      if (t >= 77.5 && t < 80.2) { const f = (t - 77.5) / (80.2 - 77.5); if (f < 0.3) { stone(cx, DX0 - 40 * f, D.y - 140 - 1400 * Math.sin(PI * f / 0.6) * 0.5 - 100, f * 6, 0); } else { const e = (f - 0.3) / 0.7; stone(cx, 650 - 320 * e, -400 + (sam.y - 60 + 400) * e * e, f * 6, 0); } }
+      if (t >= 80.2 && t < 81.6) { const q = (t - 80.2) / 1.4; stone(cx, 330 - 520 * ss(0, 1, q), FL - 30 * Math.abs(Math.sin(q * 7)) * (1 - q) + 0, -q * 6, 0); }
+      if (t >= 81.4) { if (t >= 81.4 && t < 82) { } }
+      // bat marks and rings
+      dustAt(cx, t);
+      if (t >= 37.0 && t < 38.6) sandSpray(cx, D.x, D.y - 120, (t - 37.0) / 1.6, 1.0, 26);
+      if (t >= 41.2 && t < 43.1) sandSpray(cx, C.x - 30, FL - 40, (t - 41.2) / 1.6, 0.8, 18); if (t >= 42.5 && t < 44.2) sandSpray(cx, C.x - 30, FL - 60, (t - 42.5) / 1.5, 1.1, 20);
+      // dizzy stars
+      if ((t >= 27.6 && t < 29.2) || (t >= 53.4 && t < 55.2) || (t >= 94.6 && t < 96.4) || (t >= 80.9 && t < 82.2)) { const top = g.X(0, -1.1); stars(cx, top[0], top[1] - 18, t * 0.5, 3, 62); }
+      // ink drop into the blank eye
+      if (t >= 138.8 && t < 139.7) { const eye = dPt(D, PI * 1.12, 0.31), q = (t - 138.8) / 0.4; const hp = (hands && hands[0]) ? hands[0] : [DX0 - 40, D.y - 90]; const fx = hp[0], fy = hp[1]; cx.fillStyle = INKC; cx.beginPath(); const dy = fy + (eye[1] - fy) * Math.min(1, q); cx.ellipse(fx + (eye[0] - fx) * Math.min(1, q), dy, 7, 11, 0, 0, 7); cx.fill(); }
     },
     over: (cx) => {
-      if (shadow > 0.01) { cx.save(); cx.globalCompositeOperation = 'multiply'; const sg = cx.createLinearGradient(0, -300, 0, FL + 300), k = Math.round(255 - 125 * shadow); sg.addColorStop(0, `rgb(${k},${k - 6},${k - 12})`); sg.addColorStop(1, `rgb(${255 - Math.round(60 * shadow)},${255 - Math.round(60 * shadow)},${255 - Math.round(60 * shadow)})`); cx.fillStyle = sg; cx.fillRect(-300, -300, 1700, 2600); cx.restore(); }
-      if (HND) giantHand(cx, { x: HND.x, y: HND.y, ang: HND.ang, s: HND.s, f: HND.f, spread: HND.spread, thumbOut: HND.thumbOut }, t);
-      cx.save(); cx.globalCompositeOperation = 'multiply'; const vg = cx.createRadialGradient(540, FL - 300, 420, 540, FL - 300, 1100); vg.addColorStop(0, 'rgb(255,255,255)'); vg.addColorStop(1, 'rgb(205,196,190)'); cx.fillStyle = vg; cx.fillRect(-300, -300, 1700, 2600); cx.restore();
+      cx.save(); cx.globalCompositeOperation = 'multiply'; const vg = cx.createRadialGradient(540, FL - 300, 420, 540, FL - 300, 1100); vg.addColorStop(0, 'rgb(255,255,255)'); vg.addColorStop(1, 'rgb(212,204,196)'); cx.fillStyle = vg; cx.fillRect(-300, -300, 1700, 2600); cx.restore();
+      // quiet moments: slight dimming (sound drops, light follows)
+      const dim = 0.18 * wnd(130.5, 134.4, t, 0.8) + 0.1 * wnd(111.4, 115.8, t, 0.8); if (dim > 0.01) { cx.save(); cx.globalCompositeOperation = 'multiply'; const k = Math.round(255 * (1 - dim)); cx.fillStyle = `rgb(${k},${k - 4},${k - 8})`; cx.fillRect(-300, -300, 1700, 2600); cx.restore(); }
+      // fade in / out
+      const fi = 1 - ss(0, 0.5, t), fo = ss(149.3, 150, t); const f = Math.max(fi, fo); if (f > 0.01) { cx.save(); cx.fillStyle = `rgba(241,233,216,${f})`; cx.fillRect(-300, -300, 1700, 2600); cx.restore(); }
     },
   });
 }
