@@ -14,19 +14,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 -m pip install --quiet --break-system-packages edge-tts
-      - name: generate samples
+      - name: generate samples (3 tries each, report sizes + errors)
         run: |
-          mkdir -p out
-          python3 -m edge_tts --list-voices | grep -i "th-TH" > out/voices.txt || true
-          cat out/voices.txt
-          for v in $(awk '{print $1}' out/voices.txt | grep '^th-TH'); do
-            for preset in "doc:-8%:+0Hz" "calm:-12%:-6Hz"; do
-              IFS=: read n r p <<< "$preset"
-              python3 -m edge_tts --voice "$v" --rate="$r" --pitch="$p" --text "$TEXT" --write-media "out/${v}_${n}.mp3" || echo "FAILED $v $n"
+          mkdir -p out; : > out/report.txt
+          gen() { # name voice rate pitch
+            local n=$1 v=$2 r=$3 p=$4 try
+            for try in 1 2 3; do
+              args=(--voice "$v" --text "$TEXT" --write-media "out/$n.mp3")
+              [ -n "$r" ] && args+=(--rate="$r"); [ -n "$p" ] && args+=(--pitch="$p")
+              python3 -m edge_tts "${args[@]}" 2> out/err.txt && [ -s "out/$n.mp3" ] && { echo "$n OK try=$try size=$(stat -c%s out/$n.mp3)" >> out/report.txt; return; }
+              rm -f "out/$n.mp3"
             done
+            echo "$n FAILED err=$(tail -c 200 out/err.txt | tr '\n' ' ')" >> out/report.txt
+          }
+          for v in th-TH-NiwatNeural th-TH-PremwadeeNeural; do
+            s=${v#th-TH-}; s=${s%Neural}
+            gen "${s}_default" $v "" ""
+            gen "${s}_doc" $v "-8%" "+0Hz"
+            gen "${s}_calm" $v "-12%" "-6Hz"
+            gen "${s}_rateonly" $v "-8%" ""
+            gen "${s}_pitchonly" $v "" "-6Hz"
           done
-          sudo apt-get install -y -qq ffmpeg > /dev/null
-          for f in out/*.mp3; do echo "$f $(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")"; done | tee out/durations.txt
+          rm -f out/err.txt; cat out/report.txt
+          echo "::notice title=voice report::$(tr '\n' ' ' < out/report.txt)"
       - name: push samples to voices branch
         run: |
           git config user.name github-actions; git config user.email actions@github.com
