@@ -10,7 +10,7 @@ export default {
   create(ctx) {
     const cam = ctx.stage.camera
     cam.fov = 48; cam.updateProjectionMatrix()
-    const room = buildRoom(ctx, { ledScale: 1.5, gain: 1.3 }), fade = frameOverlay(ctx.dom)
+    const room = buildRoom(ctx, { ledScale: 1.5, gain: 1.1 }), fade = frameOverlay(ctx.dom)
     const row = (col: string, txt: string) => el('div', `opacity:0;margin-bottom:26px;font:700 56px/1.2 ${F.display};color:${C.white}`, panel, dot(col) + txt)
     const panel = el('div', 'position:absolute;right:130px;top:250px;padding:34px 46px 18px;border-radius:22px;background:rgba(12,14,19,.78)', ctx.dom)
     const rows = [row('#3CFF8F', 'เขียว  ปกติ'), row('#FFB020', 'เหลือง  เตือน'), row('#FF4D52', 'แดง  มีปัญหา')]
@@ -24,6 +24,7 @@ export default {
         const mix: Mix = p < 0.42 ? [1, 1, 1] : p < 0.7 ? [0.72, 0.72, 1] : [0.64, 0.64, 0.9]
         room.update(f.t, mix)
         rows.forEach((r, i) => { r.style.opacity = String(ease.out(seg(p, [0.3, 0.5, 0.72][i], [0.4, 0.6, 0.82][i]))) })
+        panel.style.opacity = rows[0].style.opacity
         fade(t, f.t)
       },
     }

@@ -25,7 +25,7 @@ export default {
     mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(COUNT * 3), 3); mesh.frustumCulled = false; ctx.root.add(mesh)
     const d = new THREE.Object3D(), cold = new THREE.Color(0.3, 0.75, 1.5), hot = new THREE.Color(1.6, 0.4, 0.2), c = new THREE.Color()
     const tCold = tag(ctx.dom, 'ลมเย็น', C.blue, 46), tHot = tag(ctx.dom, 'ลมร้อน', C.red, 46)
-    const pCold = new THREE.Vector3(0, 0.3, RZ + 1.5), pHotL = new THREE.Vector3(-3.3, 0.5, RZ), pHotR = new THREE.Vector3(3.3, 0.5, RZ)
+    const pCold = new THREE.Vector3(0, 0.3, RZ - 1.4), pHotL = new THREE.Vector3(-3.3, 0.5, RZ - 1.4), pHotR = new THREE.Vector3(3.3, 0.5, RZ - 1.4)
     const tHot2 = tag(ctx.dom, 'ลมร้อน', C.red, 46)
     return {
       update(f) {
@@ -39,8 +39,8 @@ export default {
           c.copy(cold).lerp(hot, seg(u, 0.3, 0.62)); mesh.instanceColor!.setXYZ(i, c.r, c.g, c.b)
         }
         mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor!.needsUpdate = true
-        place(cam, tCold, pCold, ease.out(seg(f.p, 0.22, 0.34)), -60, 0)
-        place(cam, tHot, pHotL, ease.out(seg(f.p, 0.62, 0.74)), -60, 0); place(cam, tHot2, pHotR, ease.out(seg(f.p, 0.62, 0.74)), -60, 0)
+        place(cam, tCold, pCold, ease.out(seg(f.p, 0.2, 0.3)), -70, 0)
+        place(cam, tHot, pHotL, ease.out(seg(f.p, 0.52, 0.62)), -70, 0); place(cam, tHot2, pHotR, ease.out(seg(f.p, 0.52, 0.62)), -70, 0)
         fade(t, f.t)
       },
     }
