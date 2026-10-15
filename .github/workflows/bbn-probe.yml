@@ -1,0 +1,44 @@
+name: bbn-probe
+# Which Chrome flags let a single 1080p WebGL screenshot finish on the runner? (one still per variant, 170 s cap)
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { v: base, flags: '' }
+          - { v: angle, flags: '--use-gl=angle --use-angle=swiftshader' }
+          - { v: angle-webgl, flags: '--use-gl=angle --use-angle=swiftshader-webgl' }
+          - { v: nogpu, flags: '--disable-gpu' }
+          - { v: ingpu, flags: '--in-process-gpu --disable-gpu-sandbox' }
+          - { v: angle-ingpu, flags: '--use-gl=angle --use-angle=swiftshader --in-process-gpu --disable-gpu-sandbox' }
+    defaults:
+      run:
+        working-directory: bbn-test/video
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: |
+          npm install --no-audit --no-fund
+          mkdir -p public out
+          node tools/cues.mjs
+      - name: still with variant ${{ matrix.v }}
+        run: |
+          printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage ${{ matrix.flags }} "$@"\n' > /tmp/chrome-wrap.sh
+          chmod +x /tmp/chrome-wrap.sh
+          /usr/bin/google-chrome --version
+          S=$(date +%s)
+          set +e
+          CHROME=/tmp/chrome-wrap.sh timeout 170 node tools/render.mjs --still 0 --out out/s.png > out/probe.log 2>&1
+          RC=$?
+          E=$(( $(date +%s) - S ))
+          echo "variant=${{ matrix.v }} rc=$RC elapsed=${E}s"
+          python3 - <<PY
+          t = open('out/probe.log').read()
+          print('::notice title=probe ${{ matrix.v }} rc=$RC elapsed=${E}s::' + t[-700:].replace('%','%25').replace('\n','%0A'))
+          PY
+          exit $RC
