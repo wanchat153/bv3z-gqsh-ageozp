@@ -6,7 +6,7 @@ on:
       seconds: { description: 'video length in seconds', default: '6.4' }
       parts: { description: 'number of parallel jobs', default: '20' }
       fps: { description: 'frames per second', default: '30' }
-      jobs: { description: 'Chrome pages per runner (render.mjs --jobs)', default: '4' }
+      jobs: { description: 'Chrome pages per runner (render.mjs --jobs); >1 hangs screenshots on 2nd+ page', default: '1' }
 jobs:
   plan:
     runs-on: ubuntu-latest
