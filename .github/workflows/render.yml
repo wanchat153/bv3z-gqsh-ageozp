@@ -1,0 +1,57 @@
+name: render
+on:
+  workflow_dispatch:
+    inputs:
+      seconds: { description: 'video length in seconds', default: '6.4' }
+      parts: { description: 'number of parallel jobs (max 256)', default: '20' }
+      wx: { description: 'watermark x', default: '380' }
+      wy: { description: 'watermark y', default: '480' }
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      frames: ${{ steps.m.outputs.frames }}
+    steps:
+      - id: m
+        run: |
+          NF=$(python3 -c "print(round(${{ inputs.seconds }}*60))")
+          N=${{ inputs.parts }}
+          echo "frames=$NF" >> $GITHUB_OUTPUT
+          python3 - <<PY >> $GITHUB_OUTPUT
+          import json
+          nf=$NF; n=min($N,nf)
+          m=[{"i":i,"s":nf*i//n,"e":nf*(i+1)//n} for i in range(n)]
+          print("matrix="+json.dumps({"include":m}))
+          PY
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-audit --no-fund
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - run: node tools/render_part.mjs episode ${{ matrix.s }} ${{ matrix.e }} out/part_${{ matrix.i }}
+        env: { WORKERS: 4, CHROME: /usr/bin/google-chrome }
+      - run: mv out/part_${{ matrix.i }}/part.mp4 out/part.mp4
+      - uses: actions/upload-artifact@v4
+        with: { name: 'part-${{ matrix.i }}', path: out/part.mp4, retention-days: 1, compression-level: 0 }
+  finish:
+    needs: [plan, render]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - uses: actions/download-artifact@v4
+        with: { path: parts, pattern: 'part-*' }
+      - run: |
+          # sort parts numerically: rename part-N -> part-000N
+          for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
+          bash tools/finish.sh parts episode/audio.wav out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
+      - uses: actions/upload-artifact@v4
+        with: { name: video, path: out.mp4, retention-days: 14 }
