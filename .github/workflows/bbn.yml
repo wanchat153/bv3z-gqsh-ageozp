@@ -1,13 +1,30 @@
 name: bbn
-# Render test for the bbn-video-studio music-video template (bbn-test/video), split across parallel jobs.
+# Educational clip (server room): Thai narration + parallel frame rendering on GitHub Actions.
+#   narrate  : edge-tts per line -> real durations -> timing.json + voice.m4a (runs alongside the render setup)
+#   plan     : integer frame boundaries per part
+#   render   : N parallel parts (1 Chrome page each), each waits for the narration artifact only when it needs cues.json
+#   finish   : concat (stream copy) + mux the voice, report timings
 on:
   workflow_dispatch:
     inputs:
-      seconds: { description: 'video length in seconds', default: '6.4' }
-      parts: { description: 'number of parallel jobs', default: '20' }
+      seconds: { description: 'video length in seconds', default: '45' }
+      parts: { description: 'parallel render jobs (free plan runs 20 at once; more just queue)', default: '20' }
       fps: { description: 'frames per second', default: '30' }
-      jobs: { description: 'Chrome pages per runner (render.mjs --jobs); >1 hangs screenshots on 2nd+ page', default: '1' }
+permissions:
+  contents: read
+  actions: read
 jobs:
+  narrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null &
+          python3 -m pip install --quiet --break-system-packages edge-tts
+          wait
+          python3 bbn-test/tools/narrate.py narr ${{ inputs.seconds }}
+      - uses: actions/upload-artifact@v4
+        with: { name: narr, path: narr, retention-days: 3 }
   plan:
     runs-on: ubuntu-latest
     outputs:
@@ -23,7 +40,6 @@ jobs:
           fps = int("${{ inputs.fps }}")
           nf = round(float("${{ inputs.seconds }}") * fps)
           n = min(int("${{ inputs.parts }}"), nf)
-          # integer frame boundaries (floor), converted to seconds only at the end
           m = []
           for i in range(n):
               f0, f1 = nf * i // n, nf * (i + 1) // n
@@ -40,18 +56,30 @@ jobs:
     defaults:
       run:
         working-directory: bbn-test/video
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - name: setup (npm, ffmpeg, cues)
+        with: { node-version: 22, cache: npm, cache-dependency-path: bbn-test/video/package-lock.json }
+      - name: setup (npm ci + ffmpeg)
         run: |
           S0=$(date +%s.%N)
-          npm install --no-audit --no-fund
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          mkdir -p public out
-          node tools/cues.mjs
+          (sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null) &
+          npm ci --no-audit --no-fund
+          wait
           echo "SETUP_S=$(python3 -c "import time;print(round(time.time()-$S0,1))")" >> $GITHUB_ENV
+      - name: get narration timing -> cues.json
+        run: |
+          W0=$(date +%s.%N)
+          for i in $(seq 1 90); do
+            gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts -q '.artifacts[]|select(.name=="narr")|.id' | grep -q . && break
+            sleep 2
+          done
+          gh run download $GITHUB_RUN_ID -n narr -D "$GITHUB_WORKSPACE/narr"
+          mkdir -p public out
+          node tools/cues.mjs --align "$GITHUB_WORKSPACE/narr/timing.json"
+          echo "WAIT_S=$(python3 -c "import time;print(round(time.time()-$W0,1))")" >> $GITHUB_ENV
       - name: render frames ${{ matrix.f0 }}-${{ matrix.f1 }}
         env:
           CHROME: /tmp/chrome-wrap.sh
@@ -60,7 +88,7 @@ jobs:
           printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage "$@"\n' > /tmp/chrome-wrap.sh
           chmod +x /tmp/chrome-wrap.sh
           R0=$(date +%s.%N)
-          node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs ${{ inputs.jobs }} --out out/part.mp4 2>&1 | tee out/render.log
+          node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs 1 --out out/part.mp4 2>&1 | tee out/render.log
           R1=$(date +%s.%N)
           FR=$(( ${{ matrix.f1 }} - ${{ matrix.f0 }} ))
           GOT=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 out/part.mp4)
@@ -68,14 +96,15 @@ jobs:
           import json
           r = $R1 - $R0
           print(json.dumps({"i": ${{ matrix.i }}, "f0": ${{ matrix.f0 }}, "f1": ${{ matrix.f1 }}, "frames": $FR, "got_frames": int("$GOT"),
-                            "render_s": round(r, 2), "s_per_frame": round(r / $FR, 3), "setup_s": round(float("$SETUP_S"), 1)}))
+                            "render_s": round(r, 2), "s_per_frame": round(r / $FR, 3), "setup_s": round(float("$SETUP_S"), 1), "wait_s": round(float("$WAIT_S"), 1)}))
           PY
           cat out/timing.json
       - name: show render log on failure
         if: failure()
         run: |
           python3 - <<'PY'
-          t = (lambda x: x[:1500] + '\n[...]\n' + x[-1200:])(open('out/render.log').read()) if __import__('os').path.exists('out/render.log') else 'no render.log'
+          import os
+          t = (lambda x: x[:1500] + '\n[...]\n' + x[-1200:])(open('out/render.log').read()) if os.path.exists('out/render.log') else 'no render.log'
           print('::error title=render log tail::' + t.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))
           PY
       - uses: actions/upload-artifact@v4
@@ -87,48 +116,38 @@ jobs:
           retention-days: 1
           compression-level: 0
   finish:
-    needs: [plan, render]
+    needs: [plan, narrate, render]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null
       - uses: actions/download-artifact@v4
         with: { path: parts, pattern: 'part-*' }
-      - name: concat + timing report
+      - uses: actions/download-artifact@v4
+        with: { name: narr, path: narr }
+      - name: concat + mux voice + timing report
         run: |
           for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
           ls parts/*/part.mp4 | sort | sed "s#^#file '$PWD/#;s#\$#'#" > list.txt
           ffmpeg -v error -y -f concat -safe 0 -i list.txt -c copy out.mp4
-          FRAMES=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 out.mp4)
-          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4)
+          ffmpeg -v error -y -i out.mp4 -i narr/voice.m4a -c:v copy -c:a copy -t ${{ inputs.seconds }} -movflags +faststart final.mp4
+          FRAMES=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 final.mp4)
+          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 final.mp4)
           T1=$(date +%s.%N)
           python3 - <<PY | tee -a $GITHUB_STEP_SUMMARY
           import glob, json
           rows = sorted((json.load(open(f)) for f in glob.glob("parts/*/timing.json")), key=lambda r: r["i"])
-          print("## bbn render test")
-          print(f"- expected frames: ${{ needs.plan.outputs.frames }}, final video: $FRAMES frames, $DUR s")
-          print(f"- first-plan-to-finish wall time (excl. queue before plan): {$T1 - ${{ needs.plan.outputs.t0 }}:.1f} s")
+          tj = json.load(open("narr/timing.json"))
+          print("## bbn educational clip")
+          print(f"- expected frames: ${{ needs.plan.outputs.frames }}, final video: $FRAMES frames, $DUR s, narration rate {tj['rate']}, speech ends {tj['lines'][-1]['end']} s")
+          print(f"- plan-to-finish wall time (excl. queue before plan): {$T1 - ${{ needs.plan.outputs.t0 }}:.1f} s")
           rs = [r["render_s"] for r in rows]; sp = [r["s_per_frame"] for r in rows]
           print(f"- render step per job: min {min(rs)} / avg {sum(rs)/len(rs):.1f} / max {max(rs)} s")
           print(f"- seconds per frame per job: min {min(sp)} / avg {sum(sp)/len(sp):.3f} / max {max(sp)}")
-          print(f"- setup per job (npm+apt+cues): avg {sum(r['setup_s'] for r in rows)/len(rows):.1f} s")
+          print(f"- setup per job (npm+ffmpeg): avg {sum(r['setup_s'] for r in rows)/len(rows):.1f} s; waiting for narration: avg {sum(r['wait_s'] for r in rows)/len(rows):.1f} s")
           print(f"- frame count mismatches: {[r['i'] for r in rows if r['frames'] != r['got_frames']] or 'none'}")
-          print("\n| job | frames | got | render s | s/frame | setup s |\n|---|---|---|---|---|---|")
+          print("\n| job | frames | got | render s | s/frame | setup s | wait s |\n|---|---|---|---|---|---|---|")
           for r in rows:
-              print(f"| {r['i']} | {r['f0']}-{r['f1']} | {r['got_frames']} | {r['render_s']} | {r['s_per_frame']} | {r['setup_s']} |")
+              print(f"| {r['i']} | {r['f0']}-{r['f1']} | {r['got_frames']} | {r['render_s']} | {r['s_per_frame']} | {r['setup_s']} | {r['wait_s']} |")
           PY
-      - name: Thai male voice-over (edge-tts)
-        continue-on-error: true
-        run: |
-          python3 -m pip install --quiet --break-system-packages edge-tts
-          python3 -m edge_tts --voice th-TH-NiwatNeural --rate=-5% --text "ยินดีต้อนรับสู่ห้องเซิร์ฟเวอร์" --write-media voice.mp3
-          ffprobe -v error -show_entries format=duration -of csv=p=0 voice.mp3
-      - name: ambience + mux
-        run: |
-          V=none; [ -s voice.mp3 ] && V=voice.mp3
-          bash bbn-test/audio.sh $V audio.m4a ${{ inputs.seconds }}
-          ffmpeg -v error -y -i out.mp4 -i audio.m4a -c:v copy -c:a copy -t ${{ inputs.seconds }} -movflags +faststart final.mp4
-          echo "- audio: voice-over file = $V (none means voice failed, ambience only)" >> $GITHUB_STEP_SUMMARY
-          ffprobe -v error -show_entries stream=codec_type,duration -of csv=p=0 final.mp4
       - uses: actions/upload-artifact@v4
         with: { name: bbn-video, path: final.mp4, retention-days: 3 }

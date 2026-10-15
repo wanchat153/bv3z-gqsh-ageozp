@@ -1,0 +1,98 @@
+name: bbn-preview
+# Quick visual check: stills at chosen times (one runner each) -> contact sheet pushed to the `preview` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      times: { description: 'comma-separated seconds', default: '2,6,10,13,17,20,24,27,31,34,38,43' }
+permissions:
+  contents: write
+  actions: read
+jobs:
+  narrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null &
+          python3 -m pip install --quiet --break-system-packages edge-tts
+          wait
+          python3 bbn-test/tools/narrate.py narr 45
+      - uses: actions/upload-artifact@v4
+        with: { name: narr, path: narr, retention-days: 1 }
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: |
+          python3 - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          ts = [x.strip() for x in "${{ inputs.times }}".split(",") if x.strip()]
+          print("matrix=" + json.dumps({"include": [{"i": i, "t": t} for i, t in enumerate(ts)]}))
+          PY
+  still:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: bbn-test/video
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: bbn-test/video/package-lock.json }
+      - run: |
+          (sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null) &
+          npm ci --no-audit --no-fund
+          wait
+      - name: cues from narration
+        run: |
+          for i in $(seq 1 90); do
+            gh api repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts -q '.artifacts[]|select(.name=="narr")|.id' | grep -q . && break
+            sleep 2
+          done
+          gh run download $GITHUB_RUN_ID -n narr -D "$GITHUB_WORKSPACE/narr"
+          mkdir -p public out
+          node tools/cues.mjs --align "$GITHUB_WORKSPACE/narr/timing.json"
+      - name: still at ${{ matrix.t }}s
+        env:
+          CHROME: /tmp/chrome-wrap.sh
+        run: |
+          printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage "$@"\n' > /tmp/chrome-wrap.sh
+          chmod +x /tmp/chrome-wrap.sh
+          node tools/render.mjs --still ${{ matrix.t }} --out out/still.png 2>&1 | tail -15
+      - name: show log on failure
+        if: failure()
+        run: echo "::error title=still ${{ matrix.t }}::failed (see earlier step)"
+      - uses: actions/upload-artifact@v4
+        with: { name: 'still-${{ matrix.i }}', path: bbn-test/video/out/still.png, retention-days: 1 }
+  sheet:
+    needs: [plan, still]
+    if: always() && needs.still.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null
+      - uses: actions/download-artifact@v4
+        with: { path: stills, pattern: 'still-*' }
+      - name: contact sheet
+        run: |
+          mkdir -p out
+          ls stills | sort -t- -k2 -n > order.txt
+          i=0; for d in $(cat order.txt); do cp stills/$d/still.png out/s$(printf %02d $i).png; i=$((i+1)); done
+          cp narr_timing.json out/ 2>/dev/null || true
+          ffmpeg -v error -y -framerate 1 -i out/s%02d.png -vf "scale=640:360,tile=3x4" -frames:v 1 out/sheet.png
+          ls -la out
+      - name: push to preview branch
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan preview
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          git add -f out
+          git commit -q -m "preview stills"
+          git push -q -f origin preview
