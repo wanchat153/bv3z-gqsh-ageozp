@@ -30,36 +30,46 @@ def dur(path):
                                 capture_output=True, text=True).stdout.strip())
 
 def synth(text, rate, path):
-    for attempt in range(6):  # the free service sometimes returns no audio: retry
+    for attempt in range(12):  # the free service sometimes returns no audio: retry with growing pauses
         r = subprocess.run(['python3', '-m', 'edge_tts', '--voice', VOICE, f'--rate={rate}', '--text', text, '--write-media', path],
                            capture_output=True, text=True)
         if r.returncode == 0 and os.path.exists(path) and os.path.getsize(path) > 0: return
         if os.path.exists(path): os.remove(path)
-        time.sleep(1.5)
-    raise SystemExit(f'TTS failed for: {text[:30]}... {r.stderr[-200:]}')
+        time.sleep(min(1.5 + attempt, 8))
+    raise RuntimeError(f'TTS failed for: {text[:30]}... {r.stderr[-300:]}')
 
-chosen = None
-for rate in ['-8%', '-4%', '+0%', '+6%', '+12%']:
-    durs = []
-    for i, (lid, text) in enumerate(lines):
-        p = os.path.join(OUT, f'seg_{i}.mp3'); synth(text, rate, p); durs.append(dur(p))
-    total = LEAD + sum(durs) + GAP * (len(lines) - 1)
-    print(f'rate {rate}: speech ends at {total:.2f}s (budget {TOTAL - TAIL:.1f}s)')
-    chosen = (rate, durs, total)
-    if total <= TOTAL - TAIL: break
-rate, durs, total = chosen
+def main():
+    global chosen
+    chosen = None
+    for rate in ['-8%', '-4%', '+0%', '+6%', '+12%']:
+        durs = []
+        for i, (lid, text) in enumerate(lines):
+            p = os.path.join(OUT, f'seg_{i}.mp3'); synth(text, rate, p); durs.append(dur(p))
+        total = LEAD + sum(durs) + GAP * (len(lines) - 1)
+        print(f'rate {rate}: speech ends at {total:.2f}s (budget {TOTAL - TAIL:.1f}s)')
+        chosen = (rate, durs, total)
+        if total <= TOTAL - TAIL: break
+    rate, durs, total = chosen
 
-t, tl, starts = LEAD, [], []
-for (lid, _), d in zip(lines, durs):
-    starts.append(t); tl.append({'id': lid, 'start': round(t, 3), 'end': round(t + d, 3)}); t += d + GAP
-json.dump({'duration': TOTAL, 'bpm': 120, 'offset': 0, 'lines': tl, 'rate': rate}, open(os.path.join(OUT, 'timing.json'), 'w'), indent=1)
+    t, tl, starts = LEAD, [], []
+    for (lid, _), d in zip(lines, durs):
+        starts.append(t); tl.append({'id': lid, 'start': round(t, 3), 'end': round(t + d, 3)}); t += d + GAP
+    json.dump({'duration': TOTAL, 'bpm': 120, 'offset': 0, 'lines': tl, 'rate': rate}, open(os.path.join(OUT, 'timing.json'), 'w'), indent=1)
 
-inputs = []; chains = []
-for i, st in enumerate(starts):
-    inputs += ['-i', os.path.join(OUT, f'seg_{i}.mp3')]
-    ms = int(round(st * 1000)); chains.append(f'[{i}:a]adelay={ms}|{ms}[a{i}]')
-mix = ''.join(f'[a{i}]' for i in range(len(starts)))
-flt = ';'.join(chains) + f';{mix}amix=inputs={len(starts)}:normalize=0:duration=longest,apad=whole_dur={TOTAL},atrim=0:{TOTAL},afade=t=out:st={TOTAL - 0.6}:d=0.6[a]'
-subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', flt, '-map', '[a]', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000',
-                os.path.join(OUT, 'voice.m4a')], check=True)
-print('voice ends at', round(total, 2), 's; rate', rate)
+    inputs = []; chains = []
+    for i, st in enumerate(starts):
+        inputs += ['-i', os.path.join(OUT, f'seg_{i}.mp3')]
+        ms = int(round(st * 1000)); chains.append(f'[{i}:a]adelay={ms}|{ms}[a{i}]')
+    mix = ''.join(f'[a{i}]' for i in range(len(starts)))
+    flt = ';'.join(chains) + f';{mix}amix=inputs={len(starts)}:normalize=0:duration=longest,apad=whole_dur={TOTAL},atrim=0:{TOTAL},afade=t=out:st={TOTAL - 0.6}:d=0.6[a]'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', flt, '-map', '[a]', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000',
+                    os.path.join(OUT, 'voice.m4a')], check=True)
+    print('voice ends at', round(total, 2), 's; rate', rate)
+
+try:
+    main()
+except Exception as e:
+    import traceback
+    msg = (str(e) + ' | ' + traceback.format_exc()[-500:]).replace('%', '%25').replace('\n', '%0A')
+    print('::error title=narrate failed::' + msg)
+    sys.exit(1)
