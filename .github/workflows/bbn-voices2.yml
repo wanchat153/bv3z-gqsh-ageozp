@@ -1,0 +1,46 @@
+name: bbn-voices2
+# Try free open-source Thai TTS models (KhanomTan, MMS-TTS) on the runner; samples go to branches voices-khanom / voices-mms.
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: 'sample narration', default: 'ห้องเซิร์ฟเวอร์ คือหัวใจของโลกออนไลน์ เครื่องนับพันทำงานตลอดยี่สิบสี่ชั่วโมง' }
+permissions:
+  contents: write
+jobs:
+  tts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: khanom, py: '3.10', pkgs: 'pythaitts', script: khanom.py }
+          - { name: mms, py: '3.11', pkgs: 'transformers scipy', script: mms.py }
+    env:
+      TEXT: ${{ inputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ matrix.py }}' }
+      - name: install + synthesise
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg espeak-ng libsndfile1 > /dev/null
+          mkdir -p out; : > out/report.txt
+          ( pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu && pip install --quiet ${{ matrix.pkgs }} ) > out/pip.log 2>&1 \
+            || echo "PIP FAILED: $(tail -c 400 out/pip.log | tr '\n' ' ')" >> out/report.txt
+          S=$(date +%s)
+          python bbn-test/tts/${{ matrix.script }} > out/run.log 2>&1 || echo "RUN FAILED: $(tail -c 500 out/run.log | tr '\n' ' ')" >> out/report.txt
+          echo "run $(( $(date +%s) - S ))s: $(grep -E 'SPEAKERS|OK|FAILED' out/run.log | tr '\n' ' ')" >> out/report.txt
+          for f in out/*.wav; do [ -f "$f" ] && ffmpeg -v error -y -i "$f" -ar 44100 -ac 1 "${f%.wav}.mp3" && echo "$(basename $f .wav) $(ffprobe -v error -show_entries format=duration -of csv=p=0 ${f%.wav}.mp3)s" >> out/report.txt; done
+          rm -f out/*.wav out/pip.log out/run.log
+          cat out/report.txt
+          echo "::notice title=report ${{ matrix.name }}::$(tr '\n' '|' < out/report.txt | cut -c1-1500)"
+      - name: push samples
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices-${{ matrix.name }}
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          git add -f out
+          git commit -q -m "samples ${{ matrix.name }}"
+          git push -q -f origin voices-${{ matrix.name }}
