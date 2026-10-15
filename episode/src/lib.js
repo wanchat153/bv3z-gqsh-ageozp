@@ -76,7 +76,8 @@ function wallBG(c, t) {
   // dark beam
   c.fillStyle = '#4A3828'; c.fillRect(-300, 170, 1680, 38); c.strokeStyle = INKC; c.lineWidth = 4; c.strokeRect(-304, 170, 1688, 38);
   // shelves left (x 0..330) and right (750..1080), each 5 rows
-  for (const [sx, sw_] of [[-20, 360], [740, 360]]) bookshelf(c, sx, 240, sw_, FL - 240, sx < 0 ? 1 : 7);
+  // the LEFT shelf is not drawn here: it moves (tilts) in story.js, so it is drawn only there (never leave a static copy in the background)
+  bookshelf(c, 740, 240, 360, FL - 240, 7);
   // shoji door far wall center (rear), slightly visible between shelves
   const dx = 400, dw = 280, dy = 520, dh = FL - 520;
   c.fillStyle = '#F3EBD3'; c.fillRect(dx, dy, dw, dh); c.strokeStyle = '#6B4F33'; c.lineWidth = 8; c.strokeRect(dx, dy, dw, dh);
