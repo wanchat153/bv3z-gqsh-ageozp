@@ -56,8 +56,9 @@ jobs:
         env:
           CHROME: /usr/bin/google-chrome
         run: |
+          set -o pipefail
           R0=$(date +%s.%N)
-          node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs ${{ inputs.jobs }} --out out/part.mp4
+          node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs ${{ inputs.jobs }} --out out/part.mp4 2>&1 | tee out/render.log
           R1=$(date +%s.%N)
           FR=$(( ${{ matrix.f1 }} - ${{ matrix.f0 }} ))
           GOT=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 out/part.mp4)
@@ -68,6 +69,13 @@ jobs:
                             "render_s": round(r, 2), "s_per_frame": round(r / $FR, 3), "setup_s": round(float("$SETUP_S"), 1)}))
           PY
           cat out/timing.json
+      - name: show render log on failure
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          t = open('out/render.log').read()[-1800:] if __import__('os').path.exists('out/render.log') else 'no render.log'
+          print('::error title=render log tail::' + t.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: part-${{ matrix.i }}
