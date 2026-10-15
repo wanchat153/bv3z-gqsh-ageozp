@@ -54,9 +54,11 @@ jobs:
           echo "SETUP_S=$(python3 -c "import time;print(round(time.time()-$S0,1))")" >> $GITHUB_ENV
       - name: render frames ${{ matrix.f0 }}-${{ matrix.f1 }}
         env:
-          CHROME: /usr/bin/google-chrome
+          CHROME: /tmp/chrome-wrap.sh
         run: |
           set -o pipefail
+          printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox --disable-dev-shm-usage "$@"\n' > /tmp/chrome-wrap.sh
+          chmod +x /tmp/chrome-wrap.sh
           R0=$(date +%s.%N)
           node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs ${{ inputs.jobs }} --out out/part.mp4 2>&1 | tee out/render.log
           R1=$(date +%s.%N)
