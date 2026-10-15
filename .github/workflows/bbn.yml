@@ -1,0 +1,110 @@
+name: bbn
+# Render test for the bbn-video-studio music-video template (bbn-test/video), split across parallel jobs.
+on:
+  workflow_dispatch:
+    inputs:
+      seconds: { description: 'video length in seconds', default: '6.4' }
+      parts: { description: 'number of parallel jobs', default: '20' }
+      fps: { description: 'frames per second', default: '30' }
+      jobs: { description: 'Chrome pages per runner (render.mjs --jobs)', default: '4' }
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      frames: ${{ steps.m.outputs.frames }}
+      t0: ${{ steps.m.outputs.t0 }}
+    steps:
+      - id: m
+        run: |
+          echo "t0=$(date +%s.%N)" >> $GITHUB_OUTPUT
+          python3 - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          fps = int("${{ inputs.fps }}")
+          nf = round(float("${{ inputs.seconds }}") * fps)
+          n = min(int("${{ inputs.parts }}"), nf)
+          # integer frame boundaries (floor), converted to seconds only at the end
+          m = []
+          for i in range(n):
+              f0, f1 = nf * i // n, nf * (i + 1) // n
+              m.append({"i": i, "f0": f0, "f1": f1, "from": f"{f0 / fps:.6f}", "to": f"{f1 / fps:.6f}"})
+          print("frames=" + str(nf))
+          print("matrix=" + json.dumps({"include": m}))
+          PY
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: bbn-test/video
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: setup (npm, ffmpeg, cues)
+        run: |
+          S0=$(date +%s.%N)
+          npm install --no-audit --no-fund
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          mkdir -p public out
+          node tools/cues.mjs
+          echo "SETUP_S=$(python3 -c "import time;print(round(time.time()-$S0,1))")" >> $GITHUB_ENV
+      - name: render frames ${{ matrix.f0 }}-${{ matrix.f1 }}
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: |
+          R0=$(date +%s.%N)
+          node tools/render.mjs --from ${{ matrix.from }} --to ${{ matrix.to }} --fps ${{ inputs.fps }} --jobs ${{ inputs.jobs }} --out out/part.mp4
+          R1=$(date +%s.%N)
+          FR=$(( ${{ matrix.f1 }} - ${{ matrix.f0 }} ))
+          GOT=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 out/part.mp4)
+          python3 - <<PY > out/timing.json
+          import json
+          r = $R1 - $R0
+          print(json.dumps({"i": ${{ matrix.i }}, "f0": ${{ matrix.f0 }}, "f1": ${{ matrix.f1 }}, "frames": $FR, "got_frames": int("$GOT"),
+                            "render_s": round(r, 2), "s_per_frame": round(r / $FR, 3), "setup_s": round(float("$SETUP_S"), 1)}))
+          PY
+          cat out/timing.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.i }}
+          path: |
+            bbn-test/video/out/part.mp4
+            bbn-test/video/out/timing.json
+          retention-days: 1
+          compression-level: 0
+  finish:
+    needs: [plan, render]
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - uses: actions/download-artifact@v4
+        with: { path: parts, pattern: 'part-*' }
+      - name: concat + timing report
+        run: |
+          for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
+          ls parts/*/part.mp4 | sort | sed "s#^#file '$PWD/#;s#\$#'#" > list.txt
+          ffmpeg -v error -y -f concat -safe 0 -i list.txt -c copy out.mp4
+          FRAMES=$(ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=nb_read_frames -of csv=p=0 out.mp4)
+          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out.mp4)
+          T1=$(date +%s.%N)
+          python3 - <<PY | tee -a $GITHUB_STEP_SUMMARY
+          import glob, json
+          rows = sorted((json.load(open(f)) for f in glob.glob("parts/*/timing.json")), key=lambda r: r["i"])
+          print("## bbn render test")
+          print(f"- expected frames: ${{ needs.plan.outputs.frames }}, final video: $FRAMES frames, $DUR s")
+          print(f"- first-plan-to-finish wall time (excl. queue before plan): {$T1 - ${{ needs.plan.outputs.t0 }}:.1f} s")
+          rs = [r["render_s"] for r in rows]; sp = [r["s_per_frame"] for r in rows]
+          print(f"- render step per job: min {min(rs)} / avg {sum(rs)/len(rs):.1f} / max {max(rs)} s")
+          print(f"- seconds per frame per job: min {min(sp)} / avg {sum(sp)/len(sp):.3f} / max {max(sp)}")
+          print(f"- setup per job (npm+apt+cues): avg {sum(r['setup_s'] for r in rows)/len(rows):.1f} s")
+          print(f"- frame count mismatches: {[r['i'] for r in rows if r['frames'] != r['got_frames']] or 'none'}")
+          print("\n| job | frames | got | render s | s/frame | setup s |\n|---|---|---|---|---|---|")
+          for r in rows:
+              print(f"| {r['i']} | {r['f0']}-{r['f1']} | {r['got_frames']} | {r['render_s']} | {r['s_per_frame']} | {r['setup_s']} |")
+          PY
+      - uses: actions/upload-artifact@v4
+        with: { name: bbn-video, path: out.mp4, retention-days: 3 }
