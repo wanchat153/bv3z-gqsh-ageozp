@@ -73,7 +73,7 @@ jobs:
         if: failure()
         run: |
           python3 - <<'PY'
-          t = open('out/render.log').read()[-1800:] if __import__('os').path.exists('out/render.log') else 'no render.log'
+          t = (lambda x: x[:1500] + '\n[...]\n' + x[-1200:])(open('out/render.log').read()) if __import__('os').path.exists('out/render.log') else 'no render.log'
           print('::error title=render log tail::' + t.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))
           PY
       - uses: actions/upload-artifact@v4
