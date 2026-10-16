@@ -1,0 +1,27 @@
+name: bbn-fetch
+# Download the ElevenLabs narration clips listed in bbn-test/assets/narr-manifest.json (signed URLs, valid ~2 h)
+# and commit them to bbn-test/assets/narr/ so later runs never depend on the expiring links.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p bbn-test/assets/narr
+          python3 - <<'PY'
+          import json, urllib.request
+          m = json.load(open('bbn-test/assets/narr-manifest.json'))
+          for k, v in m.items():
+              urllib.request.urlretrieve(v['url'], f'bbn-test/assets/narr/{k}.mp3')
+              print(k, v['dur'])
+          PY
+          ls -la bbn-test/assets/narr
+          python3 -c "import json;m=json.load(open('bbn-test/assets/narr-manifest.json'));[v.pop('url') for v in m.values()];json.dump(m,open('bbn-test/assets/narr-manifest.json','w'),indent=0)"
+          git config user.name bot; git config user.email bot@x
+          git add bbn-test/assets
+          git commit -qm "narration clips (ElevenLabs, Thai Narrator 3, eleven_v4)"
+          git push
