@@ -1,38 +1,35 @@
 import * as THREE from 'three'
+import { Assets, layer, samurai, mochi, mulBlend } from './inkkit'
 const W = 1920, H = 1080
-const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1); document.body.appendChild(r.domElement)
-const scene = new THREE.Scene(); scene.background = new THREE.Color('#E4DCCB'); scene.fog = new THREE.Fog('#E4DCCB', 14, 40)
-const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100); cam.position.set(0, 1.45, 11); cam.lookAt(0, 1.0, 0)
-const meta = await (await fetch('/ink/meta.json')).json()
-const loader = new THREE.TextureLoader()
-const TX: Record<string, THREE.Texture> = {}
-for (const n of Object.keys(meta)) { const t = await loader.loadAsync(`/ink/${n}.png`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; TX[n] = t }
-const tex = (n: string) => TX[n]
-const PX = 1 / 300
-function sprite(name: string, ax: number, ay: number, k: number, x: number, z: number, y = 0, tilt = 0) {
-  const m = meta[name], w = m.w * PX * k, h = m.h * PX * k
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex(name), transparent: true, alphaTest: 0.02, depthWrite: false }))
-  mesh.position.set(x + ((m.x + m.w / 2) - ax) * PX * k, y - ((m.y + m.h / 2) - ay) * PX * k, z); mesh.rotation.z = tilt; mesh.renderOrder = Math.round(z * 100) + (name === "sam_eyes" ? 3 : 0); scene.add(mesh); return mesh
-}
-// ground plane with painted paper + brush lines
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1); r.autoClear = false; document.body.appendChild(r.domElement)
+const A = await new Assets().load()
+const scene = new THREE.Scene(); scene.background = A.tex['paper_paper']
+const cam = new THREE.PerspectiveCamera(28, W / H, 0.1, 100); cam.position.set(0, 1.5, 12); cam.lookAt(0, 0.95, 0)
+// ground: perspective plane, ink wash + strokes, multiplied onto paper
 const gc = document.createElement('canvas'); gc.width = 1024; gc.height = 1024; const g = gc.getContext('2d')!
-g.fillStyle = '#D9D0BC'; g.fillRect(0, 0, 1024, 1024)
-for (let i = 0; i < 90; i++) { g.strokeStyle = `rgba(60,64,72,${0.06 + 0.1 * ((i * 37) % 10) / 10})`; g.lineWidth = 2 + (i % 4); const y = (i * 97) % 1024, x = (i * 211) % 1024; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 120 + (i % 7) * 50, y + (i % 3) * 3); g.stroke() }
-const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(3, 3); gt.colorSpace = THREE.SRGBColorSpace
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ map: gt })); ground.rotation.x = -Math.PI / 2; scene.add(ground)
-// puddles (flat, slightly glossy blue-grey) on the ground
-for (const [x, z, rx] of [[-3, 2.5, 1.5], [2.6, 3.5, 1.9], [4.2, -1, 1.2]]) { const p = new THREE.Mesh(new THREE.CircleGeometry(rx, 40), new THREE.MeshBasicMaterial({ color: '#9FB0BA', transparent: true, opacity: 0.7 })); p.rotation.x = -Math.PI / 2; p.scale.y = 0.5; p.position.set(x, 0.005, z); p.renderOrder = -150; scene.add(p) }
-// hills as flat planes at depth
-for (const [z, h, c, o] of [[-14, 3.2, '#8C98A3', 0.55], [-9, 1.9, '#7B8792', 0.7]] as const) { const sh = new THREE.Shape(); sh.moveTo(-30, 0); for (let x = -30; x <= 30; x += 1.5) sh.lineTo(x, h * (0.55 + 0.45 * Math.sin(x * 0.31 + z) * Math.cos(x * 0.13))); sh.lineTo(30, 0); const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o })); m.position.set(0, 0, z); m.renderOrder = -200; scene.add(m) }
-// characters (flat painted parts), feet on the ground
-const SS = 0.62   // samurai scale
-const sx = -0.6, sz = 0
-const ax = 600, ay = 520 + 1.58 * 300
-sprite('sam_legs', ax, ay, SS, sx, sz); sprite('sam_body', ax, ay, SS, sx, sz + 0.01); sprite('sam_arms', ax, ay, SS, sx, sz + 0.02); sprite('sam_over', ax, ay, SS, sx, sz + 0.03); sprite('sam_eyes', ax, ay, SS, sx, sz + 0.04)
-sprite('cat_sit_all', 560, 1050, 0.62, 1.9, 0.2)
-sprite('umbrella', 700, 760, SS * 1.5, sx + 0.9, sz - 0.05, 1.0)
-// shadows
-for (const [x, z, rx] of [[sx, 0, 0.55], [1.75, 0.2, 0.5]]) { const s = new THREE.Mesh(new THREE.CircleGeometry(rx, 32), new THREE.MeshBasicMaterial({ color: '#161312', transparent: true, opacity: 0.22 })); s.rotation.x = -Math.PI / 2; s.scale.y = 0.35; s.position.set(x, 0.01, z); s.renderOrder = -100; scene.add(s) }
-// extra depth: a second pair of characters far back (parallax / scale check)
-sprite('cat_stand_all', 560, 1050, 0.3, -5.2, -5)
-r.render(scene, cam); (window as any).READY = true
+g.fillStyle = '#fff'; g.fillRect(0, 0, 1024, 1024)
+const grad = g.createLinearGradient(0, 0, 0, 1024); grad.addColorStop(0, 'rgba(120,120,128,0.10)'); grad.addColorStop(1, 'rgba(120,120,128,0.30)'); g.fillStyle = grad; g.fillRect(0, 0, 1024, 1024)
+for (let i = 0; i < 70; i++) { g.strokeStyle = `rgba(40,44,52,${0.07 + 0.12 * ((i * 37) % 10) / 10})`; g.lineWidth = 3 + (i % 4); const y = (i * 97) % 1024, x = (i * 211) % 1024; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 140 + (i % 7) * 60, y + (i % 3) * 4); g.stroke() }
+const gt = new THREE.CanvasTexture(gc); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(2, 4); gt.colorSpace = THREE.SRGBColorSpace
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 60), (() => { const m = new THREE.MeshBasicMaterial({ map: gt, transparent: true, depthWrite: false }); mulBlend(m); return m })()); ground.rotation.x = -Math.PI / 2; ground.position.set(0, 0, -20); ground.renderOrder = -50; scene.add(ground)
+// backdrop: hills (far), tora lantern, tree - ink layers multiplied onto the paper, bottoms standing on the ground line
+const kb = 0.0105
+const hills = layer(A, 'hills', 960, 900, kb * 1.0, { mul: true, order: -40 }); hills.g.position.set(0, 0, -30); hills.g.scale.setScalar(4.5); scene.add(hills.g)
+const toro = layer(A, 'toro', 250, 900, 0.0042 * 1.6, { mul: true, order: -20 }); toro.g.position.set(-6.2, 0, -3); scene.add(toro.g)
+const tree = layer(A, 'tree', 1640, 900, 0.0042 * 1.6, { mul: true, order: -20 }); tree.g.position.set(6.6, 0, -4); scene.add(tree.g)
+// contact shadows
+const shadow = (x: number, z: number, rx: number) => { const s = new THREE.Mesh(new THREE.CircleGeometry(rx, 32), new THREE.MeshBasicMaterial({ color: '#161312', transparent: true, opacity: 0.22, depthWrite: false })); s.rotation.x = -Math.PI / 2; s.scale.y = 0.4; s.position.set(x, 0.01, z); s.renderOrder = -10; scene.add(s) }
+const SW = 0.5   // samurai S in world units
+const sam = samurai(A, SW, 10); sam.root.position.set(-0.7, 1.58 * SW, 0); scene.add(sam.root); shadow(-0.7, 0, SW * 0.95)
+// umbrella: grip pinned to the samurai's right hand
+const handR: [number, number] = [1.05, 0.7]
+sam.pose({ handR, eyes: 'up' })
+const um = layer(A, 'umbrella', 960, 860, SW / 300 * 2.6, { order: 6 }); scene.add(um.g)
+um.g.position.set(-0.7 + handR[0] * SW, 1.58 * SW + handR[1] * SW, 0.05)
+const cat = mochi(A, SW, 12); cat.root.position.set(1.15, 0, 0.2); cat.show('cat_sit_tail2'); scene.add(cat.root); shadow(1.1, 0.2, 0.45)
+// paper treatment on top, like the kit's final composite
+const ov = new THREE.Scene(), oc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+const quad = (t: THREE.Texture, blending: THREE.Blending, op: number) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: op, blending, depthTest: false })); ov.add(m) }
+quad(A.tex['paper_vig'], THREE.NormalBlending, 1)
+r.clear(); r.render(scene, cam); r.render(ov, oc)
+;(window as any).READY = true
