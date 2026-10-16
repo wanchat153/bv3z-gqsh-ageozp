@@ -2,8 +2,8 @@
 // ================= story part 2: Sam, hands + items, Mochi (pure functions of t) =================
 const Dd = SAMS * 1.58;
 // ---------- Sam path (body centre x). Facing is derived from the last movement unless overridden ----------
-const SX = [[0, -220], [2.6, 240], [4.1, 240], [6.5, 455], [12.0, 455], [13.5, 240], [14.0, 240], [15.5, 455], [16.4, 455], [17.2, 240], [17.8, 240], [18.4, 390], [19.2, 500], [26.0, 500], [27.0, 545], [27.8, 545], [28.8, 500], [42.0, 500],
-  [43.1, 300], [43.6, 300], [44.9, 520], [46.0, 520], [47.1, 300], [47.6, 300], [48.9, 520], [50.1, 520], [51.2, 300], [52.0, 300], [53.0, 520], [57.0, 520], [58.2, 440], [66.8, 440], [68.4, 500], [69.8, 500], [70.8, 455], [78.0, 455],
+const SX = [[0, -220], [2.6, 240], [4.1, 240], [6.5, 455], [12.0, 455], [13.5, 240], [14.0, 240], [15.5, 455], [16.4, 455], [17.2, 240], [17.8, 240], [18.4, 390], [19.2, 480], [26.0, 480], [27.0, 545], [27.8, 545], [28.8, 470], [42.0, 470],
+  [43.1, 300], [43.6, 300], [44.9, 470], [46.0, 470], [47.1, 300], [47.6, 300], [48.9, 470], [50.1, 470], [51.2, 300], [52.0, 300], [53.0, 470], [57.0, 470], [58.2, 440], [66.8, 440], [68.4, 470], [69.8, 470], [70.8, 455], [78.0, 455],
   [79.0, 820], [80.0, 420], [81.0, 800], [82.0, 380], [83.0, 780], [84.2, 860], [84.6, 830], [86.0, 830], [86.6, 760], [88.0, 520], [91.45, 520], [92.6, 150], [93.0, 165], [95.5, 170], [99.0, 570], [124.2, 570], [125.5, 600], [150, 600]];
 const FACEOV = [[13.4, 14.2, -1], [17.1, 18.0, -1], [28.8, 42.0, -1], [86.6, 91.5, 1], [92.6, 99.0, -1]];
 function faceAt(t) {
@@ -17,6 +17,13 @@ const SITW = [[99.3, 150]];
 const LIFTK = [[58.4, 0], [58.7, -20], [59.5, -130], [60.4, -190], [61.4, -150], [62.4, -210], [62.6, -210]];
 const wk = (W, t, e = 0.25) => { let m = 0; for (const [a, b] of W) m = Math.max(m, ss(a, a + e, t) * (1 - ss(b - e, b, t))); return m; };
 function shockAt(t) { let m = 0; for (const e of EV) { if (e[2] < 0.25 || t < e[0]) continue; const d = t - e[0]; if (d > 1.6) continue; if (!['hop', 'meow', 'grow', 'splash', 'spray', 'clang', 'tong', 'slash', 'hiss', 'burp', 'pop', 'dig', 'twang'].includes(e[1])) m = Math.max(m, e[2] * Math.exp(-d / 0.7) * ss(e[0], e[0] + 0.05, t)); } return m; }
+const PRK = [[18.4, 0], [18.55, -0.45], [18.85, -1.72], [18.97, -1.5], [19.1, -1.6], [21.4, -1.57], [21.75, -1.1], [22.0, 0.14], [22.3, 0], [62.95, 0], [63.05, -1.7], [63.2, -1.45], [63.4, -1.6], [64.2, -1.5], [64.6, -0.8], [64.9, 0.08], [65.2, 0]];
+const proneRot = (t) => { if (t < 18.4 || (t > 22.3 && t < 62.95) || t > 65.2) return 0; const seg = t < 30 ? PRK.slice(0, 9) : PRK.slice(9); return KS(seg, t)[0]; };
+let TURNS = null;
+function turnK(t) { // narrow-and-flip pulse when Sam changes facing, so the flip is hidden
+  if (!TURNS) { TURNS = []; let f = faceAt(0); for (let u = 0.05; u < DUR; u += 0.05) { const g = faceAt(u); if (g !== f) { TURNS.push(u); f = g; } } }
+  let k = 0; for (const tf of TURNS) { const d = Math.abs(t - tf); if (d < 0.14) k = Math.max(k, 1 - d / 0.14); } return k;
+}
 function samAt(t) {
   const x0 = ks1(SX, t), sp = (ks1(SX, t + 0.05) - ks1(SX, t - 0.05)) / 0.1, face = faceAt(t);
   const cr = wk(CROUCHW, t, 0.12), pr = wk(PRONEW, t, 0.2), sit = wk(SITW, t, 0.5), sh = shockAt(t);
@@ -24,7 +31,9 @@ function samAt(t) {
   let hop = 0; for (const [te, h] of HOPS) hop += arc(t, te, h, 0.34);
   let rot = 0.035 * Math.sin(t * 1.3) * (1 - pr);
   if (mov) rot += 0.05 * Math.sign(sp) * Math.min(1, Math.abs(sp) / 300) * (Math.abs(sp) > 250 ? 1.6 : 1);
-  rot += -1.45 * pr;
+  rot += proneRot(t);
+  const acc = (ks1(SX, t + 0.1) - 2 * x0 + ks1(SX, t - 0.1)) / 0.01; if (pr < 0.2 && sit < 0.3) rot += clamp(acc * 0.00008, -0.15, 0.15);   // weight shift: lean into speed-ups, rock forward when stopping
+  const wph = x0 * 0.045; const bob = mov ? Math.abs(Math.sin(wph)) * (Math.abs(sp) > 250 ? 11 : 7) : 0;
   // dips at the bucket / pours: small forward lean
   rot += 0.1 * wk([[3.3, 4.0], [13.6, 14.1], [17.3, 17.8], [35.6, 36.0]], t, 0.15) * -face;
   // slip: body tips back as feet fly (face = right)
@@ -33,13 +42,16 @@ function samAt(t) {
   let fly = 0, airY = 0; if (t >= 91.45 && t < 92.6) { const q = (t - 91.45) / 1.15; rot += -2 * PI * q; airY = -230 * Math.sin(PI * q); fly = 1; }
   const D2a = Dd;
   let sy = 1 - 0.18 * cr + 0.012 * Math.sin(t * 2.1) - 0.17 * sit, sx = 1 + 0.12 * cr + 0.1 * sit;
+  for (const [te] of HOPS) { const an = ss(te - 0.22, te - 0.02, t) * (1 - ss(te - 0.02, te + 0.04, t)); sy -= 0.17 * an; sx += 0.1 * an; }   // anticipation crouch before every hop
+  { const tk = turnK(t); sx *= 1 - 0.42 * tk; }
+  if (mov) { const st = Math.abs(Math.sin(wph)); sy -= 0.03 * (1 - st); sx += 0.02 * (1 - st); }
   for (const [te] of HOPS) { const d = t - te - 0.34; if (d > 0 && d < 0.3) { const q = Math.sin(PI * d / 0.3) * 0.1; sy -= q; sx += q * 0.7; } }
   // landing squash after the lift fall + after the throw
-  for (const [ta, w] of [[63.05, 0.3], [92.6, 0.3]]) { const d = t - ta; if (d > 0 && d < w) { const q = Math.sin(PI * d / w) * 0.2; sy -= q; sx += q * 0.7; } }
+  for (const [ta, w] of [[63.05, 0.3], [92.6, 0.3], [18.85, 0.32]]) { const d = t - ta; if (d > 0 && d < w) { const q = Math.sin(PI * d / w) * 0.2; sy -= q; sx += q * 0.7; } }
   let lift = t < 62.6 ? ks1(LIFTK, t) : (t < 63.05 ? -210 * (1 - Math.pow((t - 62.6) / 0.45, 2)) : 0);
   lift += airY;
   const D2 = Dd * sy;
-  let x = x0 + D2 * Math.sin(rot) * (1 - pr) * (fly ? 0.0 : 1), y = FL - D2 * Math.cos(rot) - hop + lift;
+  let x = x0 + D2 * Math.sin(rot) * (1 - pr) * (fly ? 0.0 : 1), y = FL - D2 * Math.cos(rot) - hop + lift - bob;
   if (pr > 0) { y = FL - 118 * pr - (1 - pr) * D2 * Math.cos(rot * (1 - pr)) - hop + lift; x = x0; }
   if (fly) { x = x0; y = FL - Dd * 0.5 + airY; }
   const walk = mov ? x0 * 0.045 * (-face) : (lift < -40 ? t * 9 : null);
@@ -49,8 +61,8 @@ function samAt(t) {
 }
 // ---------- hand poses (forward frame, dx dy from the body centre) + ladle angle aF ----------
 const PS = {
-  idle: [-150, 95, 150, 95, 0], carry: [-150, 95, 165, 45, PI + 0.15], scoop: [-150, 95, 132, -14, PI + 1.2], pour: [-150, 95, 165, -50, PI + 0.95], cheer: [-110, -30, 110, -30, 0], shrug: [-140, 70, 140, 70, 0],
-  catchP: [-150, 95, 165, 60, PI + 0.45], hold2: [30, 118, 125, 118, 0], pole: [20, 78, 165, 80, 0], place: [-150, 95, 160, 135, 0], sword: [-140, 60, 150, -45, 0], slash: [-140, 60, 150, 70, 0],
+  idle: [-150, 95, 150, 95, 0], carry: [-150, 95, 165, 45, PI + 0.15], scoop: [-150, 95, 132, -14, PI + 1.2], pour: [-150, 95, 165, -85, PI + 0.95], cheer: [-110, -30, 110, -30, 0], shrug: [-140, 70, 140, 70, 0],
+  catchP: [-150, 95, 210, 60, PI + 0.45], hold2: [30, 118, 125, 118, 0], pole: [20, 78, 165, 80, 0], place: [-150, 95, 160, 135, 0], sword: [-140, 60, 150, -45, 0], slash: [-140, 60, 150, 70, 0],
   fishup: [-150, 95, 130, -70, 0], run: [-130, 40, 130, 40, 0], flail: [-120, -50, 110, -80, 0], up: [-60, -130, 60, -130, 0], rest: [-130, 120, 130, 120, 0],
 };
 const HP = [[0, 'idle'], [3.0, 'idle'], [3.3, 'carry'], [3.55, 'scoop'], [3.9, 'scoop'], [4.3, 'carry'], [6.6, 'carry'], [6.9, 'pour'], [7.5, 'pour'], [7.8, 'carry'], [7.95, 'cheer'], [8.4, 'cheer'], [8.8, 'carry'], [13.5, 'carry'], [13.65, 'scoop'], [14.0, 'scoop'], [14.35, 'carry'], [15.6, 'carry'], [15.85, 'pour'], [16.25, 'pour'], [16.5, 'carry'],
@@ -75,7 +87,7 @@ function ladleAt(t, hands, bk) {
   const wat = lerpK(WAT, t);
   const held = (c, aF) => { const aS = hands.f > 0 ? aF : PI - aF; return { x: hands.R[0] - 133 * Math.cos(aS), y: hands.R[1] - 133 * Math.sin(aS), ang: aS, wat }; };
   if (ladleHeld(t)) return held(0, hands.aF);
-  if (t >= 18.5 && t < 19.6) { const k = KS([[18.5, 450, 1090, PI - 0.5], [18.9, 560, 880, PI + 1.5], [19.35, 600, 1170, PI + 3.0], [19.6, 560, 1248, PI + 0.2]], t); return { x: k[0], y: k[1], ang: k[2], wat: wat }; }
+  if (t >= 18.5 && t < 19.6) { const k = KS([[18.5, 450, 1090, PI - 0.5], [18.9, 590, 880, PI + 1.5], [19.35, 640, 1290, PI + 3.0], [19.6, 560, 1248, PI + 0.2]], t); return { x: k[0], y: k[1], ang: k[2], wat: wat }; }
   if (t >= 19.6 && t < 27.45) return { x: 560, y: 1248, ang: PI + 0.2, wat: 0, rest: true };
   if (t >= 33.4 && t < 34.3) { const k = KS([[33.4, 800, 1150, PI + 0.45], [33.75, 620, 880, PI + 1.8], [34.3, 428, 1165, PI + 1.2]], t); return { x: k[0], y: k[1], ang: k[2], wat: 0 }; }
   if (t >= 37.3 && t < 37.9) { const k = KS([[37.3, 785, 1180, PI + 0.45], [37.6, 640, 1090, PI + 2.2], [37.9, 470, 1250, PI + 0.2]], t); return { x: k[0], y: k[1], ang: k[2], wat: 0 }; }
@@ -113,8 +125,8 @@ function swordAt(t, hands) {
 // ---------- fish (act 6) ----------
 function fishAt(t, hands) {
   if (t < 74.3 || t >= 76.2) return null;
-  if (t < 74.9) { const q = (t - 74.3) / 0.6; return { x: 640 + 30 * q, y: 1210 - 160 * Math.sin(PI * q), rot: 6 * q }; }
-  if (t < 75.55) return { x: 672, y: 1236, rot: 0.1 };
+  if (t < 74.9) { const q = (t - 74.3) / 0.6; return { x: 680 + 30 * q, y: 1370 - 190 * Math.sin(PI * q), rot: 6 * q }; }
+  if (t < 75.55) return { x: 712, y: 1376, rot: 0.1 };
   if (t < 76.0) return { x: hands.R[0], y: hands.R[1] - 20, rot: -0.6 };
   const q = (t - 76.0) / 0.2; return { x: hands.R[0] + 6 * q, y: hands.R[1] - 20 - 200 * q, rot: -0.6 };
 }
@@ -127,9 +139,9 @@ function kasaAt(t) { // offsets relative to its seat: dx, dy, rot
   return { dx: 52, dy: 174, rot: 1.1 };
 }
 // ---------- Mochi ----------
-const MH = [[10.4, 10.9, 600, 600, 45], [33.95, 34.5, 600, 600, 70], [63.0, 63.5, 600, 600, 50], [72.4, 73.0, 600, 650, 25], [74.3, 74.8, 650, 650, 70],
-  [78.6, 79.3, 650, 760, 90], [79.5, 80.3, 760, 520, 100], [80.5, 81.3, 520, 740, 100], [81.5, 82.3, 740, 440, 100], [82.5, 83.3, 440, 700, 100], [83.4, 84.1, 700, 770, 70], [100.5, 101.2, 770, 700, 40], [120.4, 121.0, 700, 715, 40]];
-function catGround(t) { let x = 600, up = 0, last = null; for (const m of MH) if (t >= m[0]) last = m; if (last) { const [t0, t1, x0, x1, h] = last; if (t < t1) { const q = (t - t0) / (t1 - t0), e = q * q * (3 - 2 * q); x = x0 + (x1 - x0) * e; up = h * Math.sin(PI * q); } else x = x1; } return { x, up }; }
+const MH = [[10.4, 10.9, 640, 640, 45], [33.95, 34.5, 640, 640, 70], [63.0, 63.5, 640, 640, 50], [72.4, 73.0, 640, 680, 25], [74.3, 74.8, 680, 680, 70],
+  [78.6, 79.3, 680, 760, 90], [79.5, 80.3, 760, 520, 100], [80.5, 81.3, 520, 740, 100], [81.5, 82.3, 740, 440, 100], [82.5, 83.3, 440, 700, 100], [83.4, 84.1, 700, 770, 70], [100.5, 101.2, 770, 700, 40], [120.4, 121.0, 700, 715, 40]];
+function catGround(t) { let x = 640, up = 0, last = null; for (const m of MH) if (t >= m[0]) last = m; if (last) { const [t0, t1, x0, x1, h] = last; if (t < t1) { const q = (t - t0) / (t1 - t0), e = q * q * (3 - 2 * q); x = x0 + (x1 - x0) * e; up = h * Math.sin(PI * q); } else x = x1; } return { x, up }; }
 function catAt(t) {
   const g = catGround(t); let rot = 0, sqx = 1, sqy = 1, tail = 0.12, sleep = 0, wide = 0.12;
   for (const m of MH) { const a = m[0] - 0.4, b = m[0]; if (t > a && t < b) { const q = ss(a, b - 0.03, t); sqy = 1 - 0.18 * q; sqx = 1 + 0.1 * q; tail = 0.4; } const d = t - m[1]; if (d > 0 && d < 0.35) { const q = Math.sin(PI * d / 0.35) * Math.exp(-d / 0.25); sqy *= 1 - 0.16 * q; sqx *= 1 + 0.1 * q; } }
@@ -148,5 +160,5 @@ function catAt(t) {
   const wetK = Math.max(wk([[19.4, 22]], t, 0.6), wk([[49.8, 52.5]], t, 0.6), wk([[85.0, 90]], t, 0.8));
   let look = [0.5, -0.1];
   for (const [a, b, l] of [[9.8, 12, [0.2, -0.9]], [22.6, 26, [0.1, -0.9]], [57, 64, [-0.4, -0.7]], [75, 77, [0.1, -0.9]], [116, 119, [0.3, -0.8]], [126, 134, [0.1, -0.9]], [136, 141, [0.2, -0.9]]]) if (t >= a && t < b) look = l;
-  return { x: g.x, y: FL - g.up - 2, rot, sqx, sqy, tail, sleep: asleep, wide, wet: wetK, look, down: 0 };
+  return { x: g.x, y: FL + 112 - g.up - 2, rot, sqx, sqy, tail, sleep: asleep, wide, wet: wetK, look, down: 0 };
 }

@@ -43,7 +43,7 @@ function mouthPos(tilt) { const a = 0.52 - 1.02 * tilt, lx = -158 * Math.cos(a),
 // ---------- bamboo poles (gutter) ----------
 const POLES = [ // len, stack position (centre), place window [t0,t1], end x when laid as gutter, toss window, toss target
   { id: 'A', len: 70, st: [330, 1345, 0.08], pick: 43.4, lay: [44.95, 46.0], endx: 745, toss: [46.0, 46.6, 70, 1395] },
-  { id: 'B', len: 205, st: [290, 1365, 0.05], pick: 47.6, lay: [49.0, 50.15], endx: 605, toss: [50.15, 50.8, 60, 1415] },
+  { id: 'B', len: 172, st: [290, 1365, 0.05], pick: 47.6, lay: [49.0, 50.15], endx: 605, toss: [50.15, 50.8, 60, 1415] },
   { id: 'C', len: 110, st: [350, 1380, 0.03], pick: 52.0, lay: [53.0, 86.6], endx: 703, toss: null },
 ];
 const GUT0 = [812, 1226];

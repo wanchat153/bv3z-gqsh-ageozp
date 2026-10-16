@@ -75,14 +75,15 @@ function mapleTree(c, x, y, s) {
   const cols = ['#C23A25', '#D9552A', '#E4752E', '#B8301F'];
   for (const [bx, by, r, k] of [[-120, -380, 100, 0], [20, -470, 120, 1], [140, -360, 105, 2], [-30, -330, 90, 3], [-150, -290, 70, 1], [170, -250, 66, 0]]) {
     SH(c, (c) => blob(c, bx, by, r, 12, k * 5 + bx, 0.16, 0.82), { f: cols[k], sh: 'rgba(90,20,10,0.38)', hl: 'rgba(255,196,110,0.4)', d: [r * 0.12, r * 0.16], line: 2.6,
-      tex: (c) => { for (let i = 0; i < 26; i++) { const a = hash(i + k, 3) * PI2, rr = r * 0.8 * hash(i + k, 4); mapleLeaf(c, bx + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.8, 6 + 3.5 * hash(i, 5), hash(i, 6) * 6, hash(i, 8) > 0.5 ? '#F29A44' : '#9E2418', 0); } } });
+      tex: (c) => { for (let i = 0; i < 9; i++) { const a = hash(i + k, 3) * PI2, rr = r * 0.72 * hash(i + k, 4); c.fillStyle = i % 3 ? 'rgba(255,170,80,0.42)' : 'rgba(120,24,16,0.32)'; c.beginPath(); c.ellipse(bx + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.75, r * (0.18 + 0.12 * hash(i, 6)), r * 0.12, hash(i, 7) * 3, 0, PI2); c.fill(); }
+        for (let i = 0; i < 9; i++) { const a = hash(i + k, 13) * PI2, rr = r * 0.9 * hash(i + k, 14); mapleLeaf(c, bx + Math.cos(a) * rr, by + Math.sin(a) * rr * 0.78, 11 + 5 * hash(i, 15), hash(i, 16) * 6, hash(i, 17) > 0.5 ? '#F29A44' : '#A62A1C', 0); } } });
   }
   c.restore();
 }
 function pineBehind(c, x, y, s) {
   c.save(); c.translate(x, y); c.scale(s, s);
   SH(c, (c) => { c.moveTo(-14, 0); c.bezierCurveTo(-30, -60, 20, -120, -6, -210); c.lineTo(18, -210); c.bezierCurveTo(40, -120, -2, -60, 16, 0); c.closePath(); }, { f: '#5B4333', sh: 'rgba(30,18,10,0.45)', d: [6, 0], line: 2.6 });
-  for (const [px, py, r] of [[-70, -150, 74], [60, -200, 84], [-20, -260, 70], [110, -120, 58]]) SH(c, (c) => E(c, px, py, r, r * 0.4), { f: '#3F6A47', sh: 'rgba(14,40,24,0.45)', hl: 'rgba(150,200,120,0.4)', d: [6, 10], line: 2.6 });
+  for (const [px, py, r] of [[-70, -150, 74], [60, -200, 84], [-20, -260, 70], [110, -120, 58]]) padShape(c, px, py, r, 5, 2.6);
   c.restore();
 }
 function bambooStalk(c, x, top, bot, w, col = '#7F9A52') {
@@ -227,6 +228,14 @@ function bucket(c, x, y, s = 1, water = 0.8) { // wooden oke, y = ground
   SH(c, (c) => E(c, 0, -120, 64, 14), { f: '#5C8896', line: 3.2 }); c.fillStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.ellipse(-16, -123, 26, 4, 0, 0, PI2); c.fill();
   c.restore();
 }
+// niwaki cloud-pad: scalloped outline, tonal needle clumps, dark underside (sapling + pine behind the wall)
+function padShape(c, px, py, rx, k = 0, line = 3.8) {
+  const ry = 0.44;
+  SH(c, (c) => blob(c, px, py, rx, 15, k * 7 + Math.round(px), 0.13, ry), { f: '#4A7A48', sh: 'rgba(12,38,24,0.55)', hl: 'rgba(176,222,128,0.5)', d: [rx * 0.07, rx * 0.2], line,
+    tex: (c) => { for (let i = 0; i < 11; i++) { const a = -PI + PI * hash(i + k, 1), rr = 0.15 + 0.7 * hash(i + k, 2), cx0 = px + Math.cos(a) * rx * rr, cy0 = py + Math.sin(a) * rx * ry * rr * 0.9 - 2, tone = hash(i, 3);
+        c.fillStyle = tone > 0.55 ? 'rgba(150,204,104,0.55)' : 'rgba(22,56,32,0.45)'; c.beginPath(); c.ellipse(cx0, cy0, rx * 0.2, rx * 0.085, 0, 0, PI2); c.fill();
+        c.lineWidth = 1.6; c.strokeStyle = tone > 0.55 ? 'rgba(206,238,150,0.85)' : 'rgba(16,44,26,0.6)'; for (let j = 0; j < 9; j++) { const b = -PI * 0.95 + PI * 0.9 * (j / 8); c.beginPath(); c.moveTo(cx0, cy0 + 4); c.lineTo(cx0 + Math.cos(b) * rx * 0.17, cy0 + Math.sin(b) * rx * 0.1 - 2); c.stroke(); } } } });
+}
 // ---------- young pine (niwaki) with stake: g 0..1 growth, droop 0..1 ----------
 function sapling(c, x, y, g = 0.2, t = 0, sway = 0, droop = 0) {
   c.save(); c.translate(x, y);
@@ -245,8 +254,7 @@ function sapling(c, x, y, g = 0.2, t = 0, sway = 0, droop = 0) {
   for (const [sd, q, sc, k] of pads) {
     const bx0 = bx(q), by0 = -24 - (Hh - 24) * q, px = bx0 + sd * (50 + 120 * g) * sc, py = by0 - 18 - 14 * g + droop * 24 * (sd ? 1 : 0.4) + 3 * Math.sin(t * 1.3 + k), rx = (44 + 118 * g) * sc;
     c.strokeStyle = '#5E4128'; c.lineWidth = 5 + 8 * g; c.lineCap = 'round'; c.beginPath(); c.moveTo(bx0, by0); c.quadraticCurveTo((bx0 + px) / 2, by0 - 4, px, py + 8); c.stroke();
-    SH(c, (c) => E(c, px, py, rx, rx * 0.42), { f: '#4A7A48', sh: 'rgba(14,40,24,0.5)', hl: 'rgba(168,214,120,0.45)', d: [rx * 0.06, rx * 0.2], line: 3.8,
-      tex: (c) => { c.lineWidth = 1.8; for (let i = 0; i < 46; i++) { const a = -PI + PI * hash(i + k, 1), rr = 0.35 + 0.65 * hash(i + k, 2); c.strokeStyle = hash(i, 3) > 0.5 ? 'rgba(170,214,120,0.7)' : 'rgba(18,48,28,0.6)'; const ax = px + Math.cos(a) * rx * rr, ay = py + Math.sin(a) * rx * 0.42 * rr; c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax + Math.cos(a) * 12, ay + Math.sin(a) * 6 + 2); c.stroke(); } } });
+    padShape(c, px, py, rx, k);
   }
   c.restore();
 }
@@ -266,7 +274,7 @@ function samState(x, o = {}) { return Object.assign({ x, y: FL - SAMS * 1.58, gr
 let BG1 = null, BG2 = null;
 function bgLayers() {
   if (BG1) return;
-  const mk = () => { const cv = document.createElement('canvas'); cv.width = 1080; cv.height = 1920; return cv; };
+  const mk = () => { const cv = document.createElement('canvas'); cv.width = 2160; cv.height = 3840; cv.getContext('2d').scale(2, 2); return cv; };   // 2x so the camera can zoom without blur
   BG1 = mk(); drawSkyStatic(BG1.getContext('2d'));
   BG2 = mk(); const c = BG2.getContext('2d');
   // behind the wall
@@ -293,4 +301,6 @@ function bgLayers() {
   
   // fallen leaves
   for (let i = 0; i < 12; i++) fallenLeaf(c, 60 + 960 * hash(i, 7), 1190 + 700 * hash(i, 8) * hash(i, 8), 13 + 5 * hash(i, 9), hash(i, 10) * 6.28, i);
+  softenBG(BG1, 1.0); softenBG(BG2, 1.3);
 }
+function softenBG(cv, px) { const t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height; const tc = t.getContext('2d'); tc.filter = `blur(${px}px)`; tc.drawImage(cv, 0, 0); const c2 = cv.getContext('2d'); c2.setTransform(1, 0, 0, 1, 0, 0); c2.clearRect(0, 0, cv.width, cv.height); c2.drawImage(t, 0, 0); }
