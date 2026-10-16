@@ -1,0 +1,19 @@
+name: bbn-send
+# Copy the final video of a finished bbn run onto branch `final` so it can be fetched.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id: { description: 'bbn run id', required: true }
+permissions:
+  contents: write
+  actions: read
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: bbn-video, path: v, run-id: "${{ inputs.run_id }}", github-token: "${{ github.token }}" }
+      - run: |
+          cd v && git init -q -b final && git add final.mp4
+          git -c user.name=bot -c user.email=bot@x commit -qm "final video run ${{ inputs.run_id }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" final
