@@ -20,13 +20,13 @@ const tree = layer(A, 'tree', 1640, 900, 0.0042 * 1.6, { mul: true, order: -20 }
 // contact shadows
 const shadow = (x: number, z: number, rx: number) => { const s = new THREE.Mesh(new THREE.CircleGeometry(rx, 32), new THREE.MeshBasicMaterial({ color: '#161312', transparent: true, opacity: 0.22, depthWrite: false })); s.rotation.x = -Math.PI / 2; s.scale.y = 0.4; s.position.set(x, 0.01, z); s.renderOrder = -10; scene.add(s) }
 const SW = 0.5   // samurai S in world units
-const sam = samurai(A, SW, 10); sam.root.position.set(-0.7, 1.58 * SW, 0); scene.add(sam.root); shadow(-0.7, 0, SW * 0.95)
+const sam = samurai(A, SW, 10); sam.root.position.set(-0.6, 1.58 * SW, 0); scene.add(sam.root); shadow(-0.6, 0, SW * 0.95)
 // umbrella: grip pinned to the samurai's right hand
 const handR: [number, number] = [1.05, 0.7]
 sam.pose({ handR, eyes: 'up' })
 const um = layer(A, 'umbrella', 960, 860, SW / 300 * 2.6, { order: 6 }); scene.add(um.g)
-um.g.position.set(-0.7 + handR[0] * SW, 1.58 * SW + handR[1] * SW, 0.05)
-const cat = mochi(A, SW, 12); cat.root.position.set(1.15, 0, 0.2); cat.show('cat_sit_tail2'); scene.add(cat.root); shadow(1.1, 0.2, 0.45)
+um.g.position.set(-0.6 + handR[0] * SW, 1.58 * SW + handR[1] * SW, 0.05)
+const cat = mochi(A, SW, 12); cat.root.position.set(0.45, 0, 0.2); cat.show('cat_sit_tail2'); scene.add(cat.root); shadow(0.4, 0.2, 0.45)
 // paper treatment on top, like the kit's final composite
 const ov = new THREE.Scene(), oc = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 const quad = (t: THREE.Texture, blending: THREE.Blending, op: number) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: op, blending, depthTest: false })); ov.add(m) }
