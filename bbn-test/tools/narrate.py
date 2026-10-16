@@ -6,7 +6,7 @@ measures the real durations, and writes
   <outdir>/timing.json  ({duration, lines:[{id,start,end}]} for tools/cues.mjs --align)
   <outdir>/voice.m4a    (all lines placed on the timeline, padded/trimmed to total_seconds)
 """
-import json, os, re, subprocess, sys, time
+import json, os, re, shutil, subprocess, sys, time
 
 OUT = sys.argv[1]; TOTAL = float(sys.argv[2]) if len(sys.argv) > 2 else 45.0
 VOICE = 'th-TH-NiwatNeural'; LEAD = 0.7; GAP = 0.45; TAIL = 1.5
@@ -39,9 +39,19 @@ def synth(text, rate, path):
     raise RuntimeError(f'TTS failed for: {text[:30]}... {r.stderr[-300:]}')
 
 def main():
-    global chosen
+    global chosen, GAP
     chosen = None
-    for rate in ['-8%', '-4%', '+0%', '+6%', '+12%']:
+    assets = os.path.join(HERE, '..', 'assets', 'narr')
+    if all(os.path.exists(os.path.join(assets, f'{lid}.mp3')) for lid, _ in lines):  # pre-generated ElevenLabs clips
+        GAP = 0.6
+        durs = []
+        for i, (lid, _) in enumerate(lines):
+            p = os.path.join(OUT, f'seg_{i}.mp3'); shutil.copy(os.path.join(assets, f'{lid}.mp3'), p); durs.append(dur(p))
+        total = LEAD + sum(durs) + GAP * (len(lines) - 1)
+        print(f'assets: speech ends at {total:.2f}s (budget {TOTAL - TAIL:.1f}s)')
+        if total > TOTAL - TAIL: raise RuntimeError(f'narration {total:.1f}s does not fit {TOTAL}s')
+        chosen = ('eleven_v4', durs, total)
+    for rate in ([] if chosen else ['-8%', '-4%', '+0%', '+6%', '+12%']):
         durs = []
         for i, (lid, text) in enumerate(lines):
             p = os.path.join(OUT, f'seg_{i}.mp3'); synth(text, rate, p); durs.append(dur(p))
@@ -61,7 +71,7 @@ def main():
         inputs += ['-i', os.path.join(OUT, f'seg_{i}.mp3')]
         ms = int(round(st * 1000)); chains.append(f'[{i}:a]adelay={ms}|{ms}[a{i}]')
     mix = ''.join(f'[a{i}]' for i in range(len(starts)))
-    flt = ';'.join(chains) + f';{mix}amix=inputs={len(starts)}:normalize=0:duration=longest,apad=whole_dur={TOTAL},atrim=0:{TOTAL},afade=t=out:st={TOTAL - 0.6}:d=0.6[a]'
+    flt = ';'.join(chains) + f';{mix}amix=inputs={len(starts)}:normalize=0:duration=longest,loudnorm=I=-16:LRA=11:TP=-1.5,apad=whole_dur={TOTAL},atrim=0:{TOTAL},afade=t=out:st={TOTAL - 0.6}:d=0.6[a]'
     subprocess.run(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', flt, '-map', '[a]', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000',
                     os.path.join(OUT, 'voice.m4a')], check=True)
     print('voice ends at', round(total, 2), 's; rate', rate)

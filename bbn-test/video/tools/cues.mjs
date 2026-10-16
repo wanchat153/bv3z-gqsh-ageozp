@@ -63,7 +63,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const l of lines) Object.assign(l, a.lines.find(x => x.id === l.id) ?? {})
     duration = a.duration; bpm = a.bpm ?? BPM; offset = a.offset ?? 0
   } else duration = gridTimes(lines)
-  duration = Math.max(duration, lines.at(-1).end + 7) // always leave room for the end card
+  if (alignIdx <= 0) duration = Math.max(duration, lines.at(-1).end + 7) // always leave room for the end card (aligned runs keep their exact length)
   const scenes = buildScenes(lines, map, duration)
   writeFileSync(root + 'video/public/cues.json', JSON.stringify({ bpm, offset, duration, lines, scenes }, null, 1))
   console.log(`cues: ${lines.length} lines, ${scenes.length} scenes, ${duration.toFixed(1)}s`)

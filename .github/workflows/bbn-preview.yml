@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       times: { description: 'comma-separated seconds', default: '2,6,10,13,17,20,24,27,31,34,38,43' }
+      seconds: { description: 'video length in seconds', default: '180' }
 permissions:
   contents: write
   actions: read
@@ -16,7 +17,7 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends ffmpeg > /dev/null &
           python3 -m pip install --quiet --break-system-packages edge-tts
           wait
-          python3 bbn-test/tools/narrate.py narr 45
+          python3 bbn-test/tools/narrate.py narr ${{ inputs.seconds }}
       - uses: actions/upload-artifact@v4
         with: { name: narr, path: narr, retention-days: 1 }
   plan:
