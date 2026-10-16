@@ -45,7 +45,7 @@ export default {
         if (flash > 0) main.update(1, flash, 0.25 + 0.75 * glow)
         else if (t >= L1) main.update(1, 0, glow)
         sky(flash * 0.9); sc.lightK(flash); cl.setLight(0.08 + flash * 0.8)
-        place(ctx.stage.camera, tUp, V(5, 14.5, -42), ease.out(seg(t, L1 - 3.0, L1 - 2.3)) * (1 - ease.out(seg(t, L1 - 0.1, L1 + 0.2))), 30, -10)
+        place(ctx.stage.camera, tUp, V(5, 14.5, -42), ease.out(seg(t, L1 - 3.0, L1 - 2.3)) * (1 - ease.out(seg(t, L1 - 0.7, L1 - 0.3))), 30, -10)
         place(ctx.stage.camera, tConn, V(5, 14.5, -42), ease.out(seg(t, L1 + 0.0, L1 + 0.3)) * (1 - ease.out(seg(t, L1 + 2.4, L1 + 3.0))), 30, -10)
         const o = ease.out(seg(f.li >= 2 ? f.lp : 0, 0.05, 0.2)) * (f.li >= 2 ? 1 : 0)
         hot.style.opacity = String(o)

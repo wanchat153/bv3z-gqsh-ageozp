@@ -231,18 +231,18 @@ export function scenery(root: THREE.Group) {
   return {
     lightK,
     house(x: number, z: number, s = 1, lit = true) {
-      add(new THREE.Mesh(new THREE.BoxGeometry(3 * s, 2 * s, 2.4 * s), basic('#0d1320')), x, s, z)
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(2.4 * s, 1.4 * s, 4), basic('#0b101b')); roof.rotation.y = Math.PI / 4
+      add(new THREE.Mesh(new THREE.BoxGeometry(3 * s, 2 * s, 2.4 * s), basic('#17213a')), x, s, z)
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(2.4 * s, 1.4 * s, 4), basic('#131c32')); roof.rotation.y = Math.PI / 4
       add(roof, x, 2 * s + 0.7 * s, z)
       if (lit) add(new THREE.Mesh(new THREE.PlaneGeometry(0.6 * s, 0.6 * s), warm), x + 0.4 * s, 1.1 * s, z + 1.21 * s)
     },
     tree(x: number, z: number, s = 1) {
-      add(new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 1.6 * s, 6), basic('#0a0e16')), x, 0.8 * s, z)
-      for (let i = 0; i < 3; i++) add(new THREE.Mesh(new THREE.ConeGeometry((1.5 - i * 0.35) * s, 2 * s, 7), basic('#0a121a')), x, (2 + i * 1.1) * s, z)
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 1.6 * s, 6), basic('#101a28')), x, 0.8 * s, z)
+      for (let i = 0; i < 3; i++) add(new THREE.Mesh(new THREE.ConeGeometry((1.5 - i * 0.35) * s, 2 * s, 7), basic('#10202c')), x, (2 + i * 1.1) * s, z)
     },
     tower(x: number, z: number, h: number, w = 1.2) {
-      add(new THREE.Mesh(new THREE.BoxGeometry(w, h, w), basic('#0e1522')), x, h / 2, z)
-      add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, h * 0.18, w * 0.5), basic('#0e1522')), x, h + h * 0.09, z)
+      add(new THREE.Mesh(new THREE.BoxGeometry(w, h, w), basic('#1a2438')), x, h / 2, z)
+      add(new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, h * 0.18, w * 0.5), basic('#1a2438')), x, h + h * 0.09, z)
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.05, h * 0.22, 5), basic('#2a3550')), x, h + h * 0.28, z)
     },
   }

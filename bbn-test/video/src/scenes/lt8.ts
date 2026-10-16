@@ -14,11 +14,12 @@ export default {
     const sc = scenery(ctx.root)
     sc.tree(-14, -30, 2.2); sc.house(12, -32, 1.8)
     // car
-    const car = new THREE.Group(); car.position.set(44, 0, -30); ctx.root.add(car)
-    const cm = new THREE.MeshBasicMaterial({ color: '#1a2336' })
+    const car = new THREE.Group(); car.position.set(44, 0, -30); car.scale.setScalar(1.8); ctx.root.add(car)
+    const cm = new THREE.MeshBasicMaterial({ color: '#34476b' })
     const b1 = new THREE.Mesh(new THREE.BoxGeometry(6, 1.3, 2.6), cm); b1.position.y = 0.95; car.add(b1)
     const b2 = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.1, 2.4), cm); b2.position.set(-0.2, 2.1, 0); car.add(b2)
     for (const x of [-1.9, 1.9]) for (const z of [-1.3, 1.3]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.4, 14), new THREE.MeshBasicMaterial({ color: '#070a10' })); w.rotation.x = Math.PI / 2; w.position.set(x, 0.55, z); car.add(w) }
+    for (const z of [-0.8, 0.8]) { const hl = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.25, 0.5), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.0, 1.2) })); hl.position.set(3.05, 1.0, z); car.add(hl) }
     const skin = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(6.15, 1.45, 2.75)), new THREE.LineBasicMaterial({ color: new THREE.Color(1.4, 1.2, 0.4), transparent: true, opacity: 0 })); skin.position.y = 0.95; car.add(skin)
     const inner = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.2, 1.1, 0.5), transparent: true, opacity: 0, blending: THREE.AdditiveBlending })); inner.position.y = 1.7; car.add(inner)
     const cl = cloud(ctx.root, { seed: 71, n: 160, z: -40, y0: 34, y1: 56, w: 80, depth: 22 })
@@ -49,8 +50,8 @@ export default {
         ;(inner.material as THREE.MeshBasicMaterial).opacity = hit > 0 ? 0.18 + 0.05 * Math.sin(t * 3) : 0
         place(ctx.stage.camera, tBad, V(-14, 9, -30), ease.out(seg(t, 1.0, 1.6)) * (1 - pan), 0, -10)
         place(ctx.stage.camera, tOk, V(12, 6.4, -32), ease.out(seg(t, 4.2, 4.8)) * (1 - pan), 0, 0)
-        place(ctx.stage.camera, tCar, V(44, 4.2, -30), ease.out(seg(t, L1 + 0.8, L1 + 1.4)) * (1 - ease.out(seg(t, L2 - 0.3, L2 + 0.3))), 0, -10)
-        place(ctx.stage.camera, tFlow, V(44, 2.4, -28), ease.out(seg(t, L1 + 3.2, L1 + 3.8)) * (1 - ease.out(seg(t, L2 - 0.3, L2 + 0.3))), 0, 30)
+        place(ctx.stage.camera, tCar, V(44, 7.4, -30), ease.out(seg(t, L1 + 0.8, L1 + 1.4)) * (1 - ease.out(seg(t, L2 - 0.3, L2 + 0.3))), 0, -10)
+        place(ctx.stage.camera, tFlow, V(44, 4.6, -28), ease.out(seg(t, L1 + 3.2, L1 + 3.8)) * (1 - ease.out(seg(t, L2 - 0.3, L2 + 0.3))), 0, 30)
         const w = f.li >= 2 ? ease.out(seg(f.lp, 0.0, 0.2)) : 0
         wait.style.opacity = String(w)
         const prog = f.li >= 2 ? clamp(seg(f.lp, 0.15, 0.95)) : 0, ang = prog * Math.PI * 2

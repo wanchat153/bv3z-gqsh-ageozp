@@ -42,11 +42,11 @@ export default {
         sky(flash * 0.8); sc.lightK(flash); cl.setLight(0.08 + flash * 0.7)
         // shock shells expand around the channel
         const a = Math.max(0, t - (0.6 + 0.5))
-        shells.forEach((m, i) => { const q = a - i * 0.55; const r = 0.5 + Math.max(0, q) * 3.2; m.scale.set(r, 1, r); (m.material as THREE.MeshBasicMaterial).opacity = q > 0 ? 0.35 * Math.exp(-q * 0.7) * (t < LB ? 1 : 0) : 0 })
+        shells.forEach((m, i) => { const q = a - i * 0.55; const r = 0.5 + Math.max(0, q) * 3.2; m.scale.set(r, 1, r); (m.material as THREE.MeshBasicMaterial).opacity = q > 0 ? 0.22 * Math.exp(-q * 0.7) * (t < LB ? 1 : 0) : 0 })
         // sound front on the ground (slowed down): reaches the observer ~8 s after the flash
         const tau = Math.max(0, t - (LB + 0.3 + 0.5)), D = BX + 12, v = D / 8.1
         ring.scale.set(Math.max(0.01, tau * v), Math.max(0.01, tau * v), 1)
-        ;(ring.material as THREE.MeshBasicMaterial).opacity = t < LB + 0.8 ? 0 : (tau * v < D ? 0.9 : 0.9 * Math.exp(-(tau * v - D) * 0.6))
+        ;(ring.material as THREE.MeshBasicMaterial).opacity = t < LB + 0.8 ? 0 : (tau * v < D ? 0.55 : 0.55 * Math.exp(-(tau * v - D) * 0.6))
         const e = seg(t, 0, f.dur)
         cam(ctx.stage.camera, ease.inOut(seg(t, LB - 1, LB + 1)), [20, 12, 46], [8, 40, 26], [30, 16, -42], [9, 0, -42], t)
         place(ctx.stage.camera, tShock, V(BX, 20, BZ), ease.out(seg(t, 3.2, 3.8)) * (t < LB ? 1 : 0), 40, 0)
