@@ -9,6 +9,7 @@ on:
       height: { description: 'frame height (1080 for landscape)', default: '1920' }
       wx: { description: 'watermark x, or none for no watermark', default: '380' }
       wy: { description: 'watermark y', default: '480' }
+      episode_dir: { description: 'episode folder with studio.html and audio.flac', default: 'episode' }
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -39,7 +40,7 @@ jobs:
         with: { node-version: 20 }
       - run: npm install --no-audit --no-fund
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-thai-tlwg fonts-noto-core
-      - run: node tools/render_part.mjs episode ${{ matrix.s }} ${{ matrix.e }} out/part_${{ matrix.i }}
+      - run: node tools/render_part.mjs ${{ inputs.episode_dir }} ${{ matrix.s }} ${{ matrix.e }} out/part_${{ matrix.i }}
         env: { WORKERS: 4, FPS: '${{ inputs.fps }}', WIDTH: '${{ inputs.width }}', HEIGHT: '${{ inputs.height }}', CHROME: /usr/bin/google-chrome }
       - run: mv out/part_${{ matrix.i }}/part.mp4 out/part.mp4
       - uses: actions/upload-artifact@v4
@@ -55,6 +56,6 @@ jobs:
       - run: |
           # sort parts numerically: rename part-N -> part-000N
           for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
-          bash tools/finish.sh parts episode/audio.flac out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
+          bash tools/finish.sh parts ${{ inputs.episode_dir }}/audio.flac out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
       - uses: actions/upload-artifact@v4
         with: { name: video, path: out.mp4, retention-days: 14 }
