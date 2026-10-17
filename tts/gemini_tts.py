@@ -67,6 +67,6 @@ for i, voice in enumerate(VOICES):
     if i == 0 and ok == 0:
         log("first voice failed, stopping to avoid wasting quota")
         sys.exit(1)
-    time.sleep(6)
+    time.sleep(int(os.environ.get("SLEEP", "22")))
 
 log(f"done ok={ok}/{len(VOICES)}")
