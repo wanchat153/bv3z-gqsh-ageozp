@@ -1,1 +1,10 @@
-<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}</style></head><body><script>addEventListener('load',()=>{const s=document.createElement('script');s.src='app.js';document.body.appendChild(s)})</script></body></html>
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#000}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
+<script src="src/core.js"></script><script src="src/engine.js"></script><script src="src/chars.js"></script><script src="src/cast.js"></script>
+<script src="cues.js"></script><script src="scene.js"></script><script src="anim.js"></script>
+<script>
+initEngine(document.getElementById('c')); initCast();
+window.READY = true;
+// grab(t) -> PNG data URL of the frame at time t (pure function of t)
+window.grabPNG0 = (t, fmt = 'png', q = 0.93) => { frame(t); return document.getElementById('c').toDataURL(fmt === 'jpg' ? 'image/jpeg' : 'image/png', q); };
+window.grabPNG = (t) => window.grabPNG0(t).split(',')[1];
+</script></body></html>
