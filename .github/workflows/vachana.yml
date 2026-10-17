@@ -1,0 +1,58 @@
+name: vachana
+# Thai male voices from VachanaTTS (via PyThaiTTS) on CPU; mp3s are pushed to the `voices-vachana` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: 'narration text', default: 'ยามค่ำคืนที่ฝนโปรยปราย ซามูไรหยดหมึกนั่งอยู่ข้างเตาอุ่นๆ ข้างกายมีแมวส้มชื่อโมจิหมอบหลับตาพริ้ม เสียงหยดน้ำฝนบนหลังคา ค่อยๆ กลายเป็นจังหวะเพลงที่แสนอบอุ่น และนี่คือจุดเริ่มต้นของเรื่องราวในคืนนี้' }
+permissions:
+  contents: write
+jobs:
+  vachana:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GEN_TEXT: ${{ inputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: install
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libsndfile1 > /dev/null
+          mkdir -p out; : > out/report.txt
+          pip install --quiet pythaitts > out/pip.log 2>&1 || echo "PIP FAILED: $(tail -c 600 out/pip.log | tr '\n' ' ')" >> out/report.txt
+      - name: synthesise
+        run: |
+          cat > synth.py <<'PY'
+          import os, time, traceback
+          from pythaitts import TTS
+          text = os.environ["GEN_TEXT"]
+          tts = TTS(pretrained="vachana")
+          for spk in ["th_m_1", "th_m_2"]:
+              t0 = time.time()
+              try:
+                  tts.tts(text, speaker_idx=spk, filename=f"out/vachana_{spk}.wav")
+                  print(f"OK {spk} {time.time()-t0:.1f}s", flush=True)
+              except Exception:
+                  traceback.print_exc()
+                  print(f"FAILED {spk}", flush=True)
+          PY
+          sed -i 's/^          //' synth.py
+          S=$(date +%s)
+          python synth.py > out/run.log 2>&1 || echo "RUN FAILED" >> out/report.txt
+          echo "run $(( $(date +%s) - S ))s: $(grep -E '^(OK|FAILED)' out/run.log | tr '\n' ' ')" >> out/report.txt
+          grep -iE 'error|traceback' out/run.log | tail -5 >> out/report.txt || true
+          for f in out/vachana_*.wav; do [ -f "$f" ] && ffmpeg -v error -y -i "$f" -ar 44100 -ac 1 -b:a 192k "${f%.wav}.mp3" && echo "$(basename $f .wav) $(ffprobe -v error -show_entries format=duration -of csv=p=0 ${f%.wav}.mp3)s" >> out/report.txt; done
+          mkdir -p keep; cp out/*.mp3 out/report.txt keep/ 2>/dev/null || true
+          cat out/report.txt
+          echo "::notice title=vachana report::$(tr '\n' '|' < out/report.txt | cut -c1-1500)"
+      - name: push results
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices-vachana
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          rm -rf out; mv keep out 2>/dev/null || mkdir -p out
+          git add -f out
+          git commit -q -m "vachana samples"
+          git push -q -f origin voices-vachana
