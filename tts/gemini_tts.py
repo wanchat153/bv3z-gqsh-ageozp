@@ -56,7 +56,7 @@ for i, voice in enumerate(VOICES):
                 msg = json.loads(msg)["error"]["message"]
             except Exception:
                 pass
-            log(f"HTTP {e.code} {voice} attempt={attempt}: {msg[:300]}")
+            log(f"HTTP {e.code} {voice} attempt={attempt}: {' '.join(str(msg).split())[:1500]}")
             if e.code == 429 and attempt == 1:
                 time.sleep(20)
                 continue
