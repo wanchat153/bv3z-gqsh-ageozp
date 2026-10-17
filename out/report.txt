@@ -1,0 +1,8 @@
+out/ref_plain.wav 4.200000s
+out/ref_bright.wav 4.200000s
+run 31s: FAILED plain FAILED bright 
+Traceback (most recent call last):
+ModuleNotFoundError: No module named 'torchcodec'
+Traceback (most recent call last):
+    raise ImportError(
+ImportError: TorchCodec is required for load_with_torchcodec. Please install torchcodec to use this function.
