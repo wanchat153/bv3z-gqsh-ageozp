@@ -5,6 +5,8 @@ on:
     inputs:
       speaker: { description: 'Vachana speaker id', default: 'th_m_2' }
       tempo: { description: 'speech tempo, 1.0 = original, lower = slower', default: '0.88' }
+      script: { description: 'script json path', default: 'script/narration.json' }
+      branch: { description: 'result branch', default: 'voices-narration' }
 permissions:
   contents: write
 jobs:
@@ -14,6 +16,7 @@ jobs:
     env:
       SPEAKER: ${{ inputs.speaker }}
       TEMPO: ${{ inputs.tempo }}
+      SCRIPT: ${{ inputs.script }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,9 +34,9 @@ jobs:
         if: always()
         run: |
           git config user.name github-actions; git config user.email actions@github.com
-          git checkout -q --orphan voices-narration
+          git checkout -q --orphan ${{ inputs.branch }}
           git rm -rq --cached . > /dev/null 2>&1 || true
           rm -rf out; mv keep out 2>/dev/null || { mkdir -p out; echo "no output" > out/report.txt; }
           git add -f out
           git commit -q -m "narration"
-          git push -q -f origin voices-narration
+          git push -q -f origin ${{ inputs.branch }}

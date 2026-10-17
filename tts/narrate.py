@@ -9,7 +9,7 @@ SPEAKER = os.environ.get("SPEAKER", "th_m_2")
 LEAD, GAP, TAIL = 1.5, 1.0, 3.0
 TEMPO = float(os.environ.get("TEMPO", "0.88"))  # <1 = slower speech, pitch kept
 RATE = 48000
-segs = json.load(open("script/narration.json", encoding="utf-8"))
+segs = json.load(open(os.environ.get("SCRIPT", "script/narration.json"), encoding="utf-8"))
 os.makedirs("out/seg", exist_ok=True)
 tts = TTS(pretrained="vachana")
 
