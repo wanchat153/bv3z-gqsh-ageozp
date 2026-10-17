@@ -23,8 +23,8 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libsndfile1 > /dev/null
           mkdir -p out; : > out/report.txt
-          ( pip install --quiet torch torchaudio --index-url https://download.pytorch.org/whl/cpu \
-            && pip install --quiet f5-tts-th edge-tts ) > out/pip.log 2>&1 \
+          ( pip install --quiet torch==2.4.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cpu \
+            && pip install --quiet f5-tts-th edge-tts soundfile ) > out/pip.log 2>&1 \
             || echo "PIP FAILED: $(tail -c 600 out/pip.log | tr '\n' ' ')" >> out/report.txt
       - name: reference clips (male, edge-tts)
         run: |
@@ -34,6 +34,7 @@ jobs:
           for f in out/ref_plain.wav out/ref_bright.wav; do echo "$f $(ffprobe -v error -show_entries format=duration -of csv=p=0 $f)s" >> out/report.txt; done
       - name: synthesise
         run: |
+          python -c "import torch,torchaudio;print('torch',torch.__version__,'torchaudio',torchaudio.__version__)" >> out/report.txt 2>&1 || true
           S=$(date +%s)
           python tts/f5thai.py > out/run.log 2>&1 || echo "RUN FAILED" >> out/report.txt
           echo "run $(( $(date +%s) - S ))s: $(grep -E '^(OK|FAILED)' out/run.log | tr '\n' ' ')" >> out/report.txt
