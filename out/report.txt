@@ -1,0 +1,15 @@
+[0;93m2026-10-17 11:29:27.398577259 [W:onnxruntime:Default, device_discovery.cc:95 GetPciBusId] Skipping pci_bus_id for PCI path at "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/5620e0c7-8062-4dce-aeb7-520c7ef76171" because filename "5620e0c7-8062-4dce-aeb7-520c7ef76171" did not match expected pattern of [0-9a-f]+:[0-9a-f]+:[0-9a-f]+[.][0-9a-f]+[m
+Downloading https://huggingface.co/VIZINTZOR/VachanaTTS/resolve/main/voices/th_m_2.onnx ...
+Downloading https://huggingface.co/VIZINTZOR/VachanaTTS/resolve/main/speaker_config.json ...
+OK s01_intro 19.91s synth 4.5s
+OK s02_sun 14.14s synth 0.7s
+OK s03_planets 14.94s synth 1.0s
+OK s04_scale 14.28s synth 0.7s
+OK s05_giants 12.89s synth 0.8s
+OK s06_gravity 13.68s synth 0.8s
+OK s07_newton 16.25s synth 0.9s
+OK s08_orbit 14.12s synth 0.7s
+OK s09_speed 11.44s synth 0.6s
+OK s10_einstein 13.30s synth 0.8s
+OK s11_outro 16.80s synth 0.8s
+done segments=11/11 failed=0 audio=177.24s
