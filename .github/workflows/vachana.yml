@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libsndfile1 > /dev/null
           mkdir -p out; : > out/report.txt
-          pip install --quiet pythaitts > out/pip.log 2>&1 || echo "PIP FAILED: $(tail -c 600 out/pip.log | tr '\n' ' ')" >> out/report.txt
+          pip install --quiet pythaitts vachanatts > out/pip.log 2>&1 || echo "PIP FAILED: $(tail -c 600 out/pip.log | tr '\n' ' ')" >> out/report.txt
       - name: synthesise
         run: |
           cat > synth.py <<'PY'
