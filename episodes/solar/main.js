@@ -201,8 +201,12 @@
     g.add(cl); g.clouds = cl; return g;
   }
 
-  // ---------- solar system ----------
-  const PL = [
+  const sunLight2 = new THREE.PointLight(0xfff1d8, 0, 0, 0); scene.add(sunLight2);
+
+  // ---------- world layout: one continuous flight through all places ----------
+  const AX = { solar1: 0, giants: 450, grav: 900, newt: 1350, cannon: 1800, solar2: 2250, warp: 2700 };
+
+  const PLD = [
     { n: 'ดาวพุธ', R: .75, a: 8.5, P: .241, mass: 'พุธ', mk: () => body(.75, T.mercury, null, .05) },
     { n: 'ดาวศุกร์', R: 1.2, a: 11.8, P: .615, mass: 'ศุกร์', mk: () => body(1.2, T.venus, { c: 0xffc873, s: 1.12, p: 2.4, o: 3.2 }, .005) },
     { n: 'โลก', R: 1.25, a: 15.5, P: 1, mass: 'โลก', mk: () => earth(1.25) },
@@ -213,55 +217,66 @@
     { n: 'ดาวเนปจูน', R: 1.95, a: 49.5, P: 164.8, mass: 'เนปจูน', mk: () => body(1.95, T.neptune, { c: 0x5a86ff, s: 1.1, p: 2.4, o: 3.2 }, .003) },
   ];
   const TINT = [0xc9bfb2, 0xf2d08f, 0x6fb4ff, 0xff9a70, 0xeccaa0, 0xf0dca0, 0xa2eef2, 0x6c92ff];
-  const SUNR = 4.2;
-  const gSolar = new THREE.Group(); scene.add(gSolar);
-  const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(SUNR, 64, 44), new THREE.MeshBasicMaterial({ map: T.sun.map, color: new THREE.Color(1.9, 1.7, 1.5) }));
-  gSolar.add(sunMesh);
-  const mkGlow = (sc, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op })); s.scale.setScalar(sc); gSolar.add(s); return s; };
-  const glowA = mkGlow(SUNR * 6, .9), glowB = mkGlow(SUNR * 14, .35);
-  const TR_N = 56;
-  PL.forEach((p, i) => {
-    const g = p.mk(); p.mesh = g; gSolar.add(g);
-    if (p.ring) {
-      const rg = new THREE.RingGeometry(p.R * 1.25, p.R * 2.35, 128, 1), pa = rg.attributes.position, uv = rg.attributes.uv;
-      for (let k = 0; k < pa.count; k++) uv.setXY(k, (Math.hypot(pa.getX(k), pa.getY(k)) - p.R * 1.25) / (p.R * 1.1), .5);
-      const ring = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, roughness: 1 }));
-      ring.rotation.x = Math.PI / 2 - .42; g.add(ring); p.ringMesh = ring;
-    }
-    const pts = []; for (let k = 0; k <= 256; k++) { const a = k / 256 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * p.a, 0, Math.sin(a) * p.a)); }
-    p.orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x7f9bd6, transparent: true, opacity: .28 }));
-    gSolar.add(p.orbit);
-    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TR_N * 3), 3));
-    const col = new Float32Array(TR_N * 3), c0 = new THREE.Color(TINT[i]);
-    for (let k = 0; k < TR_N; k++) { const f = Math.pow(1 - k / (TR_N - 1), 2.2); col[k * 3] = c0.r * f; col[k * 3 + 1] = c0.g * f; col[k * 3 + 2] = c0.b * f; }
-    tg.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    p.trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
-    p.trail.frustumCulled = false; gSolar.add(p.trail);
-  });
-  const ANG0 = [0.5, 2.2, 4.0, 5.3, 1.2, 3.3, 0.2, 2.6], EARTH_SEC = 10;
-  function placePlanets(t) {
-    PL.forEach((p, i) => {
-      const w = (2 * Math.PI) / (EARTH_SEC * p.P), ang = ANG0[i] + t * w;
-      p.mesh.position.set(Math.cos(ang) * p.a, 0, Math.sin(ang) * p.a);
-      p.mesh.rotation.y = t * (i === 4 || i === 5 ? .5 : .3);
-      if (p.mesh.clouds) p.mesh.clouds.rotation.y = t * .04;
-      const span = clamp(w * 1.3, .05, 1.5), pos = p.trail.geometry.attributes.position.array;
-      for (let k = 0; k < TR_N; k++) { const a = ang - span * k / (TR_N - 1); pos[k * 3] = Math.cos(a) * p.a; pos[k * 3 + 1] = 0; pos[k * 3 + 2] = Math.sin(a) * p.a; }
-      p.trail.geometry.attributes.position.needsUpdate = true;
-    });
-    sunMesh.rotation.y = t * .05;
+  const SUNR = 4.2, TR_N = 56, ANG0 = [0.5, 2.2, 4.0, 5.3, 1.2, 3.3, 0.2, 2.6], EARTH_SEC = 10;
+  function ringFor(R) {
+    const rg = new THREE.RingGeometry(R * 1.25, R * 2.35, 128, 1), pa = rg.attributes.position, uv = rg.attributes.uv;
+    for (let k = 0; k < pa.count; k++) uv.setXY(k, (Math.hypot(pa.getX(k), pa.getY(k)) - R * 1.25) / (R * 1.1), .5);
+    const ring = new THREE.Mesh(rg, new THREE.MeshStandardMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, roughness: 1 }));
+    ring.rotation.x = Math.PI / 2 - .42; return ring;
   }
+  function makeSolar(ax) {
+    const S = { group: new THREE.Group(), PL: [], ax };
+    S.group.position.set(ax, 0, 0); scene.add(S.group);
+    S.sun = new THREE.Mesh(new THREE.SphereGeometry(SUNR, 64, 44), new THREE.MeshBasicMaterial({ map: T.sun.map, color: new THREE.Color(1.9, 1.7, 1.5) }));
+    S.group.add(S.sun);
+    [[SUNR * 6, .9], [SUNR * 14, .35]].forEach(([sc, op]) => {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: op })); sp.scale.setScalar(sc); S.group.add(sp);
+    });
+    PLD.forEach((d, i) => {
+      const p = Object.assign({}, d); p.mesh = d.mk(); S.group.add(p.mesh);
+      if (d.ring) p.mesh.add(ringFor(d.R));
+      const pts = []; for (let k = 0; k <= 256; k++) { const a = k / 256 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * d.a, 0, Math.sin(a) * d.a)); }
+      p.orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x7f9bd6, transparent: true, opacity: .28 })); S.group.add(p.orbit);
+      const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TR_N * 3), 3));
+      const col = new Float32Array(TR_N * 3), c0 = new THREE.Color(TINT[i]);
+      for (let k = 0; k < TR_N; k++) { const f = Math.pow(1 - k / (TR_N - 1), 2.2); col[k * 3] = c0.r * f; col[k * 3 + 1] = c0.g * f; col[k * 3 + 2] = c0.b * f; }
+      tg.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      p.trail = new THREE.Line(tg, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })); p.trail.frustumCulled = false; S.group.add(p.trail);
+      S.PL.push(p);
+    });
+    S.place = (t, mask = 1) => {
+      S.PL.forEach((p, i) => {
+        const w = (2 * Math.PI) / (EARTH_SEC * p.P), ang = ANG0[i] + t * w;
+        p.mesh.position.set(Math.cos(ang) * p.a, 0, Math.sin(ang) * p.a);
+        p.mesh.rotation.y = t * (i === 4 || i === 5 ? .5 : .3);
+        if (p.mesh.clouds) p.mesh.clouds.rotation.y = t * .04;
+        const span = clamp(w * 1.3, .05, 1.5), pos = p.trail.geometry.attributes.position.array;
+        for (let k = 0; k < TR_N; k++) { const a = ang - span * k / (TR_N - 1); pos[k * 3] = Math.cos(a) * p.a; pos[k * 3 + 1] = 0; pos[k * 3 + 2] = Math.sin(a) * p.a; }
+        p.trail.geometry.attributes.position.needsUpdate = true;
+        const m = Math.max(.001, mask); p.mesh.scale.setScalar(m); p.mesh.visible = p.orbit.visible = p.trail.visible = mask > .01;
+        p.orbit.material.opacity = .28 * mask; p.trail.material.opacity = mask;
+      });
+      S.sun.rotation.y = t * .05;
+    };
+    return S;
+  }
+  const solar1 = makeSolar(AX.solar1), solar2 = makeSolar(AX.solar2);
 
-  // ---------- other scene objects ----------
+  // giants
+  const gGiants = new THREE.Group(); gGiants.position.set(AX.giants, 0, 0); scene.add(gGiants);
+  const gJup = body(3.5, T.jupiter, { c: 0xe7c9a0, s: 1.05, p: 2.4, o: 3.2 }, .004, 64), gSat = body(3.0, T.saturn, { c: 0xf0dca0, s: 1.05, p: 2.4, o: 3.2 }, .004, 64), gEar = earth(1.25);
+  gSat.add(ringFor(3.0)); gJup.position.set(-12, 0, 0); gSat.position.set(14, 0, 0); gEar.position.set(-2.2, -3.1, 6); gSat.rotation.z = .1;
+  gGiants.add(gJup, gSat, gEar);
+
   const GOLDC = () => new THREE.Color(2.2, 1.7, .4);
-  const gGrav = new THREE.Group(); scene.add(gGrav);
+  const gGrav = new THREE.Group(); gGrav.position.set(AX.grav, 0, 0); scene.add(gGrav);
   const gm1 = earth(3), gm2 = body(1.5, T.mars, { c: 0xff8a5a, s: 1.07, p: 2.4, o: 3.2 }, .05);
   const arr1 = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 3, 0xffd34d, 1, .8);
   const arr2 = new THREE.ArrowHelper(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(), 3, 0xffd34d, 1, .8);
   [arr1, arr2].forEach((a) => { a.line.material = new THREE.LineBasicMaterial({ color: GOLDC() }); a.cone.material = new THREE.MeshBasicMaterial({ color: GOLDC() }); });
   gGrav.add(gm1, gm2, arr1, arr2);
 
-  const gNewt = new THREE.Group(); scene.add(gNewt);
+  const gNewt = new THREE.Group(); gNewt.position.set(AX.newt, 0, 0); scene.add(gNewt);
   const bigEarth = earth(10), moon = body(2.7, T.moon, null, .06);
   const apple = new THREE.Group();
   apple.add(new THREE.Mesh(new THREE.SphereGeometry(.8, 28, 20), new THREE.MeshStandardMaterial({ color: 0xd8262b, roughness: .35 })));
@@ -270,10 +285,10 @@
   const moonArrow = new THREE.ArrowHelper(new THREE.Vector3(-1, 0, 0), new THREE.Vector3(), 8, 0xffd34d, 2, 1.2);
   moonArrow.line.material = new THREE.LineBasicMaterial({ color: GOLDC() }); moonArrow.cone.material = new THREE.MeshBasicMaterial({ color: GOLDC() });
   const moonPath = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 200 }, (_, k) => new THREE.Vector3(Math.cos(k / 200 * 6.2832) * 60, Math.sin(k / 200 * 6.2832) * 60, 0))), new THREE.LineBasicMaterial({ color: 0x8fa6d6, transparent: true, opacity: .45 }));
-  moonPath.position.set(0, -10, 0);
+  moonPath.position.set(0, -10, 0); bigEarth.position.set(0, -10, 0);
   gNewt.add(bigEarth, apple, moon, moonArrow, moonPath);
 
-  const gCannon = new THREE.Group(); scene.add(gCannon);
+  const gCannon = new THREE.Group(); gCannon.position.set(AX.cannon, 0, 0); scene.add(gCannon);
   const cannonEarth = earth(10); gCannon.add(cannonEarth);
   const MU = 100, R0 = 13, VC = Math.sqrt(MU / R0);
   const SHOTS = [{ f: .45, col: [2.6, .9, .6] }, { f: .8, col: [2.6, 2.0, .5] }, { f: 1.0, col: [.7, 2.6, 1.4] }];
@@ -299,7 +314,7 @@
   const peak = new THREE.Mesh(new THREE.ConeGeometry(2.2, 4.4, 5), new THREE.MeshStandardMaterial({ color: 0x75604a, roughness: 1 })); peak.position.set(0, 11.0, 0);
   gCannon.add(cannonBody, peak);
 
-  const gWarp = new THREE.Group(); scene.add(gWarp);
+  const gWarp = new THREE.Group(); gWarp.position.set(AX.warp, 0, 0); scene.add(gWarp);
   const warpH = (x, z) => -9 / Math.sqrt(x * x + z * z + 3.2);
   (function () {
     const pts = [], col = [], N = 45, L = 24, c0 = new THREE.Color(.25, .8, 2.2), c1 = new THREE.Color(.1, .25, .9);
@@ -322,6 +337,15 @@
   const mtLine = new THREE.Line(mtGeo, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })); mtLine.frustumCulled = false;
   gWarp.add(warpSun, warpGlow, marble, mtLine);
 
+  // space dust along the flight path: gives parallax so travelling between places reads as smooth motion
+  (function () {
+    const n = 9000, pos = new Float32Array(n * 3); let sd = 99; const r = () => ((sd = (sd * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < n; i++) { pos[i * 3] = -300 + r() * 3400; pos[i * 3 + 1] = (r() - .5) * 260; pos[i * 3 + 2] = (r() - .5) * 400; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTex, color: 0x9fb8ff, size: 3.2, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    pts.frustumCulled = false; scene.add(pts);
+  })();
+
   // ---------- overlay helpers (minimal text) ----------
   function txt(s, x, y, size, o = {}) {
     ctx.save();
@@ -332,124 +356,115 @@
     ctx.fillStyle = o.c || '#fff'; ctx.fillText(s, x, y); ctx.restore();
   }
   function project(v) { const p = v.clone().project(cam); return { x: (p.x * .5 + .5) * W, y: (-p.y * .5 + .5) * H }; }
+  const wpos = (obj, dy = 0) => { const v = new THREE.Vector3(); obj.getWorldPosition(v); v.y += dy; return v; };
   const tag = (s, x, y, a) => { txt(s, x, y, 34, { a, w: 400 }); ctx.save(); ctx.globalAlpha = a * .6; ctx.fillStyle = '#9fc2ff'; ctx.fillRect(x - 24, y + 12, 48, 2); ctx.restore(); };
   const GOLD = '#ffd36b';
 
-  // ---------- cameras ----------
-  const hide = () => { gSolar.visible = gGrav.visible = gNewt.visible = gCannon.visible = gWarp.visible = false; };
-  const look = (px, py, pz, tx, ty, tz) => { cam.position.set(px, py, pz); cam.lookAt(tx, ty, tz); };
-  const orbitCam = (d, az, el, tx = 0, ty = 0, tz = 0) => look(tx + d * Math.cos(el) * Math.cos(az), ty + d * Math.sin(el), tz + d * Math.cos(el) * Math.sin(az), tx, ty, tz);
+  // camera pose helpers: return [px,py,pz,tx,ty,tz] in world space
+  const orb = (ax, d, az, el, tx = 0, ty = 0, tz = 0) => [ax + tx + d * Math.cos(el) * Math.cos(az), ty + d * Math.sin(el), tz + d * Math.cos(el) * Math.sin(az), ax + tx, ty, tz];
 
+  // ---------- scenes: upd() animates objects, pose() gives the camera, overlay() draws text ----------
+  const sunSeg = SEG.sun, plSeg = SEG.planets;
   const scenes = {
-    intro(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      orbitCam(lerp(210, 86, ease(u)), lerp(.5, 1.45, u), lerp(.55, .36, u));
-      return () => {
+    intro: {
+      upd(t) { }, pose: (t, s, u) => orb(AX.solar1, lerp(210, 86, ease(u)), lerp(.5, 1.45, u), lerp(.55, .36, u)),
+      overlay(t, s) {
         const a = fade(t, s.start + 2, s.start + 13, 1.4, 1.6);
-        txt('ระบบสุริยะ', W / 2, 400, 170, { a, ls: 6 });
-        txt('และแรงโน้มถ่วง', W / 2, 500, 70, { a, w: 400, c: '#cfe3ff', ls: 8 });
-      };
+        txt('ระบบสุริยะ', W / 2, 400, 170, { a, ls: 6 }); txt('และแรงโน้มถ่วง', W / 2, 500, 70, { a, w: 400, c: '#cfe3ff', ls: 8 });
+      },
     },
-    sun(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      PL.forEach((p) => { p.mesh.visible = p.orbit.visible = p.trail.visible = false; });
-      orbitCam(lerp(30, 21, ease(u)), .9, .12); bloom.strength = 1.0;
-      return () => {
+    sun: {
+      upd() { }, pose: (t, s, u) => orb(AX.solar1, lerp(30, 21, ease(u)), .9, .12),
+      overlay(t, s) {
         const a = fade(t, when('sun', '99') - .6, s.end + 2, .8, 1.2);
         txt('99.86%', 1450, 480, 150, { a, c: GOLD }); txt('ของมวลทั้งหมด', 1450, 540, 42, { a, w: 400, c: '#e8f0ff' });
         const b = fade(t, when('sun', 'ล้าน') - 1.2, s.end + 2, .8, 1.2);
         txt('1.3 ล้าน×', 1450, 700, 96, { a: b, c: '#8fc7ff' }); txt('เท่าของปริมาตรโลก', 1450, 752, 38, { a: b, w: 400, c: '#e8f0ff' });
-      };
+      },
     },
-    planets(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      orbitCam(lerp(120, 98, u), lerp(1.25, 1.55, u), .55);
-      return () => {
-        PL.forEach((p) => {
+    planets: {
+      upd() { }, pose: (t, s, u) => orb(AX.solar1, lerp(120, 98, u), lerp(1.25, 1.55, u), .55),
+      overlay(t, s) {
+        solar1.PL.forEach((p) => {
           const k = ease((t - when('planets', p.mass) + .1) / .6) * fade(t, s.start, s.end + 3, .1, 1.2); if (k <= 0) return;
-          const v = p.mesh.position.clone(); v.y += p.R + 1.8; const q = project(v); tag(p.n, q.x, q.y, k);
+          const q = project(wpos(p.mesh, p.R + 1.8)); tag(p.n, q.x, q.y, k);
         });
-      };
+      },
     },
-    scale(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      orbitCam(125, 1.57, 1.2);
-      const rad = ease(prog(t, s.start + 1.5, s.end - 1.2)) * 52;
-      const items = [[2, '8 นาที 20 วินาที'], [4, '43 นาที'], [5, '1 ชม. 20 น.'], [6, '2 ชม. 40 น.'], [7, '4 ชม. 10 น.']];
-      return () => {
-        const c = project(new THREE.Vector3(0, 0, 0)), e = project(new THREE.Vector3(rad, 0, 0)), rp = Math.hypot(e.x - c.x, e.y - c.y);
-        ctx.save(); ctx.strokeStyle = 'rgba(255,225,140,.95)'; ctx.lineWidth = 5; ctx.shadowColor = '#ffc860'; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(c.x, c.y, rp, 0, 7); ctx.stroke();
-        ctx.globalAlpha = .12; ctx.lineWidth = 60; ctx.stroke(); ctx.restore();
-        items.forEach(([i, lab]) => {
-          const p = PL[i]; if (rad < p.a) return; const w = ease((rad - p.a) / 2.5) * fade(t, s.start, s.end + 2, .1, 1.2);
-          const q = project(p.mesh.position.clone().add(new THREE.Vector3(0, p.R + 1.2, 0))); txt(lab, q.x, q.y - 8, 38, { a: w, c: GOLD });
+    scale: {
+      upd() { }, pose: (t, s, u) => orb(AX.solar1, 125, lerp(1.55, 1.57, u), lerp(1.0, 1.2, ease(u))),
+      overlay(t, s) {
+        const rad = ease(prog(t, s.start + 1.5, s.end - 1.2)) * 52; if (rad < .2) return;
+        const c = project(wpos(solar1.sun)), e = project(wpos(solar1.sun).add(new THREE.Vector3(rad, 0, 0))), rp = Math.hypot(e.x - c.x, e.y - c.y);
+        const fa = fade(t, s.start, s.end + 2, .6, 1.2);
+        ctx.save(); ctx.globalAlpha = fa; ctx.strokeStyle = 'rgba(255,225,140,.95)'; ctx.lineWidth = 5; ctx.shadowColor = '#ffc860'; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(c.x, c.y, rp, 0, 7); ctx.stroke();
+        ctx.globalAlpha = .12 * fa; ctx.lineWidth = 60; ctx.stroke(); ctx.restore();
+        [[2, '8 นาที 20 วินาที'], [4, '43 นาที'], [5, '1 ชม. 20 น.'], [6, '2 ชม. 40 น.'], [7, '4 ชม. 10 น.']].forEach(([i, lab]) => {
+          const p = solar1.PL[i]; if (rad < p.a) return; const w = ease((rad - p.a) / 2.5) * fa;
+          const q = project(wpos(p.mesh, p.R + 1.2)); txt(lab, q.x, q.y - 8, 38, { a: w, c: GOLD });
         });
-      };
+      },
     },
-    giants(t, s, u) {
-      gSolar.visible = true; PL.forEach((p, i) => { p.orbit.visible = p.trail.visible = false; p.mesh.visible = (i === 4 || i === 5 || i === 2); });
-      sunMesh.visible = glowA.visible = glowB.visible = false;
-      const J = PL[4].mesh, S = PL[5].mesh, E = PL[2].mesh;
-      J.position.set(-12, 0, 0); S.position.set(14, 0, 0); E.position.set(-2.2, -3.1, 6);
-      J.rotation.y = t * .25; S.rotation.y = t * .25; S.rotation.z = .1;
-      look(lerp(0, 3, u), 3, lerp(40, 33, ease(u)), 0, 0, 0);
-      sunLight.intensity = 0; key.intensity = 3.2; amb.intensity = 1.5;
-      return () => {
-        const q = project(new THREE.Vector3(-12, 5.6, 0)); tag('ดาวพฤหัสบดี', q.x, q.y, fade(t, s.start + .5, s.end, .6, .8));
-        const eq = project(new THREE.Vector3(-2.2, -4.9, 6)); tag('โลก', eq.x, eq.y, fade(t, s.start + 1.5, s.end, .6, .8));
-        const sq = project(new THREE.Vector3(14, 6.4, 0)); tag('ดาวเสาร์', sq.x, sq.y, fade(t, s.start + 6, s.end, .6, .8));
+    giants: {
+      upd(t, s, u) { gJup.rotation.y = t * .25; gSat.rotation.y = t * .25; gEar.rotation.y = t * .3; gEar.clouds.rotation.y = t * .35; },
+      pose: (t, s, u) => [AX.giants + lerp(0, 3, u), 3, lerp(40, 33, ease(u)), AX.giants, 0, 0],
+      overlay(t, s) {
+        const q = project(wpos(gJup, 5.6)); tag('ดาวพฤหัสบดี', q.x, q.y, fade(t, s.start + .5, s.end, .6, .8));
+        const eq = project(wpos(gEar, -1.7)); tag('โลก', eq.x, eq.y, fade(t, s.start + 1.5, s.end, .6, .8));
+        const sq = project(wpos(gSat, 6.4)); tag('ดาวเสาร์', sq.x, sq.y, fade(t, s.start + 6, s.end, .6, .8));
         const k = fade(t, when('giants', 'มวล') - .5, s.end + 2, .6, 1);
         txt('318×', W / 2 - 18, 170, 110, { a: k, c: GOLD, al: 'right' }); txt('เท่าของโลก', W / 2 + 18, 170, 44, { a: k, w: 400, al: 'left' });
         const k2 = fade(t, when('giants', 'สองเท่า') - 1, s.end + 2, .6, 1);
         txt('> 2×', W / 2 - 18, 290, 110, { a: k2, c: '#8fc7ff', al: 'right' }); txt('ดาวเคราะห์ที่เหลือรวมกัน', W / 2 + 18, 290, 44, { a: k2, w: 400, al: 'left' });
-      };
+      },
     },
-    gravity(t, s, u) {
-      gGrav.visible = true; sunLight.intensity = 0; key.intensity = 3.2; amb.intensity = 1.5;
-      const r = 12 + 6 * Math.sin(u * 6.2832 * 1.5 - 1.2);
-      gm1.position.set(-r * .35, 0, 0); gm2.position.set(r * .65, 0, 0); gm1.rotation.y = t * .3; gm2.rotation.y = t * .4;
-      const F = 560 / (r * r), hl = Math.min(1.4, F * .4), hw = Math.min(.9, F * .25);
-      arr1.position.set(gm1.position.x + 3.3, 0, 0); arr1.setLength(F, hl, hw);
-      arr2.position.set(gm2.position.x - 1.8, 0, 0); arr2.setLength(F, hl, hw);
-      look(0, 6, 34, 0, 0, 0);
-      return () => { txt('F = G · m₁ · m₂ / r²', W / 2, 190, 92, { a: fade(t, s.start + .5, s.end + 1, .8, 1) }); };
+    gravity: {
+      upd(t, s, u) {
+        const r = 12 + 6 * Math.sin(u * 6.2832 * 1.5 - 1.2);
+        gm1.position.set(-r * .35, 0, 0); gm2.position.set(r * .65, 0, 0); gm1.rotation.y = t * .3; gm2.rotation.y = t * .4;
+        const F = 560 / (r * r), hl = Math.min(1.4, F * .4), hw = Math.min(.9, F * .25);
+        arr1.position.set(gm1.position.x + 3.3, 0, 0); arr1.setLength(F, hl, hw);
+        arr2.position.set(gm2.position.x - 1.8, 0, 0); arr2.setLength(F, hl, hw);
+      },
+      pose: (t, s, u) => [AX.grav, 6, 34, AX.grav, 0, 0],
+      overlay(t, s) { txt('F = G · m₁ · m₂ / r²', W / 2, 190, 92, { a: fade(t, s.start + .5, s.end + 1, .8, 1) }); },
     },
-    newton(t, s, u) {
-      gNewt.visible = true; sunLight.intensity = 0; key.intensity = 3.4; amb.intensity = 1.4;
-      bigEarth.position.set(0, -10, 0); bigEarth.rotation.y = t * .03;
-      const split = .38, fa = prog(u, .04, split);
-      apple.position.set(0, lerp(14, 0.4, fa * fa), 4); apple.visible = u < split + .12; apple.rotation.z = fa * 1.2;
-      const pull = ease(prog(u, split, split + .35)), d = lerp(30, 125, pull);
-      look(0, lerp(3, 10, pull), d, 0, lerp(2, -10, pull), 0);
-      moon.visible = moonPath.visible = moonArrow.visible = u > split;
-      const mAng = .25 + (u - split) * 2.4;
-      moon.position.set(Math.cos(mAng) * 60, -10 + Math.sin(mAng) * 60, 0); moon.rotation.y = t * .1;
-      moonArrow.position.copy(moon.position); moonArrow.setDirection(new THREE.Vector3(0, -10, 0).sub(moon.position).normalize());
-      moonArrow.setLength(Math.max(.01, 9 * ease(prog(u, split + .2, split + .3))), 2.4, 1.4);
-      return () => { txt('ไอแซก นิวตัน', 400, 140, 66, { a: fade(t, s.start + .3, s.start + 9, .8, 1) }); };
+    newton: {
+      upd(t, s, u) {
+        bigEarth.rotation.y = t * .03;
+        const split = .38, fa = prog(u, .04, split);
+        apple.position.set(0, lerp(14, 0.4, fa * fa), 4); apple.visible = u < split + .12; apple.rotation.z = fa * 1.2;
+        moon.visible = moonPath.visible = moonArrow.visible = u > split;
+        const mAng = .25 + (u - split) * 2.4;
+        moon.position.set(Math.cos(mAng) * 60, -10 + Math.sin(mAng) * 60, 0); moon.rotation.y = t * .1;
+        moonArrow.position.copy(moon.position); moonArrow.setDirection(new THREE.Vector3(0, -10, 0).sub(moon.position).normalize());
+        moonArrow.setLength(Math.max(.01, 9 * ease(prog(u, split + .2, split + .3))), 2.4, 1.4);
+      },
+      pose: (t, s, u) => { const pull = ease(prog(u, .38, .73)); return [AX.newt, lerp(3, 10, pull), lerp(30, 125, pull), AX.newt, lerp(2, -10, pull), 0]; },
+      overlay(t, s) { txt('ไอแซก นิวตัน', 400, 140, 66, { a: fade(t, s.start + .3, s.start + 9, .8, 1) }); },
     },
-    orbit(t, s, u) {
-      gCannon.visible = true; sunLight.intensity = 0; key.intensity = 3.4; amb.intensity = 1.4;
-      look(0, 4, 70, 0, 0, 0);
-      const t0 = s.start + .6, per = (s.end - s.start - 2) / 3;
-      SHOTS.forEach((sh, i) => {
-        const a = t0 + i * per, run = clamp((t - a) / (per * .95)), n = sh.pts.length, last = Math.floor(run * (n - 1));
-        const pos = sh.geo.attributes.position.array;
-        for (let k = 0; k < n; k++) { const q = sh.pts[Math.min(k, last)]; pos[k * 3] = q[0]; pos[k * 3 + 1] = q[1]; pos[k * 3 + 2] = 0; }
-        sh.geo.attributes.position.needsUpdate = true; sh.geo.setDrawRange(0, last + 1);
-        const q = sh.pts[Math.min(last, n - 1)]; sh.ball.position.set(q[0], q[1], 0);
-        sh.ball.visible = sh.line.visible = t >= a; sh.line.material.opacity = (i < 2 && t > a + per) ? .4 : 1;
-      });
-      return () => {
+    orbit: {
+      upd(t, s) {
+        const t0 = s.start + .6, per = (s.end - s.start - 2) / 3;
+        SHOTS.forEach((sh, i) => {
+          const a = t0 + i * per, run = clamp((t - a) / (per * .95)), n = sh.pts.length, last = Math.floor(run * (n - 1));
+          const pos = sh.geo.attributes.position.array;
+          for (let k = 0; k < n; k++) { const q = sh.pts[Math.min(k, last)]; pos[k * 3] = q[0]; pos[k * 3 + 1] = q[1]; pos[k * 3 + 2] = 0; }
+          sh.geo.attributes.position.needsUpdate = true; sh.geo.setDrawRange(0, last + 1);
+          const q = sh.pts[Math.min(last, n - 1)]; sh.ball.position.set(q[0], q[1], 0);
+          sh.ball.visible = sh.line.visible = t >= a; sh.line.material.opacity = (i < 2 && t > a + per) ? .4 : 1;
+        });
+      },
+      pose: (t, s, u) => [AX.cannon, 4, 70, AX.cannon, 0, 0],
+      overlay(t, s) {
         const kk = ease((t - (s.end - 4.2)) / .8) * fade(t, s.start, s.end + 3, .1, 1.2);
         txt('การโคจร = การตกไม่สิ้นสุด', W / 2, 960, 70, { a: kk, c: '#7dffb4' });
-      };
+      },
     },
-    speed(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      orbitCam(115, 1.57 + t * .02, .7); amb.intensity = .9;
-      const data = [['ดาวพุธ', 47.4], ['ดาวศุกร์', 35.0], ['โลก', 29.8], ['ดาวอังคาร', 24.1], ['ดาวพฤหัสบดี', 13.1], ['ดาวเสาร์', 9.7], ['ดาวยูเรนัส', 6.8], ['ดาวเนปจูน', 5.4]];
-      return () => {
+    speed: {
+      upd() { }, pose: (t, s, u) => orb(AX.solar2, 115, 1.57 + u * .3, .7),
+      overlay(t, s) {
+        const data = [['ดาวพุธ', 47.4], ['ดาวศุกร์', 35.0], ['โลก', 29.8], ['ดาวอังคาร', 24.1], ['ดาวพฤหัสบดี', 13.1], ['ดาวเสาร์', 9.7], ['ดาวยูเรนัส', 6.8], ['ดาวเนปจูน', 5.4]];
         const k = fade(t, s.start + .3, s.end + 2, .8, 1.2);
         ctx.save(); ctx.globalAlpha = k * .55; ctx.fillStyle = 'rgba(4,8,22,.9)'; ctx.beginPath(); ctx.roundRect(1000, 150, 830, 720, 28); ctx.fill(); ctx.restore();
         txt('กม./วินาที', 1790, 210, 30, { a: k * .8, al: 'right', w: 400, c: '#9fc2ff' });
@@ -461,51 +476,62 @@
           ctx.fillStyle = gr; ctx.shadowColor = '#5b8cff'; ctx.shadowBlur = 16; ctx.beginPath(); ctx.roundRect(x0, y + 8, wmax * v / 47.4 * g, 40, 10); ctx.fill(); ctx.restore();
           txt(v.toFixed(1), x0 + wmax * v / 47.4 * g + 14, y + 40, 30, { a: g, al: 'left', c: GOLD });
         });
-      };
+      },
     },
-    einstein(t, s, u) {
-      gWarp.visible = true; sunLight.intensity = 0; key.intensity = 2.4; amb.intensity = 1.3; bloom.strength = .9;
-      const pathAt = (tt) => { const uu = clamp((tt - s.start) / (s.end - s.start)), ang = tt * 1.3, rr = lerp(15, 7.5, ease(uu)); return [Math.cos(ang) * rr, Math.sin(ang) * rr]; };
-      const [x, z] = pathAt(t); marble.position.set(x, warpH(x, z) + .8, z);
-      const pos = mtGeo.attributes.position.array;
-      for (let k = 0; k < 90; k++) { const [a, b] = pathAt(t - k * .035); pos[k * 3] = a; pos[k * 3 + 1] = warpH(a, b) + .8; pos[k * 3 + 2] = b; }
-      mtGeo.attributes.position.needsUpdate = true;
-      orbitCam(lerp(46, 38, u), t * .06 + .5, .5, 0, -4, 0);
-      return () => { txt('กาลอวกาศ', 430, 150, 70, { a: fade(t, s.start + .4, s.end + 1, .8, 1.2), ls: 4 }); };
+    einstein: {
+      upd(t, s, u) {
+        const pathAt = (tt) => { const uu = clamp((tt - s.start) / (s.end - s.start)), ang = tt * 1.3, rr = lerp(15, 7.5, ease(uu)); return [Math.cos(ang) * rr, Math.sin(ang) * rr]; };
+        const [x, z] = pathAt(t); marble.position.set(x, warpH(x, z) + .8, z);
+        const pos = mtGeo.attributes.position.array;
+        for (let k = 0; k < 90; k++) { const [a, b] = pathAt(t - k * .035); pos[k * 3] = a; pos[k * 3 + 1] = warpH(a, b) + .8; pos[k * 3 + 2] = b; }
+        mtGeo.attributes.position.needsUpdate = true;
+      },
+      pose: (t, s, u) => orb(AX.warp, lerp(46, 38, u), (s.start + u * (s.end - s.start)) * .06 + .5, .5, 0, -4, 0),
+      overlay(t, s) { txt('กาลอวกาศ', 430, 150, 70, { a: fade(t, s.start + .4, s.end + 1, .8, 1.2), ls: 4 }); },
     },
-    outro(t, s, u) {
-      gSolar.visible = true; placePlanets(t);
-      orbitCam(lerp(70, 260, ease(u)), 1.5 + u * .4, lerp(.45, .75, u));
-      return () => {
+    outro: {
+      upd() { }, pose: (t, s, u) => orb(AX.solar2, lerp(70, 260, ease(u)), 1.5 + u * .4, lerp(.45, .75, u)),
+      overlay(t, s) {
         txt('ทุกสิ่งในจักรวาล', W / 2, 190, 80, { a: fade(t, s.start + .5, s.end - 3.5, 1, 1) });
         txt('ผูกกันด้วยแรงโน้มถ่วง', W / 2, 285, 66, { a: fade(t, s.start + 2, s.end - 3.5, 1, 1), c: GOLD });
         txt('ขอบคุณที่รับชมครับ', W / 2, 250, 110, { a: ease((t - (s.end - 3.5)) / 1.2) * ease((TL.duration - 1 - t) / 1.2) });
-      };
+      },
     },
   };
-
-  const SPAN = ORDER.map((k, i) => ({ k, a: i === 0 ? 0 : SEG[k].start - .9, b: i === ORDER.length - 1 ? TL.duration + 1 : SEG[ORDER[i + 1]].start - .9 }));
+  const SC = ORDER.map((k) => ({ k, s: SEG[k], sc: scenes[k] }));
+  const uOf = (e, t) => clamp((t - e.s.start) / (e.s.end - e.s.start));
+  // transition window between scene i and i+1 (a smooth flight, no cuts)
+  const TS = SC.map((e, i) => (i < SC.length - 1 ? e.s.end - 1.4 : 1e9)), TE = SC.map((e, i) => (i < SC.length - 1 ? SC[i + 1].s.start + .8 : 1e9));
+  const lerpA = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
 
   function frame(t) {
-    let sp = SPAN[SPAN.length - 1];
-    for (const q of SPAN) if (t >= q.a && t < q.b) { sp = q; break; }
-    hide();
-    gSolar.children.forEach((c) => (c.visible = true));
-    gGrav.children.forEach((c) => (c.visible = true)); gNewt.children.forEach((c) => (c.visible = true));
-    PL.forEach((p) => { p.mesh.visible = true; });
-    sunLight.intensity = 5; key.intensity = 1.6; amb.intensity = 1; bloom.strength = .7;
-    const s = SEG[sp.k], u = t < s.start ? 0 : clamp((t - s.start) / (s.end - s.start));
-    const overlay = scenes[sp.k](t, s, u);
+    // animate every object (pure in t)
+    SC.forEach((e) => e.sc.upd(t, e.s, uOf(e, t)));
+    const maskPl = 1 - fade(t, sunSeg.start - 1.8, plSeg.start - .6, 1.8, 1.6);
+    solar1.place(t, maskPl); solar2.place(t, 1);
+    // camera: hold the current scene's pose, then fly to the next one
+    let j = 0; while (j < SC.length - 1 && t >= TE[j]) j++;
+    let P = SC[j].sc.pose(t, SC[j].s, uOf(SC[j], t));
+    if (j < SC.length - 1 && t >= TS[j]) {
+      const kk = ease((t - TS[j]) / (TE[j] - TS[j])), Q = SC[j + 1].sc.pose(t, SC[j + 1].s, 0);
+      P = lerpA(P, Q, kk); P[1] += Math.sin(Math.PI * kk) * 18; // gentle arc
+    }
+    cam.position.set(P[0], P[1], P[2]); cam.lookAt(P[3], P[4], P[5]);
     sky.position.copy(cam.position);
+    // lighting follows where we are
+    const near = (ax) => 1 - sstep(160, 330, Math.abs(cam.position.x - ax) + Math.abs(cam.position.y) * .3);
+    const w1 = near(AX.solar1), w2 = near(AX.solar2), wS = Math.max(w1, w2);
+    sunLight.position.set(AX.solar1, 0, 0); sunLight2.position.set(AX.solar2, 0, 0);
+    sunLight.intensity = 5 * w1; sunLight2.intensity = 5 * w2;
+    key.intensity = lerp(3.3, 1.6, wS); amb.intensity = lerp(1.45, 1, wS);
+    bloom.strength = .7 + .3 * fade(t, sunSeg.start - .5, sunSeg.end + .5, 1.5, 1.5) + .2 * fade(t, SEG.einstein.start - .5, SEG.einstein.end + .5, 1.5, 1.5);
     composer.render();
     ctx.clearRect(0, 0, W, H); ctx.drawImage(glc, 0, 0);
     const vg = ctx.createRadialGradient(W / 2, H / 2, H * .5, W / 2, H / 2, H * .98);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-    overlay();
+    SC.forEach((e) => { if (t >= e.s.start - 1 && t <= e.s.end + 3.5) e.sc.overlay(t, e.s, uOf(e, t)); });
     let d = 0;
-    if (t < .8) d = 1 - t / .8;
-    if (sp.a > 0 && t - sp.a < .45) d = Math.max(d, 1 - (t - sp.a) / .45);
-    if (sp.b - t < .45 && sp.k !== 'outro') d = Math.max(d, 1 - (sp.b - t) / .45);
+    if (t < 1.2) d = 1 - t / 1.2;
     if (t > TL.duration - 1.5) d = Math.max(d, (t - (TL.duration - 1.5)) / 1.5);
     if (d > 0) { ctx.fillStyle = `rgba(0,0,0,${clamp(d)})`; ctx.fillRect(0, 0, W, H); }
   }
