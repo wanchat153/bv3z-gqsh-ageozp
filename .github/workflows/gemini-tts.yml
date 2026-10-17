@@ -1,0 +1,41 @@
+name: gemini-tts
+# Thai male narration voices from Gemini TTS; uses the repo secret GEMINI_API_KEY. mp3s are pushed to the `voices-gemini` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: 'narration text', default: 'ยามค่ำคืนที่ฝนโปรยปราย ซามูไรหยดหมึกนั่งอยู่ข้างเตาอุ่นๆ ข้างกายมีแมวส้มชื่อโมจิหมอบหลับตาพริ้ม เสียงหยดน้ำบนหลังคาค่อยๆ กลายเป็นจังหวะที่แสนอบอุ่น แล้วเรื่องราวของคืนนี้ก็เริ่มต้นขึ้น' }
+      voices: { description: 'comma separated voice names', default: 'Puck,Charon,Fenrir,Orus,Achird,Sadachbia,Iapetus,Algenib' }
+      style: { description: 'style instruction placed before the text', default: 'อ่านด้วยเสียงผู้ชายหนุ่ม สดใส อบอุ่น เหมือนนักเล่านิทาน จังหวะช้าสบาย:' }
+      model: { description: 'model id', default: 'gemini-3.8-flash-tts' }
+permissions:
+  contents: write
+jobs:
+  gemini:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEN_TEXT: ${{ inputs.text }}
+      VOICES: ${{ inputs.voices }}
+      STYLE: ${{ inputs.style }}
+      MODEL: ${{ inputs.model }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: check secret and synthesise
+        run: |
+          mkdir -p out; : > out/report.txt
+          if [ -z "$GEMINI_API_KEY" ]; then echo "SECRET MISSING: GEMINI_API_KEY is empty" | tee -a out/report.txt; exit 0; fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          python3 tts/gemini_tts.py || true
+          mkdir -p keep; cp out/*.mp3 out/report.txt keep/ 2>/dev/null || true
+          echo "::notice title=gemini report::$(tr '\n' '|' < out/report.txt | cut -c1-1500)"
+      - name: push results
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices-gemini
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          rm -rf out; mv keep out 2>/dev/null || { mkdir -p out; echo "no output" > out/report.txt; }
+          git add -f out
+          git commit -q -m "gemini tts samples"
+          git push -q -f origin voices-gemini
