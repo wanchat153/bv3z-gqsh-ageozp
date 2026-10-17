@@ -1,0 +1,2 @@
+ERROR Charon: RuntimeError: no audio in response: {"finishReason": "SAFETY", "promptFeedback": null, "usage": {"promptTokenCount": 694, "totalTokenCount": 694, "promptTokensDetails": [{"modality": "TEXT", "tokenCount": 694}], "serviceTier": "standard"}}
+first voice failed, stopping to avoid wasting quota
