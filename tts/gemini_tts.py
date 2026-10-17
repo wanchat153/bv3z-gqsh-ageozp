@@ -31,7 +31,12 @@ def synth(voice, text):
     )
     with urllib.request.urlopen(req, timeout=180) as r:
         data = json.load(r)
-    part = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+    cand = (data.get("candidates") or [{}])[0]
+    if "content" not in cand or not cand["content"].get("parts"):
+        info = {"finishReason": cand.get("finishReason"), "promptFeedback": data.get("promptFeedback"),
+                "usage": data.get("usageMetadata")}
+        raise RuntimeError("no audio in response: " + json.dumps(info, ensure_ascii=False)[:700])
+    part = cand["content"]["parts"][0]["inlineData"]
     return base64.b64decode(part["data"]), part.get("mimeType", "")
 
 
