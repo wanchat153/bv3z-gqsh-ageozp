@@ -5,7 +5,9 @@ on:
       seconds: { description: 'video length in seconds', default: '6.4' }
       parts: { description: 'number of parallel jobs (max 256)', default: '20' }
       fps: { description: 'frames per second', default: '60' }
-      wx: { description: 'watermark x', default: '380' }
+      width: { description: 'frame width (1920 for landscape)', default: '1080' }
+      height: { description: 'frame height (1080 for landscape)', default: '1920' }
+      wx: { description: 'watermark x, or none for no watermark', default: '380' }
       wy: { description: 'watermark y', default: '480' }
 jobs:
   plan:
@@ -36,9 +38,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm install --no-audit --no-fund
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-thai-tlwg fonts-noto-core
       - run: node tools/render_part.mjs episode ${{ matrix.s }} ${{ matrix.e }} out/part_${{ matrix.i }}
-        env: { WORKERS: 4, FPS: '${{ inputs.fps }}', CHROME: /usr/bin/google-chrome }
+        env: { WORKERS: 4, FPS: '${{ inputs.fps }}', WIDTH: '${{ inputs.width }}', HEIGHT: '${{ inputs.height }}', CHROME: /usr/bin/google-chrome }
       - run: mv out/part_${{ matrix.i }}/part.mp4 out/part.mp4
       - uses: actions/upload-artifact@v4
         with: { name: 'part-${{ matrix.i }}', path: out/part.mp4, retention-days: 1, compression-level: 0 }
