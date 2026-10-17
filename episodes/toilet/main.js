@@ -102,8 +102,8 @@
       const op = o.open === undefined ? 0.7 : o.open, lk = o.look || [0, 0];
       [-1, 1].forEach((sg) => {
         const cx = sg * 0.115, cy = hy - 0.02, rx = 0.088, ry = 0.064; g.save(); g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 6.2832); g.clip(); g.fillStyle = '#fff'; g.fillRect(cx - rx, cy - ry, rx * 2, ry * 2);
-        const lidY = cy - ry + 2 * ry * op, sl = 0.018; g.beginPath(); g.moveTo(cx - rx - 0.01, cy - ry - 0.02); g.lineTo(cx + rx + 0.01, cy - ry - 0.02); g.lineTo(cx + rx + 0.01, lidY + (sg < 0 ? sl : -sl)); g.lineTo(cx - rx - 0.01, lidY + (sg < 0 ? -sl : sl)); g.closePath(); g.fillStyle = OUT; g.fill();
-        const px = cx + lk[0] * 0.035, py = Math.max(cy - ry + 0.03, Math.min(cy + ry - 0.03, lidY - 0.03 + lk[1] * 0.02)); g.fillStyle = OUT; g.beginPath(); g.arc(px, py, 0.021, 0, 6.2832); g.fill(); g.restore();
+        const lidY = cy - ry + 2 * ry * op, sl = 0.018; g.beginPath(); g.moveTo(cx - rx - 0.01, cy - ry - 0.02); g.lineTo(cx + rx + 0.01, cy - ry - 0.02); g.lineTo(cx + rx + 0.01, lidY + (sg < 0 ? sl : -sl)); g.lineTo(cx - rx - 0.01, lidY + (sg < 0 ? -sl : sl)); g.closePath(); g.fillStyle = C.skin; g.fill(); g.beginPath(); g.moveTo(cx - rx - 0.01, lidY + (sg < 0 ? -sl : sl)); g.lineTo(cx + rx + 0.01, lidY + (sg < 0 ? sl : -sl)); g.lineWidth = LU * 1.3; g.strokeStyle = OUT; g.stroke();
+        const px = cx + lk[0] * 0.035, py = Math.max(cy - ry + 0.03, Math.min(cy + ry - 0.035, lidY + 0.022 + lk[1] * 0.02)); g.fillStyle = OUT; g.beginPath(); g.arc(px, py, 0.026, 0, 6.2832); g.fill(); g.restore();
         g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 6.2832); g.lineWidth = LU; g.strokeStyle = OUT; g.stroke();
       });
       ln(-0.012, hy - 0.07, 0.012, hy - 0.09, 0.8);
