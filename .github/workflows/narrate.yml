@@ -1,0 +1,37 @@
+name: narrate
+# Thai narration for script/narration.json with VachanaTTS; pushes audio.flac, timeline.json and a preview mp3 to the `voices-narration` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      speaker: { description: 'Vachana speaker id', default: 'th_m_2' }
+permissions:
+  contents: write
+jobs:
+  narrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPEAKER: ${{ inputs.speaker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: install
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libsndfile1 > /dev/null
+          mkdir -p out; : > out/report.txt
+          pip install --quiet pythaitts vachanatts requests > out/pip.log 2>&1 || echo "PIP FAILED: $(tail -c 600 out/pip.log | tr '\n' ' ')" >> out/report.txt
+      - name: synthesise
+        run: |
+          python3 tts/narrate.py 2>&1 | tee -a out/report.txt || echo "RUN FAILED" >> out/report.txt
+          mkdir -p keep; cp out/audio.flac out/timeline.json out/narration_preview.mp3 out/report.txt keep/ 2>/dev/null || cp out/report.txt keep/
+      - name: push results
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices-narration
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          rm -rf out; mv keep out 2>/dev/null || { mkdir -p out; echo "no output" > out/report.txt; }
+          git add -f out
+          git commit -q -m "narration"
+          git push -q -f origin voices-narration
