@@ -1,0 +1,23 @@
+name: publish
+# copies the `video` artifact of a finished render run onto a branch (split in <90 MB chunks) so it can be fetched with git
+on:
+  workflow_dispatch:
+    inputs:
+      run_id: { description: 'render run id', required: true }
+      branch: { description: 'target branch', default: 'video-solar' }
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          mkdir v && gh run download ${{ inputs.run_id }} -n video -D v
+          ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -show_entries format=duration,size -of default=nw=1 v/out.mp4 | tee v/info.txt
+          cd v && split -b 90m -d out.mp4 out.mp4.part && rm out.mp4 && cd ..
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan ${{ inputs.branch }}; git rm -rq --cached . >/dev/null 2>&1 || true
+          git add -f v; git commit -q -m video; git push -q -f origin ${{ inputs.branch }}
