@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       speaker: { description: 'Vachana speaker id', default: 'th_m_2' }
+      tempo: { description: 'speech tempo, 1.0 = original, lower = slower', default: '0.88' }
 permissions:
   contents: write
 jobs:
@@ -12,6 +13,7 @@ jobs:
     timeout-minutes: 20
     env:
       SPEAKER: ${{ inputs.speaker }}
+      TEMPO: ${{ inputs.tempo }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

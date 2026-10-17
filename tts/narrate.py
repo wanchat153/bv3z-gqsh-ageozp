@@ -6,7 +6,8 @@ import json, os, subprocess, sys, time, wave
 from pythaitts import TTS
 
 SPEAKER = os.environ.get("SPEAKER", "th_m_2")
-LEAD, GAP, TAIL = 1.2, 0.55, 2.5
+LEAD, GAP, TAIL = 1.5, 1.0, 3.0
+TEMPO = float(os.environ.get("TEMPO", "0.88"))  # <1 = slower speech, pitch kept
 RATE = 48000
 segs = json.load(open("script/narration.json", encoding="utf-8"))
 os.makedirs("out/seg", exist_ok=True)
@@ -36,7 +37,7 @@ for s in segs:
         failed += 1
         continue
     trim = "silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse"
-    run("ffmpeg", "-v", "error", "-y", "-i", raw, "-ar", str(RATE), "-ac", "1", "-af", trim, "-c:a", "pcm_s16le", wav)
+    run("ffmpeg", "-v", "error", "-y", "-i", raw, "-ar", str(RATE), "-ac", "1", "-af", f"{trim},atempo={TEMPO}", "-c:a", "pcm_s16le", wav)
     d = dur(wav)
     with wave.open(wav, "rb") as w:
         assert w.getframerate() == RATE and w.getnchannels() == 1 and w.getsampwidth() == 2
