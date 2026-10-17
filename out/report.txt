@@ -1,0 +1,6 @@
+OK plain
+OK slow
+OK deep
+gtts_deep.mp3 20.819592s
+gtts_plain.mp3 20.784000s
+gtts_slow.mp3 24.792000s
