@@ -81,7 +81,7 @@
     [-1, 1].forEach((sg) => {
       const sho = [sg * 0.255, 0.99]; let el, ha;
       if (o.armsFolded) { if (!back) { el = [sg * 0.35, sg < 0 ? 0.74 : 0.7]; ha = [-sg * 0.13, sg < 0 ? 0.8 : 0.76]; } else { el = [sg * 0.36, 0.74]; ha = [sg * 0.18, 0.8]; } }
-      else if (o.seated) { el = [sg * 0.4, 0.72]; ha = [sg * 0.37, 0.47]; }
+      else if (o.seated) { el = [sg * 0.45, 0.76]; ha = [sg * 0.37, 0.595]; }
       else { const pp = ph + (sg < 0 ? Math.PI : 0), sw = w ? Math.sin(pp) : 0; el = [sg * (0.355 - sw * 0.0), 0.79 + sw * 0.025]; ha = [sg * (0.335 - Math.abs(sw) * 0.02), 0.575 + sw * 0.075]; }
       A.push({ p: [sho, el, ha], w: 0.15, c: C.hood2 }); hands.push([ha, sg]);
     });
@@ -302,6 +302,8 @@
     g.beginPath(); g.roundRect(250, 560, 580, 1500, 130); g.fillStyle = C.seat; g.fill(); g.lineWidth = 7; g.strokeStyle = OUT; g.stroke();
     g.fillStyle = C.seatD; g.beginPath(); g.roundRect(700, 580, 120, 1450, 70); g.fill();
     g.beginPath(); g.roundRect(330, 610, 420, 360, 60); g.fillStyle = C.pillow; g.fill(); g.stroke();
+    // armrests
+    [170, 770].forEach((x) => { g.beginPath(); g.roundRect(x, 1500, 140, 260, 44); g.fillStyle = C.arm; g.fill(); g.lineWidth = 6; g.strokeStyle = OUT; g.stroke(); g.beginPath(); g.roundRect(x, 1500, 140, 70, 34); g.fillStyle = C.armT; g.fill(); g.stroke(); });
     // heroes
     const sit = (!F && t < 8.4) || F;
     const op = (() => { let o = 0.68; if (!F) { if (between(t, 2.2, 2.45)) o = 0.05; if (between(t, 5.3, 6.9)) o = 0.12; if (between(t, 3.0, 4.2)) o = 0.42; } else { if (between(t, 70.6, 70.85)) o = 0.05; if (between(t, 72.4, 73.4)) o = 0.85; if (t >= 73.6) o = 0.1; if (t >= 69.0 && t < 70.0) o = 0.5; } return o; })();
@@ -313,8 +315,6 @@
       g.save(); g.translate(0, -leaveK * 1700); unitDraw(540, hy + 1.3 * k, k, () => { g.scale(1 + sq, 1 - sq); hero({ back: false, seated: true, open: op, look, mouth, sweat, armsFolded: false, tilt: Math.sin(t * 0.7) * 0.02 + shake * 0.03 }); }); g.restore();
     }
     if (!gone || F) { if (!F ? t < 6.6 : t < 69.5) { g.beginPath(); g.roundRect(330, 1620, 420, 60, 24); g.fillStyle = '#7c8794'; g.fill(); g.lineWidth = 5; g.stroke(); g.beginPath(); g.roundRect(500, 1612, 80, 76, 18); g.fillStyle = '#c9d1d9'; g.fill(); g.stroke(); } }
-    // armrests
-    [170, 770].forEach((x) => { g.beginPath(); g.roundRect(x, 1500, 140, 260, 44); g.fillStyle = C.arm; g.fill(); g.lineWidth = 6; g.strokeStyle = OUT; g.stroke(); g.beginPath(); g.roundRect(x, 1500, 140, 70, 34); g.fillStyle = C.armT; g.fill(); g.stroke(); });
     g.restore();
   }
 
