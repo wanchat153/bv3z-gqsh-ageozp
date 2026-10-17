@@ -14,15 +14,16 @@ tts = TTS(model="v1")
 for name, ref in refs:
     t0 = time.time()
     try:
-        tts.infer(
+        wav = tts.infer(
             ref_audio=ref,
             ref_text=REF_TEXT,
             gen_text=GEN,
             step=STEP,
             cfg=2.0,
             speed=SPEED,
-            file_wave=f"out/f5_{name}.wav",
         )
+        import soundfile as sf
+        sf.write(f"out/f5_{name}.wav", wav, 24000)
         print(f"OK {name} {time.time() - t0:.0f}s", flush=True)
     except Exception:
         traceback.print_exc()
