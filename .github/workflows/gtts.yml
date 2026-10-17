@@ -1,0 +1,50 @@
+name: gtts
+# Free Google Translate TTS (gTTS) Thai samples: normal, slow, and a pitched-down variant; mp3s are pushed to the `voices-gtts` branch.
+on:
+  workflow_dispatch:
+    inputs:
+      text: { description: 'narration text', default: 'ยามค่ำคืนที่ฝนโปรยปราย ซามูไรหยดหมึกนั่งอยู่ข้างเตาอุ่นๆ ข้างกายมีแมวส้มชื่อโมจิหมอบหลับตาพริ้ม เสียงหยดน้ำบนหลังคาค่อยๆ กลายเป็นจังหวะที่แสนอบอุ่น แล้วเรื่องราวของคืนนี้ก็เริ่มต้นขึ้น' }
+permissions:
+  contents: write
+jobs:
+  gtts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GEN_TEXT: ${{ inputs.text }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: synthesise
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install --quiet gTTS
+          mkdir -p out; : > out/report.txt
+          python - <<'PY' 2>&1 | tee -a out/report.txt
+          import os
+          from gtts import gTTS
+          t = os.environ["GEN_TEXT"]
+          for name, slow in [("plain", False), ("slow", True)]:
+              try:
+                  gTTS(t, lang="th", slow=slow).save(f"out/gtts_{name}.mp3")
+                  print("OK", name)
+              except Exception as e:
+                  print("FAILED", name, type(e).__name__, str(e)[:300])
+          PY
+          if [ -s out/gtts_plain.mp3 ]; then
+            ffmpeg -v error -y -i out/gtts_plain.mp3 -af "rubberband=pitch=0.80,equalizer=f=150:t=q:w=1:g=3,loudnorm=I=-16:TP=-1.5" -ar 44100 -b:a 192k out/gtts_deep.mp3 && echo "OK deep" >> out/report.txt
+          fi
+          for f in out/gtts_*.mp3; do [ -f "$f" ] && echo "$(basename $f) $(ffprobe -v error -show_entries format=duration -of csv=p=0 $f)s" >> out/report.txt; done
+          cat out/report.txt
+          mkdir -p keep; cp out/*.mp3 out/report.txt keep/ 2>/dev/null || true
+      - name: push results
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git checkout -q --orphan voices-gtts
+          git rm -rq --cached . > /dev/null 2>&1 || true
+          rm -rf out; mv keep out 2>/dev/null || { mkdir -p out; echo "no output" > out/report.txt; }
+          git add -f out
+          git commit -q -m "gtts samples"
+          git push -q -f origin voices-gtts
