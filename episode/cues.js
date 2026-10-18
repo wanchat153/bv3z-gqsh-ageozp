@@ -1,150 +1,64 @@
-// cues.js — ONE timeline shared by the picture (anim.js/scene.js) and the sound (music.py reads cues.json made by `node dump_cues.js`).
-// Pebble Garden: a marble run on a locked iso camera. 32 s loop, 120 BPM (beat 0.5 s, bar 2 s), 8 marbles, one released every bar.
-// World units: cm. u = screen-right, h = height, q = depth toward camera (shifts down the screen). Marble plane is q = 0.
+// cues.js — ONE timeline for picture (anim.js/scene.js) and sound (sfx.py reads cues.json from `node dump_cues.js`).
+// Tofu Shop: 6.4 s seamless loop, locked front-elevation iso camera. STORY TIME s wraps 0..6.4 (state(6.4) == state(0)); VIDEO TIME t = s - OFF, frame 0 = Mochi's first poke at full press.
+// World cm: u right, h up, q toward camera. g = 981 cm/s^2 for everything that flies.
 const CUE = (function () {
-  const T = 32, FPS = 30, BPM = 120, BEAT = 0.5, BAR = 2.0, G = 981, RM = 2.2, NM = 8, CYC = 16;
-  const S = 11.5, OX = 547, Y0 = 1560, DQ = 0.6;                 // px per cm, screen x of u=0, floor line (q=0,h=0), depth factor
+  const T = 6.4, FPS = 60, OFF = 0.62, G = 981;
+  const S = 13.5, OX = 540, Y0 = 1400, DQ = 0.6;
   const P = (u, h, q = 0) => [OX + u * S, Y0 + q * DQ * S - h * S];
   const mod = (a, n) => ((a % n) + n) % n, clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
   const sstep = (x) => { x = clamp(x); return x * x * (3 - 2 * x); };
-  // rotate an (u,h) offset by a screen-clockwise angle th (h is up, so flip)
-  const rotUH = (du, dh, th) => { const x = du, y = -dh, c = Math.cos(th), s = Math.sin(th); return [x * c - y * s, -(x * s + y * c)]; };
-
-  // ---------------------------------------------------------------- elevator (right edge): chain loop with 8 cups
-  const EL = { H: 96, hb: 13, ht: 109, uc: 35.4 }; EL.rs = 384 / (20 * Math.PI); EL.uUp = EL.uc - EL.rs; EL.uDn = EL.uc + EL.rs;
-  EL.L = 2 * EL.H + 2 * Math.PI * EL.rs; EL.V = EL.L / CYC; EL.SP = EL.L / NM;            // cup spacing = 2 s of travel
-  const CUPO = [-3.6, -2.6], MRO = [0, 1.15];                                             // cup centre and marble rest relative to the pin
-  function pin(s) {
-    s = mod(s, EL.L); const { H, hb, ht, uc, rs, uUp, uDn } = EL;
-    if (s < H) return [uUp, hb + s]; s -= H;
-    if (s < Math.PI * rs) { const th = Math.PI - s / rs; return [uc + rs * Math.cos(th), ht + rs * Math.sin(th)]; } s -= Math.PI * rs;
-    if (s < H) return [uDn, ht - s]; s -= H;
-    const th = -s / rs; return [uc + rs * Math.cos(th), hb + rs * Math.sin(th)];
+  const sOf = (t) => mod(t + OFF, T);
+  const hash = (...a) => { let x = Math.sin(a.reduce((s, v, i) => s + (i + 1) * 12.9898 * v, 78.233)) * 43758.5453; return x - Math.floor(x); };
+  // ------------------------------------------------------------- tray + tofu cubes (7 x 5.6 x 4 cm, standing in 1.3 cm of water)
+  const TR = { u0: -22, u1: 24, h: 2.4, wl: 1.5, q0: 5, q1: 15.5 };
+  const CUBES = [-12.5, 0, 12.5].map((u, i) => ({ i, u, w: 11, hb: 0.6, ht: 8.6, qf: 14.6, qb: 10.6 }));
+  const SIT_U = 24.5, MQ = 18.5, SQ = 18, SAM_U = -26.5;
+  // ------------------------------------------------------------- pokes: Mochi (far arm from the right), samurai (hand from the left). press window = paw/hand on the cube
+  const POKES = [
+    { s: 0.62, by: 'paw', c: 2, a: 1.0 }, { s: 1.08, by: 'paw', c: 2, a: 0.8 },
+    { s: 2.00, by: 'hand', c: 0, a: 1.0 }, { s: 2.46, by: 'hand', c: 0, a: 0.8 },
+  ];
+  const WV = 26, FALL = [1, 0.55, 0.34, 0.2];                                // water wave speed cm/s, amplitude falloff per cube
+  // ------------------------------------------------------------- shishi-odoshi (bamboo tipper): fills from a dripping pipe, tips at TIP, pours POUR0..POUR1, snaps back and CLACKs at CLACK
+  const SH = { pu: -8.5, ph: 19, q: 8, L1: 9, L2: 7, th0: 0.42, th1: -0.62, TIP: 3.30, POUR0: 3.60, POUR1: 4.35, BACK: 4.35, CLACK: 4.62, spout0: -19 };
+  SH.fill = (s) => { if (s >= SH.CLACK) return clamp((s - SH.CLACK) / (SH.TIP + T - SH.CLACK)); if (s < SH.TIP) return clamp((s + T - SH.CLACK) / (SH.TIP + T - SH.CLACK)); if (s < SH.POUR1) return 1 - sstep((s - SH.POUR0) / (SH.POUR1 - SH.POUR0)); return 0; };
+  SH.th = (s) => {                                                         // tube angle, damped bounce on the stop
+    if (s < SH.TIP) return SH.th0 + 0.012 * Math.sin(s * 9) * 0;
+    if (s < SH.BACK) { const x = clamp((s - SH.TIP) / 0.30); const e = x * x; let th = SH.th0 + (SH.th1 - SH.th0) * e; if (s > SH.TIP + 0.30) th = SH.th1 + 0.035 * Math.exp(-(s - SH.TIP - 0.3) / 0.07) * Math.cos(2 * Math.PI * (s - SH.TIP - 0.3) / 0.12); return th; }
+    if (s < SH.CLACK) { const x = clamp((s - SH.BACK) / (SH.CLACK - SH.BACK)); return SH.th1 + (SH.th0 - SH.th1) * x * x; }
+    const t = s - SH.CLACK; return SH.th0 - 0.07 * Math.exp(-t / 0.06) * Math.abs(Math.cos(2 * Math.PI * t / 0.13));
+  };
+  const DRIPS = []; for (let k = 0; k < 9; k++) DRIPS.push(mod(SH.CLACK + 0.25 + 0.52 * k, T));            // pipe end drips into the tube while it fills (each arrives ~0.11 s after it leaves)
+  // ------------------------------------------------------------- cube wobble = sum of damped impulse responses (jelly: 4.6 Hz shear, 8.5 Hz squash), drive = pokes + water waves
+  const IMPS = CUBES.map(() => []);
+  POKES.forEach((p) => { const sg = p.by === 'paw' ? -1 : 1; CUBES.forEach((c, j) => { const d = Math.abs(j - p.c); IMPS[j].push({ s: p.s + 0.07 + Math.abs(c.u - CUBES[p.c].u) / WV * (d ? 1 : 0), a: p.a * FALL[d] * sg, kind: d ? 'wave' : 'poke', src: 'poke' }); }); });
+  CUBES.forEach((c, j) => IMPS[j].push({ s: SH.POUR0 + 0.05 + (c.u - SH.spout0) / WV, a: 0.9 * (1 - 0.08 * j), kind: 'wave', src: 'pour' }));
+  const W1 = 2 * Math.PI * 4.6, Z1 = 0.10, W2 = 2 * Math.PI * 8.5, Z2 = 0.16;
+  function wob(j, s) {                                                     // returns {sh (cm of top shear), sq (vertical scale)}
+    let sh = 0, sv = 0; for (const m of IMPS[j]) { const tau = s - m.s; if (tau < 0) continue; const w1 = W1 * Math.sqrt(1 - Z1 * Z1), w2 = W2 * Math.sqrt(1 - Z2 * Z2);
+      sh += m.a * Math.exp(-Z1 * W1 * tau) * Math.sin(w1 * tau) * 1.9; sv += Math.abs(m.a) * Math.exp(-Z2 * W2 * tau) * Math.sin(w2 * tau) * (m.kind === 'poke' ? 0.12 : 0.07); }
+    return { sh, sq: 1 + sv };
   }
-  function cupTilt(s) { s = mod(s, EL.L); const a = EL.H + 0.2, b = EL.H + 6.2; if (s < a || s > b) return 0; return -0.95 * Math.pow(Math.sin(Math.PI * (s - a) / (b - a)), 2); }
-  function cupAt(s) { const p = pin(s), th = cupTilt(s), c = rotUH(CUPO[0], CUPO[1], th), m = rotUH(CUPO[0] + MRO[0], CUPO[1] + MRO[1], th); return { pin: p, tilt: th, c: [p[0] + c[0], p[1] + c[1]], m: [p[0] + m[0], p[1] + m[1]] }; }
-  const S_REL = EL.H + 1.4, RIDE = S_REL / EL.V, DESC = CYC - RIDE;                      // marble leaves the cup at S_REL; descent lasts the rest of the 16 s cycle
-  const TB = 0.0 - 0.0;                                                                     // (set below) block hit time inside the descent
-  const XEND = 7.67, TBLOCK = DESC - XEND;                                                  // x = time since the block hit; the lob lands at x = XEND
-  // block hit falls on a downbeat at t = 0 (mod 2): cup phase tb chosen so that
-  const TBP = -mod(RIDE + TBLOCK, BAR);                                                     // cup 0 passes the load point at t = TBP (mod 2)
-
-  // ---------------------------------------------------------------- stations (cm)
-  const CH = { a: [24.9, 107.7], b: [-36.4, 98.4] };                                         // chute 1 marble centres
-  const BARS = []; for (let i = 0; i < 8; i++) BARS.push({ u: -34.7 + 7.0 * i, h: 84 - 3.4 * i, w: 6.0, d: 10 - 0.6 * i });
-  const CATCH = [18.8, 52.4], LIP3 = [-7.0, 46.0], SHI = { pv: [-11.0, 33.5], cupL: -10.5, tailL: 8.0, stone: [-2.8, 28.6] };
-  const GUT = { a: [-24.8, 7.0], b: [-11.5, 3.0] };                                          // low gutter (Mochi pats the marble onto it)
-  const PLK = { pv: [-1.0, 4.0], half: 10.0, rest: 0.20, hit: -0.30 };                       // plank (screen-clockwise positive: + = left end up? see plankAng)
-  const FOOT = cupAt(0).m;                                                                   // where the lob lands (cup at the load point)
-  const STOOL = { u: 12.5, h: 13.0 };
-
-  function plankAng(x) {                    // radians, screen-clockwise positive; rest: left end DOWN (negative): we use ang so that left end y = pv + half*sin(ang)
-    // x = time since the block hit. impact at x = 7.0: right end slams down (left end up)
-    const rest = -0.20, up = 0.30;
-    if (x < 7.0) return rest + (x > 6.9 ? 0 : 0);
-    const k = x - 7.0;
-    if (k < 0.10) return rest + (up - rest) * sstep(k / 0.10);
-    const kk = k - 0.10; const settle = up + (rest - up) * (1 - Math.exp(-kk * 3.2)) + 0.10 * Math.exp(-kk * 4.5) * Math.sin(kk * 14);
-    return settle;
-  }
-  function plankEnds(x) { const a = plankAng(x), c = Math.cos(a), s = Math.sin(a); return { a, L: [PLK.pv[0] - PLK.half * c, PLK.pv[1] - PLK.half * s], R: [PLK.pv[0] + PLK.half * c, PLK.pv[1] + PLK.half * s] }; }
-  // plank angle convention: positive a => right end higher? here R.h = pv.h + half*sin(a): a>0 raises the RIGHT end. Rest keeps the right end up? we want left end low at rest:
-  // rest a = +0.20 => right end up, left end down (matches), impact a = -0.30 => right end down, left end up.
-  function plankAng2(x) { const rest = 0.20, hit = -0.30; if (x < 7.0) return rest; const k = x - 7.0; if (k < 0.10) return rest + (hit - rest) * sstep(k / 0.10); const kk = k - 0.10; return rest + (hit - rest) * Math.exp(-kk * 3.4) * Math.cos(kk * 9); }
-  function plank(x) { const a = plankAng2(x), c = Math.cos(a), s = Math.sin(a); return { a, L: [PLK.pv[0] - PLK.half * c, PLK.pv[1] - PLK.half * s], R: [PLK.pv[0] + PLK.half * c, PLK.pv[1] + PLK.half * s],
-      mL: [PLK.pv[0] - (PLK.half - 2.6) * c - RM * s * -1 * -1, PLK.pv[1] - (PLK.half - 2.6) * s + RM * c] }; }
-  // marble rest point on the plank's left end (centre): along the plank, 2.6 from the end, RM above the surface (normal = (-sin a, cos a))
-  function plankMarble(x) { const a = plankAng2(x), c = Math.cos(a), s = Math.sin(a), d = PLK.half - 2.6; return [PLK.pv[0] - d * c - RM * s, PLK.pv[1] - d * s + RM * c]; }
-  function plankEndR(x) { const a = plankAng2(x), c = Math.cos(a), s = Math.sin(a); return [PLK.pv[0] + (PLK.half - 1.5) * c, PLK.pv[1] + (PLK.half - 1.5) * s + 0.9]; }
-
-  // shishi-odoshi tube angle (screen-clockwise positive: + = left (cup) end up). x = time since the block hit.
-  function shiAng(x) {
-    const rest = 0.44, down = -0.62;
-    if (x < 3.5) return rest;
-    if (x < 3.75) return rest - 0.10 * Math.sin(Math.PI * (x - 3.5) / 0.25) * 1.0;      // marble lands: small dip
-    if (x < 4.00) return rest + (down - rest) * sstep((x - 3.75) / 0.25);                // tips, pours
-    if (x < 4.50) return down + (rest - down) * Math.pow(sstep((x - 4.00) / 0.50), 2.2);  // swings back, hits the stone
-    const k = x - 4.5; return rest + 0.12 * Math.exp(-k * 7) * Math.sin(k * 26);        // bounce-settle
-  }
-  function shiCupPoint(x) { const a = shiAng(x), r = rotUH(-9.0, 2.5, a); return [SHI.pv[0] + r[0], SHI.pv[1] + r[1]]; }
-  function shiMarble(x) { const a = shiAng(x), r = rotUH(-8.6, 2.2 + RM * 0.2, a); return [SHI.pv[0] + r[0], SHI.pv[1] + r[1]]; }
-
-  // ---------------------------------------------------------------- descent program (time tau since the marble left the cup)
-  const seg = [], ev = [];
-  const A0 = (() => { const c = cupAt(S_REL); return c.m; })();
-  const roll = (t0, t1, a, b, v0 = 0) => seg.push({ k: 'roll', t0, t1, a, b, v0 });
-  const fly = (t0, t1, a, b) => seg.push({ k: 'fly', t0, t1, a, b });
-  const hold = (t0, t1, a) => seg.push({ k: 'hold', t0, t1, a });
-  const dyn = (t0, t1, f) => seg.push({ k: 'dyn', t0, t1, f });      // f(tau) -> [u,h]
-  const X = (x) => TBLOCK + x;
-  const E = (x, type, extra) => ev.push(Object.assign({ tau: X(x), x, type }, extra || {}));
-  fly(0, 0.12, A0, [CH.a[0], CH.a[1]]);
-  roll(0.12, X(0), CH.a, CH.b, 18);
-  E(0, 'block', { u: CH.b[0] - 2.2, h: CH.b[1] });
-  // marimba
-  { let prev = CH.b, tp = X(0);
-    for (let i = 0; i < 8; i++) { const b = BARS[i], lp = [b.u, b.h + RM], tl = X(0.25 * (i + 1)); fly(tp, tl, prev, lp); E(0.25 * (i + 1), 'bar', { i, u: b.u, h: b.h }); prev = lp; tp = tl; }
-    fly(tp, X(2.25), prev, CATCH); E(2.25, 'catch', { u: CATCH[0], h: CATCH[1] });
-    roll(X(2.25), X(3.25), CATCH, LIP3, 0); fly(X(3.25), X(3.5), LIP3, shiMarble(3.5)); E(3.5, 'cupland', { u: shiMarble(3.5)[0], h: shiMarble(3.5)[1] });
-    dyn(X(3.5), X(3.9), (tau) => shiMarble(tau - TBLOCK));
-    const out = shiMarble(3.9); const r3b = [out[0] - 4.2, 30.4];
-    roll(X(3.9), X(4.25), out, r3b, 12);
-    const land = [GUT.a[0] + 1.5, GUT.a[1] + RM];
-    fly(X(4.25), X(4.5), r3b, land); E(4.5, 'floor', { u: land[0], h: land[1], g: 1 });
-    // bounces on the low gutter (e = 0.5): apex 4.0, 1.0, 0.25 cm
-    const bo = (x0, x1, apex) => { const L = [land[0] + 0.15 * (x0 - 4.5) * 10, land[1]]; return L; };
-    let bu = land[0]; const bt = [[4.5, 4.68, 4.0], [4.68, 4.77, 1.0], [4.77, 4.815, 0.25]];
-    for (let j = 0; j < bt.length; j++) { const [x0, x1, ap] = bt[j], d = x1 - x0, vy = 0.5 * G * d; // symmetric arc, apex = vy^2/2g
-      seg.push({ k: 'arc', t0: X(x0), t1: X(x1), a: [bu, land[1]], b: [bu + 0.3, land[1]], apex: ap }); bu += 0.3; if (j < 2) E(x1, 'floor', { u: bu, h: land[1], g: 0.5 / (j + 1) }); }
-    const gm = [bu, land[1]];
-    // Mochi pats the marble at x = 5.0; it rolls down the low gutter to the plank's left end
-    hold(X(4.815), X(5.0), gm);
-    E(5.0, 'pat', { u: gm[0], h: gm[1] });
-    const pl = plankMarble(6.5);
-    roll(X(5.0), X(6.5), gm, pl, 15);
-    dyn(X(6.5), X(7.05), (tau) => plankMarble(tau - TBLOCK));
-    E(7.0, 'plank', { u: plank(7.0).R[0], h: plank(7.0).R[1] });
-    fly(X(7.05), X(XEND), plankMarble(7.05), FOOT); E(XEND, 'cupin', { u: FOOT[0], h: FOOT[1] });
-  }
-  E(1.25, 'roll_end', {});
-
-  function descent(tau) {
-    tau = clamp(tau, 0, DESC - 1e-6);
-    for (const s of seg) if (tau >= s.t0 && tau < s.t1) {
-      const d = s.t1 - s.t0, x = tau - s.t0;
-      if (s.k === 'roll') { const L = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), acc = 2 * (L - s.v0 * d) / (d * d), f = (s.v0 * x + 0.5 * acc * x * x) / L; return [s.a[0] + (s.b[0] - s.a[0]) * f, s.a[1] + (s.b[1] - s.a[1]) * f]; }
-      if (s.k === 'fly') { const vy = (s.b[1] - s.a[1] + 0.5 * G * d * d) / d; return [s.a[0] + (s.b[0] - s.a[0]) * x / d, s.a[1] + vy * x - 0.5 * G * x * x]; }
-      if (s.k === 'arc') { const g = 8 * s.apex / (d * d); const vy = 0.5 * g * d; return [s.a[0] + (s.b[0] - s.a[0]) * x / d, s.a[1] + vy * x - 0.5 * g * x * x]; }
-      if (s.k === 'hold') return s.a.slice();
-      if (s.k === 'dyn') return s.f(tau);
-    }
-    return seg[seg.length - 1].b ? seg[seg.length - 1].b.slice() : FOOT.slice();
-  }
-  const PAL8 = ['#FF8FA3', '#FFB26B', '#FFE066', '#8FD694', '#6FC8E8', '#8C9EFF', '#C79BFF', '#FF9FD0'];
-  // marble m (0..7): loaded into a cup at t = TBP + 2 m (mod CYC)
-  function marble(t, m) {
-    const phi = mod(t - (TBP + BAR * m), CYC);
-    if (phi < RIDE) { const c = cupAt(EL.V * phi); return { u: c.m[0], h: c.m[1], st: 'ride', phi, s: EL.V * phi, col: PAL8[m] }; }
-    const p = descent(phi - RIDE); return { u: p[0], h: p[1], st: 'run', tau: phi - RIDE, phi, col: PAL8[m] };
-  }
-  function cups(t) { const out = []; for (let j = 0; j < NM; j++) { const s = mod(EL.V * (t - TBP - BAR * j), EL.L); out.push(Object.assign({ s, j }, cupAt(s))); } return out; }
-
-  // ---------------------------------------------------------------- performers (functions of time since the block hit, x, taken mod 2)
-  const xOf = (t, xe) => mod(t - (TBP + RIDE + TBLOCK) - xe + BAR / 2, BAR) - BAR / 2;     // time relative to an event that happens at x = xe (inside a 2 s window)
-  // absolute events for the sound track
+  function press(j, s) { let k = 0; for (const p of POKES) if (p.c === j) { const t = s - p.s; if (t > -0.16 && t < 0.2) k = Math.max(k, t < 0 ? sstep(1 + t / 0.16) : 1 - sstep(t / 0.2)); } return k; }
+  // ------------------------------------------------------------- the leap drop: the last wave kicks one drop off the water toward Mochi's nose (ballistic), it sticks, she sneezes
+  const DROP = { s0: 4.80, sHit: 5.10, sSneeze: 5.28, p0: [19.8, 1.5, 12.5], nose: [21.5, 12.8, 18.5], r: 0.5 };
+  DROP.T = DROP.sHit - DROP.s0; DROP.v = [(DROP.nose[0] - DROP.p0[0]) / DROP.T, (DROP.nose[1] - DROP.p0[1] + 0.5 * G * DROP.T * DROP.T) / DROP.T, (DROP.nose[2] - DROP.p0[2]) / DROP.T];
+  DROP.pos = (s) => { const t = clamp(s - DROP.s0, 0, DROP.T); return [DROP.p0[0] + DROP.v[0] * t, DROP.p0[1] + DROP.v[1] * t - 0.5 * G * t * t, DROP.p0[2] + DROP.v[2] * t]; };
+  // pour stream: leaves the spout, ballistic, lands in the water behind the cubes
+  const HOPS = [{ t0: 4.68, T: 0.2 }];
+  // ------------------------------------------------------------- sound events (video time t = mod(s - OFF, T))
   function events() {
-    const out = [];
-    for (let m = 0; m < NM; m++) for (let r = -1; r <= 2; r++) {
-      const t0 = TBP + BAR * m + CYC * r + RIDE;                          // release time of this marble
-      for (const e of ev) { const t = t0 + e.tau; const tw = mod(t, T); out.push(Object.assign({}, e, { t: tw, m })); }
-      // belt events
-      out.push({ type: 'release', t: mod(t0, T), m, u: A0[0], h: A0[1] });
-      const tl = t0 + DESC; out.push({ type: 'cupin', t: mod(tl, T), m });
-    }
-    // dedupe (r loop covers wraps)
-    const seen = new Set(); return out.filter((e) => { const k = e.type + '|' + e.m + '|' + (e.i ?? '') + '|' + Math.round(e.t * 1000) + '|' + (e.g ?? ''); if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a.t - b.t);
+    const E = []; const ad = (s, type, o = {}) => E.push(Object.assign({ s, type, t: mod(s - OFF, T) }, o));
+    POKES.forEach((p) => ad(p.s, 'poke', { by: p.by, u: CUBES[p.c].u, a: p.a }));
+    IMPS.forEach((l, j) => l.forEach((m) => { if (m.kind === 'wave') ad(m.s, 'jiggle', { u: CUBES[j].u, a: Math.abs(m.a), src: m.src }); }));
+    ad(SH.TIP, 'creak'); ad(SH.POUR0, 'pour0'); ad(SH.POUR1, 'pour1'); ad(SH.CLACK, 'clack');
+    for (let k = 0; k < 6; k++) ad(SH.POUR0 + 0.08 + 0.12 * k, 'splat', { u: SH.spout0, a: 1 - 0.1 * k });
+    DRIPS.forEach((s) => ad(mod(s + 0.11, T), 'drip', { u: -16.7 }));
+    ad(DROP.s0, 'leap', { u: DROP.p0[0] }); ad(DROP.sHit, 'nose', { u: DROP.nose[0] }); ad(DROP.sSneeze, 'sneeze', { u: DROP.nose[0] });
+    HOPS.forEach((h) => { ad(h.t0, 'hop', { u: SAM_U }); ad(h.t0 + h.T, 'hopland', { u: SAM_U }); });
+    [0.3, 1.9, 3.1, 5.6].forEach((s, k) => ad(s, 'simmer', { u: 32, a: 0.6 + 0.4 * (k % 2) }));
+    return E.sort((a, b) => a.t - b.t);
   }
-  return { T, FPS, BPM, BEAT, BAR, G, RM, NM, CYC, S, OX, Y0, DQ, P, mod, clamp, sstep, rotUH, EL, pin, cupAt, cupTilt, S_REL, RIDE, DESC, TBLOCK, TBP, CH, BARS, CATCH, LIP3, SHI, GUT, PLK, FOOT, STOOL,
-    plank, plankAng2, plankMarble, plankEndR, shiAng, shiMarble, shiCupPoint, descent, marble, cups, xOf, events, PAL8, A0, seg, ev };
+  return { IMPS_: IMPS, T, FPS, OFF, G, S, OX, Y0, DQ, P, mod, clamp, sstep, sOf, hash, TR, CUBES, SIT_U, MQ, SQ, SAM_U, POKES, SH, DRIPS, wob, press, DROP, HOPS, events };
 })();
 if (typeof module !== 'undefined') module.exports = CUE;

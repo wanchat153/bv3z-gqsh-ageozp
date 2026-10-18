@@ -243,10 +243,13 @@ function drawCat(ctx, st, t, part = 'all') {
       const grad = (cx, cy, rx, ry, rgb, al) => { const p = G.X(cx, cy), g = c.createRadialGradient(p[0], p[1], 0, p[0], p[1], rx * s); g.addColorStop(0, `rgba(${rgb},${al * a})`); g.addColorStop(1, `rgba(${rgb},0)`); c.save(); c.translate(p[0], p[1]); c.scale(1, ry / rx); c.translate(-p[0], -p[1]); c.fillStyle = g; c.fillRect(p[0] - rx * s, p[1] - rx * s, 2 * rx * s, 2 * rx * s); c.restore(); };
       const dkRgb = (() => { const d = dk(col, 0.55); return `${d[0] | 0},${d[1] | 0},${d[2] | 0}`; })(), lite = (cx, cy, rx, ry, al, rgb = '250,236,214') => grad(cx, cy, rx, ry, rgb, al), shade = (cx, cy, rx, ry, al) => grad(cx, cy, rx, ry, dkRgb, al);
       const M = (pts) => pts.map((p) => G.X(p[0], p[1])), sm = (pts, n = 7) => cr(M(pts), true, n);
-      const SIL = sm(st.raise ? [[10, -66], [-2, -64.5], [-14, -60], [-25, -51], [-32, -40], [-36, -28], [-38.5, -17], [-38, -8], [-33, -2], [-24, 0], [-6, 0], [12, 0], [21, 0], [23.5, -2.4], [20.5, -5.5], [19, -10], [19, -22], [24, -30], [27.5, -40], [27, -50], [22, -59], [16, -64]] : [[10, -66], [-2, -64.5], [-14, -60], [-25, -51], [-32, -40], [-36, -28], [-38.5, -17], [-38, -8], [-33, -2], [-24, 0], [-6, 0], [14, 0], [27.5, 0], [29.5, -2.4], [26.5, -5.5], [25, -10], [25, -22], [28.5, -32], [28.5, -46], [23, -58], [16, -64]], 6);
+      const RK = st.raise === true ? 1 : Math.max(0, Math.min(1, +st.raise || 0));   // 0 = arm down (leg in silhouette) .. 1 = arm raised; continuous
+      const SA = [[10, -66], [-2, -64.5], [-14, -60], [-25, -51], [-32, -40], [-36, -28], [-38.5, -17], [-38, -8], [-33, -2], [-24, 0], [-6, 0], [14, 0], [27.5, 0], [29.5, -2.4], [26.5, -5.5], [25, -10], [25, -22], [28.5, -32], [28.5, -39], [28.5, -46], [23, -58], [16, -64]];
+      const SB = [[10, -66], [-2, -64.5], [-14, -60], [-25, -51], [-32, -40], [-36, -28], [-38.5, -17], [-38, -8], [-33, -2], [-24, 0], [-6, 0], [12, 0], [21, 0], [23.5, -2.4], [20.5, -5.5], [19, -10], [19, -22], [24, -30], [27.5, -40], [27, -50], [22, -59], [16, -64]];
+      const SIL = sm(SB, 6);   // body silhouette has NO near front leg; the near leg is always the arm tube from the shoulder (rest = hangs like the sheet, raise = same limb lifts)
       const HF = sm([[-19, -5.5], [-14, -9.5], [-6, -10.5], [2, -8.5], [7, -4.8], [8, -1.6], [5.5, 0], [-12, 0], [-18, -1.5]], 6);
-      let AP = [], an = 0, pc = [0, 0];
-      if (st.raise) { const path = cr(M([[14, -30], [21, -31], [30, -32.5], [40, -36.5], [48, -41]]), false, 6), n = path.length, wd = path.map((_, i) => (5.3 - 0.7 * i / (n - 1)) * s * 2), ARM = tube(path, wd), end = path[n - 1], pv = path[n - 3]; an = Math.atan2(end[1] - pv[1], end[0] - pv[0]);
+      let AP = [], an = 0, pc = [0, 0], armPath = [];
+      if (true) { const T = st.raiseTip || [48, -41], R0 = [[22, -36], [23, -28], [23, -18], [23, -9], [23.5, -4.5]], R1 = [[14, -30], [21, -31], [21 + (T[0] - 21) * 0.38, -31 + (T[1] + 31) * 0.38 + 1], [21 + (T[0] - 21) * 0.72, -31 + (T[1] + 31) * 0.72 + 0.6], T], path = armPath = cr(M(R0.map((p, i) => [p[0] + (R1[i][0] - p[0]) * RK, p[1] + (R1[i][1] - p[1]) * RK])), false, 6), n = path.length, wd = path.map((_, i) => (5.3 - 0.7 * i / (n - 1)) * s * 2), ARM = tube(path, wd), end = path[n - 1], pv = path[n - 3]; an = Math.atan2(end[1] - pv[1], end[0] - pv[0]);
         pc = [end[0] + Math.cos(an) * 2.0 * s, end[1] + Math.sin(an) * 2.0 * s];
         const PAW = ellPts(pc[0], pc[1], 6.4 * s, 5.4 * s, 22, -Math.PI / 2, 1, an), q0 = G.X(21, -31), ELB = ellPts(q0[0], q0[1], 5.4 * s, 5.4 * s, 20); AP = [ARM, PAW]; }
       const fixWind = (P) => { let ar = 0; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; ar += p[0] * q[1] - q[0] * p[1]; } return ar < 0 ? P.slice().reverse() : P; };
@@ -255,7 +258,7 @@ function drawCat(ctx, st, t, part = 'all') {
       const D = (list, sdv) => list.map((P, i) => deformPoly(P, 1.2, 0.18, sdv + i));
       const dkc = dk(col, 0.86), pawTicks = (x0, x1, sdv) => { for (const x of [x0, x1]) { const p = G.X(x, -0.8), q = G.X(x - 0.6 * G.f, -4.6); brushPts(c, [p, q], { w: 1.15 * inkW, a: a * 0.55, taper: 0.4, stri: 0, seed: sdv + x }, 2); } };
       // far legs (behind)
-      for (const [P, sdv] of (st.raise ? [] : [[FF, 5]])) { const [Q] = D([P], sd + sdv); wash(c, Q, dkc, a, sd + sdv, { edge: 0, core: 0 }); looseLine(c, Q, 0, 1, 1.4 * inkW, a * 0.7, sd + sdv + 1, { dry: 0.1, off: 0.4 }); }
+      for (const [P, sdv] of [[FF, 5]]) { const [Q] = D([P], sd + sdv), fa = a; wash(c, Q, dkc, fa, sd + sdv, { edge: 0, core: 0 }); looseLine(c, Q, 0, 1, 1.4 * inkW, fa * 0.7, sd + sdv + 1, { dry: 0.1, off: 0.4 }); }
       pawTicks(12, 17, 33);
       // body wash over the single silhouette
       const [Q] = D([SIL], sd + 1);
@@ -271,9 +274,9 @@ function drawCat(ctx, st, t, part = 'all') {
       const sc = rgba(dk(col, 0.7), 1), strokes = [];
       for (const [x, y] of [[-6, -62], [-14, -58], [-21, -51], [-27, -42]]) strokes.push([[x, y], [x - 1.5, y + 7], [x - 3, y + 15]]);
       for (const P of strokes) brushPts(c, P.map((p) => G.X(...p)), { w: 3.6 * s, col: sc, a: a * 0.55, taper: 0.85, head: 0.2, stri: 0, dry: 0, rag: 0, seed: sd + 40 + P[0][0] }, 2);
-      for (const [x, y, ln] of [[-33, -24, 9], [-33, -17, 9], [-30, -10, 8], [-25, -4.5, 6], ...(st.raise ? [[13, -14, 5], [13, -7.5, 5]] : [[20, -26, 7], [20, -19, 7], [20, -12, 7], [20.5, -5.5, 5]])]) { const p = G.X(x, y), q = G.X(x + ln * 0.9, y + 0.8); brushPts(c, [p, q], { w: 2.1 * s, col: sc, a: a * 0.5, taper: 0.5, head: 0.3, stri: 0, dry: 0, rag: 0, seed: sd + 90 + x }, 2); }
+      for (const [x, y, ln] of [[-33, -24, 9], [-33, -17, 9], [-30, -10, 8], [-25, -4.5, 6], ...(true ? [[13, -14, 5], [13, -7.5, 5]] : [[20, -26, 7], [20, -19, 7], [20, -12, 7], [20.5, -5.5, 5]])]) { const p = G.X(x, y), q = G.X(x + ln * 0.9, y + 0.8); brushPts(c, [p, q], { w: 2.1 * s, col: sc, a: a * 0.5, taper: 0.5, head: 0.3, stri: 0, dry: 0, rag: 0, seed: sd + 90 + x }, 2); }
       brushPts(c, M([[-30, -29], [-19, -32], [-8, -26], [-3.5, -17], [-5.2, -10.6]]), { w: 2.0 * inkW, a: a * 0.92, taper: 0.7, head: 0.15, stri: 0, dry: 0.05, rag: 0, seed: sd + 70 }, 2);   // thigh contour (ink)
-      if (!st.raise) brushPts(c, M([[15.5, -30], [15.3, -18], [15.8, -7], [17, -2]]), { w: 1.9 * inkW, a: a * 0.9, taper: 0.7, head: 0.15, stri: 0, dry: 0.05, rag: 0, seed: sd + 71 }, 2);   // near leg inner edge (ink)
+      if (false) brushPts(c, M([[15.5, -30], [15.3, -18], [15.8, -7], [17, -2]]), { w: 1.9 * inkW, a: a * 0.9, taper: 0.7, head: 0.15, stri: 0, dry: 0.05, rag: 0, seed: sd + 71 }, 2);   // near leg inner edge (ink)
       // rim light along the spine
       brushPts(c, M([[-22, -52], [-12, -59], [0, -64]]), { w: 2.4 * s, col: 'rgba(255,244,222,1)', a: a * 0.4, taper: 0.9, head: 0.2, stri: 0, dry: 0, rag: 0, seed: sd + 72 }, 2);
       shade(11, -12, 5, 13, 0.3); lite(-26, -30, 8, 12, 0.22, '255,244,222'); shade(-3, -14, 5, 10, 0.2);
@@ -287,13 +290,14 @@ function drawCat(ctx, st, t, part = 'all') {
       } else looseLine(c, Q, 0, 1, 1.9 * inkW, a * 0.92, sd + 2, { dry: 0.08, off: 0.5 });
       looseLine(c, QF, 0, 1, 1.9 * inkW, a * 0.92, sd + 8, { dry: 0, off: 0.4 });
       const ik = (pts, w, al, sdv, tp = 0.7) => brushPts(c, M(pts), { w: w * inkW, a: a * al, taper: tp, head: 0.15, stri: 0, dry: 0.05, rag: 0, seed: sd + sdv }, 2);
-      if (!st.raise) ik([[6.5, -24], [6.2, -12], [7, -5], [9.5, -2.6], [14.5, -3.2]], 1.5, 0.75, 81, 0.6);   // far leg edge + paw
-      pawTicks(-12, -7, 35); if (st.raise) { pawTicks(11, 16, 37); ik([[6, -24], [5.5, -12], [6.5, -4], [9, -1.5]], 1.2, 0.5, 82, 0.6); } else { pawTicks(21, 26, 37); pawTicks(10.5, 14, 38); }
+      if (true) ik([[6.5, -24], [6.2, -12], [7, -5], [9.5, -2.6], [14.5, -3.2]], 1.5, 0.75, 81, 0.6);   // far leg edge + paw
+      pawTicks(-12, -7, 35); if (true) { pawTicks(11, 16, 37); ik([[6, -24], [5.5, -12], [6.5, -4], [9, -1.5]], 1.2, 0.5, 82, 0.6); } else { pawTicks(21, 26, 37); pawTicks(10.5, 14, 38); }
       for (const x of []) { const p = G.X(x, -0.8), q = G.X(x - 0.6 * G.f, -4.8); brushPts(c, [p, q], { w: 1.15 * inkW, a: a * 0.6, taper: 0.4, stri: 0, seed: sd + x }, 2); }
-      if (st.raise) {
+      if (AP.length) {
         c.save(); c.beginPath(); for (const P of AP) { const Q2 = fixWind(P); c.moveTo(Q2[0][0], Q2[0][1]); for (let k = 1; k < Q2.length; k++) c.lineTo(Q2[k][0], Q2[k][1]); c.closePath(); } c.clip('nonzero');
-        lite(34, -38, 8, 4, 0.3); shade(24, -26, 7, 4, 0.22);
-        for (const [x, y] of [[30, -29], [33, -37]]) { const p = G.X(x - 3, y + 1), q = G.X(x + 3, y - 0.5); brushPts(c, [p, q], { w: 2.1 * s, col: sc, a: a * 0.5, taper: 0.5, head: 0.3, stri: 0, dry: 0, rag: 0, seed: sd + 91 + x }, 2); }
+        { const n = armPath.length, at = (f) => armPath[Math.min(n - 1, Math.round(f * (n - 1)))], pi = at(0.75), pb = at(0.3), L = (px_, py_, rx, ry, al, rgb) => { const g = c.createRadialGradient(px_, py_, 0, px_, py_, rx * s); g.addColorStop(0, `rgba(${rgb},${al * a})`); g.addColorStop(1, `rgba(${rgb},0)`); c.fillStyle = g; c.fillRect(px_ - rx * s, py_ - rx * s, 2 * rx * s, 2 * rx * s); };
+          L(pi[0], pi[1], 8, 4, 0.3, '250,236,214'); L(pb[0], pb[1], 7, 4, 0.22, '120,70,40');
+          for (const f of [0.5, 0.7]) { const q0 = at(f), q1 = at(Math.min(1, f + 0.08)), dx = q1[0] - q0[0], dy = q1[1] - q0[1], d = Math.hypot(dx, dy) || 1, nx = -dy / d, ny = dx / d, w = 4.2 * s; brushPts(c, [[q0[0] - nx * w, q0[1] - ny * w], [q0[0] + nx * w, q0[1] + ny * w]], { w: 2.1 * s, col: sc, a: a * 0.5, taper: 0.5, head: 0.3, stri: 0, dry: 0, rag: 0, seed: sd + 91 + f * 10 }, 2); } }
         c.restore();
         const nx = -Math.sin(an), ny = Math.cos(an);
         for (const k of [-0.9, 0, 0.9]) { const p = [pc[0] + nx * k * 2.2 * s + Math.cos(an) * 2.2 * s, pc[1] + ny * k * 2.2 * s + Math.sin(an) * 2.2 * s], q = [p[0] + Math.cos(an) * 1.8 * s, p[1] + Math.sin(an) * 1.8 * s]; brushPts(c, [p, q], { w: 1.1 * inkW, a: a * 0.55, taper: 0.4, stri: 0, seed: sd + k * 7 }, 2); }

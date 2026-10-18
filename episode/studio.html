@@ -4,7 +4,7 @@
 <script>
 initEngine(document.getElementById('c')); initCast();
 window.READY = true;
-// grab(t) -> PNG data URL of the frame at time t (pure function of t)
-window.grabPNG0 = (t, fmt = 'png', q = 0.93) => { frame(t); return document.getElementById('c').toDataURL(fmt === 'jpg' ? 'image/jpeg' : 'image/png', q); };
-window.grabPNG = (t) => window.grabPNG0(t).split(',')[1];
+// grab(t) -> PNG data URL of the frame at video time t (pure function of t)
+window.grab = (t, fmt = 'png', q = 0.93) => { frame(t); return document.getElementById('c').toDataURL(fmt === 'jpg' ? 'image/jpeg' : 'image/png', q); };
+window.grabPNG = (t) => window.grab(t).split(',')[1];
 </script></body></html>
