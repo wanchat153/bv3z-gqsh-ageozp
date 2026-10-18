@@ -1,18 +1,19 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Split Gates. Frame = pure function of t. Ball radius CONSTANT (R=25). Smoothness: 6-sample motion blur in grabPNG.
+// Spiral Arms: balls on rotating arms (epicycles) draw a growing pattern. Frame = pure function of t. Ball radius CONSTANT (R=25). 6-sample motion blur.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const R=25,FR=[40,250,1000,1250],HZ=DATA.hz,B=DATA.balls,GT=DATA.gates;
+const R=25,FR=[40,250,1000,1250],CX=540,CY=880,D=DATA,A=D.a,RAD=D.r,HUES=D.hues,PH=D.ph,T2=D.t2,T3=D.t3,TB=D.tb;
 const THEMES=[{a:'#14102a',b:'#07050f',g:'80,90,190',d:'170,180,255'},{a:'#06222b',b:'#03090d',g:'40,150,160',d:'150,235,240'},{a:'#0c2316',b:'#040b07',g:'60,160,90',d:'170,240,190'},{a:'#2a0c14',b:'#0d0306',g:'190,60,80',d:'255,170,180'},{a:'#2a1424',b:'#0d0510',g:'220,110,70',d:'255,200,150'}];
-const TH=THEMES[DATA.theme||0];
+const TH=THEMES[D.theme||0];
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
  const r=c.createRadialGradient(540,860,60,540,860,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
  c.save();c.beginPath();c.rect(0,0,W,H);c.roundRect(FR[0],FR[1],FR[2],FR[3],48);c.clip('evenodd');
  c.strokeStyle=`rgba(${TH.d},.15)`;c.lineWidth=2.5;for(let k=-1;k<4;k++){c.beginPath();c.arc(540+k*40,1000,520+k*170,0,TAU);c.stroke()}
  c.strokeStyle=`rgba(${TH.d},.10)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
- const rr=sr(31);for(let k=0;k<70;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
+ const rr=sr(57);for(let k=0;k<70;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
  c.restore();c.save();c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],48);c.fillStyle='rgba(2,2,8,.5)';c.fill();c.restore()}
 function neon(path,w=8){c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=w+3;path();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=w*.55;path();c.stroke();c.restore()}
 function sphere(x,y,h,a){c.save();c.globalAlpha=a;
@@ -25,23 +26,40 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
  for(let layer=0;layer<2;layer++)for(let k=1;k<=n;k++){const u=k/n,f=Math.pow(1-u,1.1),hh=(h+u*50)%360;
   c.strokeStyle=layer?`hsla(${hh},90%,88%,${.5*f*a})`:`hsla(${hh},88%,62%,${.55*f*a})`;c.lineWidth=Math.max(1,2*R*(layer?.5:1.25)*f);c.beginPath();c.moveTo(pts[k-1][0],pts[k-1][1]);c.lineTo(pts[k][0],pts[k][1]);c.stroke()}
  c.restore()}
-function ring(x,y,a,glow){c.save();c.globalAlpha=a;c.strokeStyle='#fff';c.shadowColor='rgba(255,255,255,.9)';c.shadowBlur=14+glow*18;c.lineWidth=4+glow*2;c.beginPath();c.arc(x,y,R,0,TAU);c.stroke();c.restore()}
-function posAt(b,t){const f=(t-b.b)*HZ;if(f<0)return null;const P=b.p,n=P.length/2-1;const k=Math.min(n,Math.floor(f)),u=Math.min(1,f-k),k2=Math.min(n,k+1);return[P[2*k]+(P[2*k2]-P[2*k])*u,P[2*k+1]+(P[2*k2+1]-P[2*k+1])*u]}
+// arm geometry: joints of ball k at time t (arm 2 grows in at T2, arm 3 at T3)
+function joints(k,t){const g2=sm((t-T2)/1.4),g3=sm((t-T3)/1.4);
+ const a1=A[0]*t+PH[k],a2=A[1]*t+PH[k]*.5,a3=A[2]*t+PH[k]*.25;
+ const j1=[CX+RAD[0]*Math.cos(a1),CY+RAD[0]*Math.sin(a1)];
+ const j2=[j1[0]+g2*RAD[1]*Math.cos(a2),j1[1]+g2*RAD[1]*Math.sin(a2)];
+ const j3=[j2[0]+g3*RAD[2]*Math.cos(a3),j2[1]+g3*RAD[2]*Math.sin(a3)];
+ return [j1,j2,j3]}
+const pos=(k,t)=>joints(k,t)[2];
+function ballAlpha(k,t){return k==0?1:sm((t-TB)/1.0)}
 function render(t){
  bg();neon(()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],48)},8);
- let cnt=0;for(const b of B)if(t>=b.b)cnt++;const full=cnt>=DATA.cap;
- // rings (dim once the box is full); gate glows briefly when a split happens there
- for(let g=0;g<GT.length;g++){let glow=0;for(const s of DATA.splits){if(s[1]==g){const d=t-s[0];if(d>=0&&d<.35)glow=Math.max(glow,1-d/.35)}}ring(GT[g][0],GT[g][1],full?.4:.95,glow)}
- for(const b of B){const p=posAt(b,t);if(!p)continue;const pts=[];for(let q=0;q<=32;q++){const pp=posAt(b,Math.max(b.b,t-q*.007));pts.push(pp||p)}trail(pts,b.h,1)}
- for(const b of B){const p=posAt(b,t);if(p)sphere(p[0],p[1],b.h,1)}
+ const nb=t>=TB?3:1,arms=t>=T3?3:(t>=T2?2:1);
+ // persistent pattern drawn by each ball (older = dimmer, hue drifts along the path)
+ const AGE=26,STEP=.012;
+ for(let k=0;k<3;k++){const t0=k==0?0:TB;if(t<t0)continue;
+  const n=Math.floor((t-t0)/STEP),pp=[];for(let q=0;q<=n;q++)pp.push(pos(k,t0+q*STEP));pp.push(pos(k,t));
+  c.save();c.globalCompositeOperation='lighter';c.lineCap='butt';c.lineJoin='round';
+  const B=14;for(let s=0;s<pp.length-1;s+=B){const e=Math.min(pp.length-1,s+B),age=t-(t0+s*STEP),f=Math.max(0,1-age/AGE);
+   c.strokeStyle=`hsla(${(HUES[k]+age*6)%360},85%,66%,${.16+.55*Math.pow(f,.8)})`;c.lineWidth=3.6;c.beginPath();c.moveTo(pp[s][0],pp[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(pp[q][0],pp[q][1]);c.stroke()}
+  c.restore()}
+ // arms (thin) + pivot ring
+ for(let k=0;k<nb;k++){const j=joints(k,t),a=ballAlpha(k,t);c.save();c.globalAlpha=.32*a;c.strokeStyle='#fff';c.lineWidth=2.5;c.lineCap='round';c.beginPath();c.moveTo(CX,CY);c.lineTo(j[0][0],j[0][1]);c.lineTo(j[1][0],j[1][1]);c.lineTo(j[2][0],j[2][1]);c.stroke();
+  c.fillStyle='#fff';for(const q of[j[0],j[1]]){c.beginPath();c.arc(q[0],q[1],4,0,TAU);c.fill()}c.restore()}
+ c.save();c.strokeStyle='#fff';c.shadowColor='rgba(255,255,255,.9)';c.shadowBlur=14;c.lineWidth=4;c.beginPath();c.arc(CX,CY,R,0,TAU);c.stroke();c.restore()
+ for(let k=0;k<nb;k++){const a=ballAlpha(k,t),pts=[];for(let q=0;q<=34;q++)pts.push(pos(k,Math.max(k==0?0:TB,t-q*.012)));trail(pts,HUES[k],a)}
+ for(let k=0;k<nb;k++){const p=pos(k,t);sphere(p[0],p[1],HUES[k],ballAlpha(k,t))}
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
- c.font='800 84px system-ui,sans-serif';c.fillText(cnt+(cnt==1?' ball':' balls'),540,95);
- c.font='700 44px system-ui,sans-serif';c.fillText(full?('All from one ball.'):(cnt==1?'One ball. Bounce through a ring.':'It splits in two. Keep going.'),540,178);c.restore()}
+ c.font='800 84px system-ui,sans-serif';c.fillText(arms+(arms==1?' arm':' arms'),540,95);
+ c.font='700 44px system-ui,sans-serif';c.fillText(arms==1?'One arm. One circle.':(arms==2?'Add a second arm. A flower appears.':'Add a third arm. The pattern never repeats.'),540,178);c.restore()}
 window.render=render;
 const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
 function blurFrame(t){for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0)}
 window.grabPNG=t=>{blurFrame(t);return cv.toDataURL('image/png').split(',')[1]};
 window.grab=t=>{blurFrame(t);return cv.toDataURL('image/jpeg',.92).split(',')[1]};
-window.DUR=DATA.dur;window.READY=true;
+window.DUR=D.dur;window.READY=true;
 </script></body></html>
