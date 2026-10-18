@@ -46,10 +46,19 @@ function samInk(ctx, st, t, wet = 1) {
     const h0 = g.X(0.2, 0.9), h1 = g.X(-1.55, 0.35); brushPts(ctx, [h0, g.X(-0.7, 0.72), h1], { w: S * 0.075, a, taper: 0.08, head: 0.05, stri: 0, seed: 7 });
   }
   if (sw.mode && sw.mode !== 'none') {
-    const F = swordFrame(st, g), { G, dir, per } = F, hb = [G[0] - dir[0] * S * 0.5, G[1] - dir[1] * S * 0.5], hf = [G[0] + dir[0] * S * 0.34, G[1] + dir[1] * S * 0.34];
+    const F = swordFrame(st, g), { G, dir, per } = F; let hb = [G[0] - dir[0] * S * 0.5, G[1] - dir[1] * S * 0.5], hf = [G[0] + dir[0] * S * 0.34, G[1] + dir[1] * S * 0.34], gc = [G[0] + dir[0] * S * 0.36, G[1] + dir[1] * S * 0.36], gdir = dir;
     if (sw.tool === 'brush') { /* no hilt */ } else {
+    // ONE sword rule (owner 2026-10-11): while sheathed (or mid-draw) the hilt continues the saya's own axis, so saya + hilt read as ONE scabbard, not two sticks.
+    // saya axis = tip at the back (-1.55,0.35) -> mouth at the hip (0.2,0.9); the hilt sticks out of the mouth along that axis. k=1 sheathed -> 0 once the blade is mostly out.
+    const holdOn = sw.mode === 'hold', k = holdOn ? 1 - sstep((sw.draw ?? 1) / 0.4) : 1;
+    if (k > 0.001) {
+      const m0 = g.X(0.2, 0.9), m1 = g.X(-1.55, 0.35), ax = [m0[0] - m1[0], m0[1] - m1[1]], al = Math.hypot(ax[0], ax[1]) || 1, ux = [ax[0] / al, ax[1] / al];
+      const sb = m0, sf = [m0[0] + ux[0] * S * 0.72, m0[1] + ux[1] * S * 0.72], sg = [m0[0] + ux[0] * S * 0.05, m0[1] + ux[1] * S * 0.05];
+      hb = [lerp(hb[0], sb[0], k), lerp(hb[1], sb[1], k)]; hf = [lerp(hf[0], sf[0], k), lerp(hf[1], sf[1], k)]; gc = [lerp(gc[0], sg[0], k), lerp(gc[1], sg[1], k)];
+      gdir = [lerp(dir[0], ux[0], k), lerp(dir[1], ux[1], k)];
+    }
     brushPts(ctx, [hb, hf], { w: S * 0.065, a, taper: 0.04, head: 0.04, stri: 0, seed: 9, rag: 0.05 }, 2);
-    const gc = [G[0] + dir[0] * S * 0.36, G[1] + dir[1] * S * 0.36]; ctx.save(); ctx.translate(gc[0], gc[1]); ctx.rotate(Math.atan2(dir[1], dir[0])); ctx.fillStyle = INKC; ctx.globalAlpha = a; ctx.beginPath(); ctx.ellipse(0, 0, S * 0.05, S * 0.17, 0, 0, 7); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1;
+    ctx.save(); ctx.translate(gc[0], gc[1]); ctx.rotate(Math.atan2(gdir[1], gdir[0])); ctx.fillStyle = INKC; ctx.globalAlpha = a; ctx.beginPath(); ctx.ellipse(0, 0, S * 0.05, S * 0.17, 0, 0, 7); ctx.fill(); ctx.restore(); ctx.globalAlpha = 1;
     }
   }
   // nub hands
