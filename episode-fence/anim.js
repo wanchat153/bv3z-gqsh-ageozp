@@ -11,11 +11,10 @@ const blinkK = (w, L) => Math.max(0, ...L.map((t) => pulse(w, t, 0.045)));
 const dmp = (d, k, f) => (d < 0 ? 0 : Math.exp(-d * k) * Math.cos(d * f));
 // ================================================================= SAMURAI (face = 1 always)
 function samState(w) {
-  const s = CUE.sam(w), S = SAMS, m = CUE.moc(w), [x, yf] = px(s.u, 0, s.q);
+  const s = CUE.sam(w), S = SAMS, m = CUE.moc(w), [x, yf] = px(s.u, s.h, s.q);
   let sy = 1 + 0.012 * Math.sin(w * 3.2), sx = 1, rot = 0, walk = null, ph = s.ph, k = s.k, closed = 0, wide = 0;
-  if (ph === 'walk') { walk = s.wph; sy += 0.03 * Math.abs(Math.sin(walk)); rot = 0.035; }
-  if (ph === 'push') { rot = 0.12 * sst(k); sy *= 1 - 0.03 * sst(k); }
-  if (ph === 'bonk') { const d = k; sx = 1 + 0.2 * dmp(d, 11, 30); sy = 1 - 0.14 * dmp(d, 11, 30); rot = -0.13 * Math.exp(-d * 8) + 0.0; closed = d < 0.15 ? 1 : 0; wide = d > 0.15 ? 0.7 * Math.exp(-(d - 0.15) * 3) : 0; }
+  if (s.wph != null) { walk = s.wph; sy += 0.03 * Math.abs(Math.sin(walk)); rot = ph === 'walk' ? 0.035 : 0; }
+  if (ph === 'bonk') { const d = k; sx = 1 + 0.2 * dmp(d, 11, 30); sy = 1 - 0.14 * dmp(d, 11, 30); rot = -0.16 * Math.exp(-d * 6); closed = d < 0.15 ? 1 : 0; wide = d > 0.15 ? 0.7 * Math.exp(-(d - 0.15) * 3) : 0; }
   if (ph === 'think') { const e = Math.min(1, k * 3, (1 - k) * 3); rot = 0.05 * Math.sin((w - CUE.T_RB) * 22) * e; }
   if (ph === 'inhale') { sx = 1 + 0.12 * sst(k); sy = 1 + 0.07 * sst(k); }
   if (ph === 'compress') { sx = lerpK(1.12, 0.42, sst(k)); sy = lerpK(1.07, 1.3, sst(k)); closed = 1; }
@@ -74,6 +73,7 @@ var frame = function (t) {
   CAMNOW = [CAMX, CAMY, ZOOM];
   const sf = samState(w), cat = catState(w), sBehind = CUE.sam(w).q < CUE.QF, bBehind = CUE.ballPos(w).q < CUE.QF;
   const wrapS = (c, fn) => sBehind ? behindFence(c, fn) : fn();
+  const samFront = CUE.sam(w).q > CUE.moc(w).q;                                              // depth order: the nearer one is drawn last
   composeFrame(CAMNOW, { noHalo: true,
     pre: (c) => {
       if (MODE === 'fenceM') { c.fillStyle = '#000'; for (const P of fencePolys()) { c.beginPath(); P.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fill(); } return; }
@@ -81,8 +81,8 @@ var frame = function (t) {
       drawSky(c, w); drawGround(c); softFloor(c, w); drawFence(c);
       (bBehind ? behindFence : (cc, fn) => fn())(c, () => drawBall(c, w));
     },
-    chars: (c) => { if (MODE === 'fenceM') return; if (MODE !== 'realM') wrapS(c, () => { samLegs(c, sf.st, w); samInk(c, sf.st, w, 0.5); samArms(c, sf.st, w, sf.hands); }); if (MODE !== 'realS') drawCat(c, cat, w); },
-    over: (c) => { if (MODE !== 'realM' && MODE !== 'fenceM') wrapS(c, () => { samOver(c, sf.st, w); if (MODE === 'full' || MODE === 'real' || MODE === 'realS') samEyes(c, sf.st, w, sf.ey, sf.ey); }); } });
+    chars: (c) => { if (MODE === 'fenceM') return; const drawS = () => { if (MODE !== 'realM') wrapS(c, () => { samLegs(c, sf.st, w); samInk(c, sf.st, w, 0.5); samArms(c, sf.st, w, sf.hands); }); }, drawM = () => { if (MODE !== 'realS') drawCat(c, cat, w); }; if (samFront) { drawM(); drawS(); } else { drawS(); drawM(); } },
+    over: (c) => { if (MODE !== 'realM' && MODE !== 'fenceM') { wrapS(c, () => { samOver(c, sf.st, w); if (MODE === 'full' || MODE === 'real' || MODE === 'realS') samEyes(c, sf.st, w, sf.ey, sf.ey); }); if (!samFront && MODE !== 'realS') drawCat(c, cat, w); } } });
 };
 window.grabLayer = (t, mode) => { MODE = mode; frame(t); return document.getElementById('c').toDataURL('image/png'); };
 window.grab = (t) => window.grabLayer(t, 'full');

@@ -23,23 +23,29 @@ const CUE = (function () {
   // ---- the ball: Mochi's swat at TS sends it from B0 through the gap to B1
   const TS = 1.25, TB1 = 3.0, B0 = [-1.6, QM - 0.6], B1 = [2.4, 2.0];
   const ballPos = (w) => { const s = clamp((w - TS) / (TB1 - TS)), e = 1 - (1 - s) * (1 - s), u = lerp(B0[0], B1[0], e), q = lerp(B0[1], B1[1], e); return { u, q, h: BR, roll: Math.hypot(u - B0[0], (q - B0[1])) / BR, v: s >= 1 || s <= 0 ? 0 : 2 * (1 - s) * Math.hypot(B1[0] - B0[0], B1[1] - B0[1]) / (TB1 - TS) }; };
-  // ---- the SAMURAI (face right only). wd = cumulative walking distance (footsteps)
-  const WA0 = 2.5, WA1 = 4.1, WB1 = 4.8, T_BONK = 4.95, T_RB = 5.45, T_INH = 6.1, T_CMP = 6.35, T_SQ0 = 6.55, T_POP = 7.25, WC0 = 7.6, WC1 = 8.3, U_FIN = 8.8;
+  // ---- the SAMURAI (face right only). Walking follows docs/iso/lessons.md: phase = distance / stride (0.8 rad per unit = 0.178*S px per rad), constant speed with a short ease only at the start, feet never slide.
+  const WA0 = 2.5, T_BONK = 4.95, T_REC = 0.45, T_RB = 5.55, T_INH = 6.1, T_CMP = 6.35, T_SQ0 = 6.55, T_POP = 7.25, WC0 = 7.6, WC1 = 8.3, U_FIN = 8.8, Q_PUSH = 7.7, Q_REC = 9.4;
+  const PA = [[-15.5, QL], [1.6, QL], [GC, Q_PUSH]];                                  // approach polyline (u, q)
+  const segLen = (P) => P.slice(1).reduce((a, p, i) => a + Math.hypot(p[0] - P[i][0], p[1] - P[i][1]), 0);
+  const LA = segLen(PA), LC = U_FIN - GC, LS = Q_REC - QB;
+  const alongP = (P, d) => { for (let i = 1; i < P.length; i++) { const l = Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]); if (d <= l || i === P.length - 1) { const k = clamp(d / l); return [lerp(P[i - 1][0], P[i][0], k), lerp(P[i - 1][1], P[i][1], k)]; } d -= l; } return P[P.length - 1]; };
+  const prof = (t, T0, T1, ta, tb, L) => { const T = T1 - T0, v = L / (T - 0.5 * ta - 0.5 * tb), x = t - T0; if (x <= 0) return 0; if (x >= T) return L; if (x < ta) return 0.5 * v * x * x / ta; if (x < T - tb) return 0.5 * v * ta + v * (x - ta); const y = T - x; return L - 0.5 * v * y * y / tb; };
+  const STR = 0.8, PH = (L) => Math.PI * Math.max(1, Math.round(STR * L / Math.PI)) / L;                 // rad per unit, rounded so every walk ends on a whole step
+  const PHA = PH(LA), PHC = PH(LC);
   const sam = (w) => {
-    let o = { u: -15.5, h: 0, q: QL, mode: 'stand', ph: 'idle', k: 0, wph: null, wd: 0, sq: 0 };
-    const set = (p) => Object.assign(o, p), wph = (d) => Math.PI * d / 1.75;
+    let o = { u: PA[0][0], h: 0, q: QL, mode: 'stand', ph: 'idle', k: 0, wph: null, wd: 0 };
+    const set = (p) => Object.assign(o, p);
     if (w < WA0) return o;
-    if (w < WA1) { const e = sstep((w - WA0) / (WA1 - WA0)), d = e * 17.1; return set({ u: lerp(-15.5, 1.6, e), wph: wph(d), wd: d, ph: 'walk' }); }
-    if (w < WB1) { const e = sstep((w - WA1) / (WB1 - WA1)), d = 17.1 + e * 6.8; return set({ u: lerp(1.6, GC, e), q: lerp(QL, 8.8, e), wph: wph(d), wd: d, ph: 'walk' }); }
-    if (w < T_RB) { const d = w - T_BONK; let q = 8.8, k = 0; if (d < 0) { const e = sstep((w - WB1) / (T_BONK - WB1)) ; q = lerp(8.8, 7.7, e * 0.0 + 0); } else { q = 7.7 + 1.7 * (1 - Math.exp(-d * 7)); k = d; }
-      return set({ u: GC, q: w < T_BONK ? lerp(8.8, 7.7, sstep((w - WB1) / (T_BONK - WB1))) : q, ph: w < T_BONK ? 'push' : 'bonk', k: w < T_BONK ? clamp((w - WB1) / (T_BONK - WB1)) : d, wd: 24.9 }); }
-    if (w < T_INH) return set({ u: GC, q: 9.4, ph: 'think', k: (w - T_RB) / (T_INH - T_RB), wd: 24.9 });
-    if (w < T_CMP) return set({ u: GC, q: 9.4, ph: 'inhale', k: (w - T_INH) / (T_CMP - T_INH), wd: 24.9 });
-    if (w < T_SQ0) return set({ u: GC, q: 9.4, ph: 'compress', k: (w - T_CMP) / (T_SQ0 - T_CMP), wd: 24.9 });
-    if (w < T_POP) { const e = sstep((w - T_SQ0) / (T_POP - T_SQ0)); return set({ u: GC, q: lerp(9.4, QB, e), ph: 'squeeze', k: e, wd: 24.9 }); }
-    if (w < WC0) return set({ u: GC, q: QB, ph: 'pop', k: (w - T_POP) / 0.5, wd: 24.9 });
-    if (w < WC1) { const e = sstep((w - WC0) / (WC1 - WC0)), d = e * (U_FIN - GC); return set({ u: lerp(GC, U_FIN, e), q: QB, ph: 'walk', wph: wph(d), wd: 24.9 + d }); }
-    return set({ u: U_FIN, q: QB, ph: 'idle', wd: 24.9 + (U_FIN - GC) });
+    if (w < T_BONK) { const d = prof(w, WA0, T_BONK, 0.3, 0.0001, LA), pt = alongP(PA, d); return set({ u: pt[0], q: pt[1], wph: d * PHA, wd: d, ph: 'walk' }); }
+    const dB = w - T_BONK;
+    if (w < T_RB) { const e = 1 - Math.exp(-dB * 7), x = clamp(dB / T_REC); return set({ u: GC, q: Q_PUSH + (Q_REC - Q_PUSH) * e, h: dB < T_REC ? 2.6 * Math.sin(Math.PI * x) : 0, ph: 'bonk', k: dB, wd: LA }); }
+    if (w < T_INH) return set({ u: GC, q: Q_REC, ph: 'think', k: (w - T_RB) / (T_INH - T_RB), wd: LA });
+    if (w < T_CMP) return set({ u: GC, q: Q_REC, ph: 'inhale', k: (w - T_INH) / (T_CMP - T_INH), wd: LA });
+    if (w < T_SQ0) return set({ u: GC, q: Q_REC, ph: 'compress', k: (w - T_CMP) / (T_SQ0 - T_CMP), wd: LA });
+    if (w < T_POP) { const d = prof(w, T_SQ0, T_POP, 0.15, 0.15, LS); return set({ u: GC, q: Q_REC - d, ph: 'squeeze', k: (w - T_SQ0) / (T_POP - T_SQ0), wph: d * PH(LS), wd: LA + d }); }
+    if (w < WC0) return set({ u: GC, q: QB, ph: 'pop', k: (w - T_POP) / 0.5, wd: LA + LS });
+    if (w < WC1) { const d = prof(w, WC0, WC1, 0.25, 0.3, LC); return set({ u: GC + d, q: QB, ph: 'walk', wph: d * PHC, wd: LA + LS + d }); }
+    return set({ u: U_FIN, q: QB, ph: 'idle', wd: LA + LS + LC });
   };
   // ---- MOCHI (sits the whole time; face right). swat lunge at TS; hop onto the board top at HP
   const MU0 = -5.5, T_WIND = 0.95, T_LUN = 1.2, HC = 7.2, HF0 = 7.45, HF1 = 8.05, HU = -3.1 - 0.15;
@@ -63,13 +69,13 @@ const CUE = (function () {
   add(TS, 'swat', -4, 1.0); add(TS + 0.05, 'roll', -2, 0.9, { dur: TB1 - TS });
   add(2.55, 'gasp', -15.5, 0.6); add(3.25, 'blink', -7, 0.3);
   add(WA0, 'hop', -15.5, 0.4);
-  for (let w = 0; w < 8.4; w += 0.004) { const a = sam(w).wd, b = sam(w + 0.004).wd; if (Math.floor(a / 1.75) !== Math.floor(b / 1.75) && b > a) add(+(w + 0.002).toFixed(3), 'step', sam(w).u, 0.45); }
+  { let pv = 0; for (let w = 0; w < 8.4; w += 0.004) { const x = sam(w), ph = x.wph == null ? null : x.wph, k = ph == null ? null : Math.floor(ph / Math.PI); if (ph != null && pv != null && k > pv) add(+w.toFixed(3), 'step', x.u, 0.45); pv = ph == null ? null : k; if (ph == null) pv = null; if (ph != null && pv == null) pv = k; } }
   add(T_BONK, 'bonk', 2.5, 1.0); add(T_BONK + 0.03, 'oof', 2.5, 0.8); add(5.1, 'mew', -7, 0.5);
   add(5.8, 'grumble', 2.5, 0.5); add(T_INH, 'inhale', 2.5, 0.6, { dur: 0.25 });
   add(T_CMP, 'squeeze', 2.5, 1.0, { dur: T_POP - T_CMP }); add(T_POP, 'pop', 2.5, 1.0); add(T_POP + 0.1, 'rustle', 2.5, 0.5);
   add(HC + 0.05, 'crouch', -7, 0.5); add(HF0, 'hop', -6, 0.8); add(HF1, 'land', -3, 0.9); add(HF1 + 0.5, 'mew', -3, 0.6);
   add(8.7, 'sigh', 10, 0.6); add(9.3, 'giggle', -3, 0.4); add(9.6, 'purr', -3, 0.4, { dur: 0.3 });
   const events = () => ev.filter((e) => e.w < W_END).map((e) => Object.assign({}, e, { t: e.w, slow: 0 })).sort((a, b) => a.t - b.t);
-  return { T, FPS, S, OX, Y0, DQ, P, clamp, sstep, lerp, hash, KS, W_END, WALL_Y, QF, QM, QL, QB, FH, GU0, GU1, GC, BR, BW, BP, TS, TB1, ballPos, T_BONK, T_RB, T_INH, T_CMP, T_SQ0, T_POP, WA0, WC0, WC1, U_FIN, HC, HF0, HF1, HU, sam, moc, BLINK, BLINKC, PUFFS, MU0, events };
+  return { T, FPS, S, OX, Y0, DQ, P, clamp, sstep, lerp, hash, KS, W_END, WALL_Y, QF, QM, QL, QB, FH, GU0, GU1, GC, BR, BW, BP, TS, TB1, ballPos, T_BONK, T_RB, T_INH, T_CMP, T_SQ0, T_POP, WA0, WC0, WC1, U_FIN, PHA, PHC, HC, HF0, HF1, HU, sam, moc, BLINK, BLINKC, PUFFS, MU0, events };
 })();
 if (typeof module !== 'undefined') module.exports = CUE;
