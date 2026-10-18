@@ -6,8 +6,24 @@ const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContex
 const R=25,HUES=DATA.hues,H_=DATA.heats,NS=5,SLOT_Y=1425,FR=[40,250,1000,1260];
 const CAP_PRE=["Same start. Same finish. Which ball wins?","Taller drop. Same question.","Now the curve dips below the finish. Who wins?","Narrow and steep. Who wins this one?","Last heat. Who wins?"];
 const CAP_POST=["The curve (cycloid) wins!","A curve beats the straight line.","It dips below the finish, still first.","Steep start = speed early.","Brachistochrone: the fastest slide."];
-function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#14102a');g.addColorStop(1,'#07050f');c.fillStyle=g;c.fillRect(0,0,W,H);
- const r=c.createRadialGradient(540,860,60,540,860,900);r.addColorStop(0,'rgba(80,90,190,.20)');r.addColorStop(1,'rgba(80,90,190,0)');c.fillStyle=r;c.fillRect(0,0,W,H)}
+const THEMES=[ // [top, bottom, glow rgb, deco rgb]  (rotates every clip; frame stays white neon)
+ {n:'indigo',a:'#14102a',b:'#07050f',g:'80,90,190',d:'170,180,255'},
+ {n:'ocean teal',a:'#06222b',b:'#03090d',g:'40,150,160',d:'150,235,240'},
+ {n:'forest',a:'#0c2316',b:'#040b07',g:'60,160,90',d:'170,240,190'},
+ {n:'deep red',a:'#2a0c14',b:'#0d0306',g:'190,60,80',d:'255,170,180'},
+ {n:'sunset',a:'#2a1424',b:'#0d0510',g:'220,110,70',d:'255,200,150'}];
+const TH=THEMES[DATA.theme||0];
+function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
+ const r=c.createRadialGradient(540,860,60,540,860,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
+ // decoration only OUTSIDE the play frame, faint
+ c.save();c.beginPath();c.rect(0,0,W,H);c.roundRect(FR[0],FR[1],FR[2],FR[3],48);c.clip('evenodd');
+ c.strokeStyle=`rgba(${TH.d},.15)`;c.lineWidth=2.5;for(let k=-1;k<4;k++){c.beginPath();c.arc(540+k*40,1000,520+k*170,0,TAU);c.stroke()}
+ c.strokeStyle=`rgba(${TH.d},.10)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+ const rr=sr(7+(DATA.theme||0)*13);for(let k=0;k<70;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
+ c.restore();
+ // inside the frame: plain and darker so balls and trails stay clear
+ c.save();c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],48);c.fillStyle='rgba(2,2,8,.5)';c.fill();c.restore()}
 function neon(path,w=8){c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=w+3;path();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=w*.55;path();c.stroke();c.restore()}
 function sphere(x,y,h,a){c.save();c.globalAlpha=a;
  const sg=c.createRadialGradient(x-R*.36,y-R*.42,R*.05,x-R*.08,y-R*.1,R*1.1);sg.addColorStop(0,`hsl(${h},65%,90%)`);sg.addColorStop(.3,`hsl(${h},70%,66%)`);sg.addColorStop(.72,`hsl(${h},64%,40%)`);sg.addColorStop(1,`hsl(${h},60%,22%)`);
@@ -34,15 +50,15 @@ function render(t){
  const hi=heatIndex(t),h=H_[hi],lt=t-h.S;h.bx_=h.mir?h.ax:h.bx;h.by_=h.by; // end ring x
  // endpoints: in gen, start A is at (ax,ay) for non-mirrored; paths already mirrored in data so use curve endpoints
  const c0=h.curves[0],N=c0.tt.length-1;const Ax=c0.P[0],Ay=c0.P[1],Bx=c0.P[2*N],By=c0.P[2*N+1];h.bx_=Bx;h.by_=By;
- let a=1;if(hi>0)a=Math.min(a,lt/.35);if(hi<H_.length-1)a=Math.min(a,(h.T-lt)/.35);a=sm(a);
- const prog=lt-h.tr;
+ const prog=lt-h.tr;let a=1;if(hi>0)a=Math.min(a,lt/.35);if(hi<H_.length-1)a=Math.min(a,(h.T-lt)/.35);a=sm(a);
  c.save();c.globalAlpha=a;
  // slot markers
  for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(r+1),slotX(r),SLOT_Y+58);
-  c.strokeStyle='rgba(255,255,255,.22)';c.lineWidth=3;c.beginPath();c.arc(slotX(r),SLOT_Y,R+3,0,TAU);c.stroke()}
+  c.strokeStyle=r==0&&prog>=Math.min(...h.fin)?'rgba(255,255,255,.95)':'rgba(255,255,255,.22)';c.lineWidth=r==0?5:3;c.beginPath();c.arc(slotX(r),SLOT_Y,R+4,0,TAU);c.stroke()}
  // ramps (thin) + travelled part lit
- for(let i=0;i<NS;i++){const cu=h.curves[i],tt=cu.tt,P=cu.P;c.strokeStyle='rgba(255,255,255,.26)';c.lineWidth=3;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(P[2*k],P[2*k+1]):c.moveTo(P[2*k],P[2*k+1]);c.stroke();
+ for(let i=0;i<NS;i++){const cu=h.curves[i],tt=cu.tt,P=cu.P;c.strokeStyle=`hsla(${HUES[i]},60%,75%,.38)`;c.lineWidth=4;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(P[2*k],P[2*k+1]):c.moveTo(P[2*k],P[2*k+1]);c.stroke();
   if(prog>0){c.save();c.globalCompositeOperation='lighter';c.strokeStyle=`hsla(${HUES[i]},80%,66%,.34)`;c.lineWidth=5;c.beginPath();let first=true;for(let k=0;k<=N&&tt[k]<=prog;k++){first?c.moveTo(P[2*k],P[2*k+1]):c.lineTo(P[2*k],P[2*k+1]);first=false}c.stroke();c.restore()}}
+ if(prog>=Math.min(...h.fin)){const wi=h.rank.indexOf(0),wu=sm((prog-Math.min(...h.fin))/.5),cu=h.curves[wi];c.save();c.globalCompositeOperation='lighter';c.strokeStyle=`hsla(${HUES[wi]},90%,75%,${.55*wu})`;c.lineWidth=9;c.shadowColor=`hsl(${HUES[wi]},90%,70%)`;c.shadowBlur=20;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(cu.P[2*k],cu.P[2*k+1]):c.moveTo(cu.P[2*k],cu.P[2*k+1]);c.stroke();c.restore()}
  ring(Ax,Ay,.95);ring(Bx,By,.95);
  // balls (draw slowest first so the winner is on top)
  const ord=[...Array(NS).keys()].sort((p,q)=>h.rank[q]-h.rank[p]);
@@ -52,9 +68,9 @@ function render(t){
  c.restore();
  // header (always visible)
  const won=prog>=Math.min(...h.fin);
- c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.96)';
+ c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
  c.font='800 84px system-ui,sans-serif';c.fillText('Heat '+(hi+1)+' / '+H_.length,540,95);
- c.font='700 40px system-ui,sans-serif';c.globalAlpha=a<1&&lt<.35?sm(lt/.35):1;c.fillText(won?CAP_POST[hi]:CAP_PRE[hi],540,178);c.restore()}
+ c.font='700 44px system-ui,sans-serif';c.globalAlpha=a<1&&lt<.35?sm(lt/.35):1;c.fillText(won?CAP_POST[hi]:CAP_PRE[hi],540,178);c.restore()}
 window.render=render;
 window.grabPNG=t=>{render(t);return cv.toDataURL('image/png').split(',')[1]};
 window.grab=t=>{render(t);return cv.toDataURL('image/jpeg',.92).split(',')[1]};
