@@ -46,9 +46,39 @@ def paste(img, col, a, x0, y0):
     if xs >= xe or ys >= ye: return
     c = col[ys - y0:ye - y0, xs - x0:xe - x0]; al = a[ys - y0:ye - y0, xs - x0:xe - x0][..., None]
     img[ys:ye, xs:xe] = img[ys:ye, xs:xe] * (1 - al) + np.clip(c, 0, 1) * al
+YY, XX = np.mgrid[0:H, 0:W].astype(np.float32)
+_G = {}
+def grade():
+    """static light field: warm light from the upper left through the shoji (side light), vignette, window light shafts on the floor"""
+    if 'g' in _G: return _G['g']
+    side = 1.06 - 0.16 * (XX / W)                                              # left side facing the light a little brighter, right a little darker
+    vig = 1 - 0.20 * np.clip((((XX - 540) / 760) ** 2 + ((YY - 900) / 1250) ** 2) - 0.25, 0, 1)
+    # window light shafts on the floor (diagonal soft bands), only below the wall base (y>1250)
+    d = (XX * 0.55 + YY * 0.84) % 360; shaft = np.exp(-(((d - 120) / 55) ** 2)) * 0.6 + np.exp(-(((d - 290) / 30) ** 2)) * 0.35
+    fl = np.clip((YY - 1250) / 120, 0, 1); shaft = shaft * fl * (1 - 0.6 * np.clip((YY - 1250) / 670, 0, 1))
+    g = (side * vig)[..., None] * np.ones(3, np.float32) * np.array([1.0, 0.985, 0.95], np.float32)
+    # floor exposure kept moderate: darker near the wall, slightly cooler far below
+    fe = 1 - 0.07 * fl * np.clip((YY - 1250) / 670, 0, 1); g = g * fe[..., None]
+    _G['g'] = (g.astype(np.float32), (shaft * 0.07).astype(np.float32)); return _G['g']
+rng = np.random.default_rng(7); PAPER = rng.normal(0, 1, (H, W)).astype(np.float32)
+def contact_shadow(img, b):
+    # crisp near the floor, fainter and softer when high (screen floor point = centre + h * 13.5 * zoom)
+    h = max(0.0, b['h']); k = 1 / (1 + h / 5.0); fy = b['y'] + h * 13.5 * 1.95 + b['r'] * 0.0
+    if b['sq'] > 0.01 and abs(b['ang'] - math.pi / 2) < 0.01: fy = b['y'] + b['r'] * 0.9
+    rx = b['r'] * (1.25 + 0.7 * (1 - k)); ry = rx * 0.30
+    x0, x1 = int(b['x'] - rx * 3), int(b['x'] + rx * 3); y0, y1 = int(fy - ry * 3), int(fy + ry * 3)
+    x0, y0 = max(x0, 0), max(y0, 0); x1, y1 = min(x1, W), min(y1, H)
+    if x1 <= x0 or y1 <= y0: return
+    q = np.sqrt(((XX[y0:y1, x0:x1] - b['x']) / rx) ** 2 + ((YY[y0:y1, x0:x1] - fy) / ry) ** 2)
+    edge = 0.10 + 0.55 * (1 - k)                                                # sharp edge near contact, soft when high
+    a = np.clip((1 - q) / edge + 0.0, 0, 1) * (0.50 * k + 0.06)
+    img[y0:y1, x0:x1] *= (1 - a[..., None] * np.array([0.8, 0.85, 0.9], np.float32))
 def frame(i, src='out', dst='out/frames'):
     I = json.load(open(f'{src}/info/f{i:04d}.json')); img = np.asarray(Image.open(f'{src}/lit/f{i:04d}.png').convert('RGB')).astype(np.float32) / 255
     b = I['ball']
+    g, shaft = grade(); img = img * g + shaft[..., None] * np.array([1.0, 0.86, 0.55], np.float32)
+    img = img + PAPER[..., None] * 0.006
+    contact_shadow(img, b)
     # ghost trail: only when the ball is fast; older ghosts are fainter and a little smaller
     if b['speed'] > 160:
         for k, g in reversed(list(enumerate(I['trail']))):
@@ -57,6 +87,7 @@ def frame(i, src='out', dst='out/frames'):
             gg = dict(g); gg['sq'] = 0.0; gg['st'] = min(g['st'], 0.12)
             col, a, x0, y0 = sphere_rgba(gg, 0.92 + 0.06 * f, al); col = col * 0.0 + (BASE * 0.9 + 0.1)[None, None, :]; paste(img, col, a, x0, y0)
     col, a, x0, y0 = sphere_rgba(b); paste(img, col, a, x0, y0)
+    img = np.where(img < 0.82, img, 0.82 + 0.18 * (1 - np.exp(-(img - 0.82) / 0.18)))                    # soft top-end roll-off (no clipped highlights)
     os.makedirs(dst, exist_ok=True); Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8)).save(f'{dst}/f{i:04d}.png')
 if __name__ == '__main__':
     a, c = int(sys.argv[1]), int(sys.argv[2]); src = sys.argv[3] if len(sys.argv) > 3 else 'out'; dst = sys.argv[4] if len(sys.argv) > 4 else 'out/frames'
