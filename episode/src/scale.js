@@ -76,16 +76,16 @@ const SYK = (() => { const K = []; for (const m of [-1, 0, 1]) { const o = m * L
 const crouchAt = (t) => ks1(SYK, t);
 // ---- Mochi ----
 function mochiAct(t) {
-  const puff = sst((t - 4.2) / 0.35) * (t < TP ? 1 : 1) - sst((t - 5.6) / 0.5);                      // inflate before the pop, deflate afterwards
+  const puff = sst((t - 3.95) / 0.6) - sst((t - 5.6) / 0.5);                      // inflate before the pop, deflate afterwards
   const pop = t >= TP ? Math.exp(-(t - TP) / 0.12) * Math.cos((t - TP) * 40) : 0;
   const bal = sst((t - TL[3]) / 0.2) * (1 - sst((t - TP) / 0.1));
-  return { sx: 1 + 0.38 * puff + 0.08 * pop, sy: 1 + 0.16 * puff - 0.06 * pop, bal, puff };
+  return { k: 1 + 0.62 * puff - 0.14 * pop, bal, puff };
 }
 // ---- events for the sound track: [t, type, amp, x] ----
 const EVF = (() => {
   const E = [[0.1, 'amb', 1, 540]];
   for (let k = 0; k < 4; k++) { const tl = TL[k], rel = tl - TFL; E.push([tl - 1.17 + 0.2, 'crouch', 0.45, SXC], [rel - 0.45, 'rustle', 0.35, SXC + 90], [rel, 'hop', 0.55, SXC + 120], [tl, 'melon', 0.85, 458, { p: k }], [tl + 0.02, 'creak', 0.5, PX]); }
-  E.push([T_BAL, 'gasp', 0.6, SXC], [T_BAL + 0.3, 'giggle', 0.5, SXC], [4.25, 'inhale', 0.6, 842, { dur: 0.3 }], [TP, 'pop', 1, 842], [TP + 0.01, 'creak', 0.9, PX], [TP + 0.04, 'bonk', 0.9, 842]);
+  E.push([T_BAL, 'gasp', 0.6, SXC], [T_BAL + 0.3, 'giggle', 0.5, SXC], [3.95, 'inhale', 0.7, 842, { dur: 0.6 }], [TP, 'pop', 1, 842], [TP + 0.01, 'creak', 0.9, PX], [TP + 0.04, 'bonk', 0.9, 842]);
   for (let k = 0; k < 4; k++) E.push([retTime(k), 'melon', 0.8, bw(RET.slot[k])[0], { p: 3 - k }]);
   E.push([5.95, 'sigh', 0.6, SXC], [4.8, 'mew', 0.5, 842], [5.5, 'purr', 0.4, 842, { dur: 0.6 }]);
   return E.sort((a, b) => a[0] - b[0]);
@@ -189,13 +189,13 @@ function catAt(t, B, mel) {
   const near = mel.filter((m) => m.st === 'fly').sort((a, b) => b.y - a.y)[0];
   let tx = SXC + 60, ty = FL - 240; if (t >= TP + 0.1 && t < TP + 1.0) { tx = BXC; ty = FL - 200; } if (near) { tx = near.x; ty = near.y; }
   const look = [clamp((tx - x) / 260, -1, 1), clamp((ty - (y - 140)) / 300, -1, 0.3)];
-  const smug = sst((t - TP - 0.3) / 0.3) * (1 - sst((t - 5.9) / 0.4)), half = 0.5 * smug;
-  return { x, y, A, look, wide: 0.15 + 0.5 * A.bal + 0.3 * pulse(t, TP, 0.1), half, tail: 0.15 + 0.45 * A.puff, mouth: 0.5 * pulse(t, TP + 0.05, 0.1) + 0.3 * wnd(5.4, 5.9, t, 0.15), tilt: 0.05 + 0.1 * smug };
+  const smug = sst((t - TP - 0.3) / 0.3) * (1 - sst((t - 5.9) / 0.4)), half = Math.max(0.5 * smug, 0.9 * A.puff * (t < TP + 0.3 ? 1 : 0));
+  return { x, y, A, look, wide: 0.15 + 0.5 * A.bal + 0.3 * pulse(t, TP, 0.1), half, tail: 0.15 + 0.45 * A.puff, mouth: (t < TP ? 0 : 0.5 * pulse(t, TP + 0.05, 0.1)) + 0.3 * wnd(5.4, 5.9, t, 0.15), tilt: 0.05 + 0.1 * smug };
 }
 function drawMochi(c, C, t) {
-  c.save(); if (C.A.sx !== 1 || C.A.sy !== 1) { c.translate(C.x, C.y); c.scale(C.A.sx, C.A.sy); c.translate(-C.x, -C.y); }
-  const m = mochi(C.x, C.y - 2, MOCS, t, { rot: 0, swat: 0, wide: C.wide, look: C.look, tail: C.tail, tilt: C.tilt }); m.mouth = { open: C.mouth }; if (C.half > 0) m.e.open = 1 - 0.45 * C.half;
-  drawCat(c, m, t); c.restore();
+  const sh = C.A.puff > 0.2 && t < TP ? Math.sin(t * 80) * 5 * C.A.puff : 0;
+  const m = mochi(C.x + sh, C.y - 2, MOCS * C.A.k, t, { rot: 0, swat: 0, wide: C.wide, look: C.look, tail: C.tail, tilt: C.tilt }); m.mouth = { open: C.mouth }; if (C.half > 0) m.e.open = 1 - 0.3 * C.half;
+  drawCat(c, m, t);
 }
 // ---------- render ----------
 function renderFrame(T) {
