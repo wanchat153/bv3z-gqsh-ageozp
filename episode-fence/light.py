@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""light.py — Python (numpy+scipy+Pillow) light pass of "สไลเดอร์": warm afternoon sun from the upper right, long soft ground shadows of both characters (sheared silhouette flipped about the sand line;
-crisp at the feet, soft far away), rim light on the sun side, cool shade on the other, sand dust puffs at every landing/bump (rebuilt from out/tab.json), vignette, filmic knee, grain.
+"""light.py — Python (numpy+scipy+Pillow) light pass of "ลูกบอลลอดรั้ว": warm afternoon sun from the upper right, ground shadows of both characters, rim light on the sun side, dust puffs (rebuilt from out/tab.json; puffs behind the fence are hidden by the boards via out/fenceM/fence.png), vignette, filmic knee, grain.
 usage: python3 light.py START END [src] [dst]"""
 import sys, os, json, math
 import numpy as np
@@ -21,9 +20,15 @@ def shadow(m, foot, shear=0.5, e=0.55, maxlen=1.0):
     hgt = d / e; ys = np.clip(foot - hgt, 0, H - 1); xs = np.clip(XX + hgt * shear, 0, W - 1)
     v = ndi.map_coordinates(m, [ys, xs], order=1) * ok
     return v * np.clip(1 - hgt / 900.0, 0, 1)
-def dust(t):
+FM = None
+def fence():
+    global FM
+    if FM is None: FM = mask('out/fenceM/fence.png')
+    return FM
+def dust(t, behind=0):
     out = np.zeros((H, W), np.float32); T = tab(); u = T['unit']
-    for k, (t0, x, y, s) in enumerate(T['puffs']):
+    for k, (t0, x, y, s, bh) in enumerate(T['puffs']):
+        if bh != behind: continue
         age = t - t0
         if age < 0 or age > 1.0: continue
         for j in range(14):
@@ -50,7 +55,7 @@ def frame(i, src='out', dst='out/frames'):
     sh = np.maximum(shadow(mS, I['samG']), shadow(mM, I['mocG']))
     sharp, soft = ndi.gaussian_filter(sh, 2.5), ndi.gaussian_filter(sh, 15)
     wm = np.clip((YY - (min(I['samG'], I['mocG']) + 6)) / 300.0, 0, 1); sh = (1 - wm) * sharp + wm * soft
-    sh = sh * (1 - ndi.gaussian_filter(mR, 1.2))
+    sh = sh * (1 - ndi.gaussian_filter(mR, 1.2)) * (1 - fence())
     img = img * (1 - 0.30 * sh * ground)[..., None] * np.array([0.97, 0.98, 1.04], np.float32)
     # rim light (sun side = right/top) + cooler far side on the characters
     mb = ndi.gaussian_filter(mR, 11.0); gx, gy = ndi.sobel(mb, axis=1) / 8.0, ndi.sobel(mb, axis=0) / 8.0
@@ -59,7 +64,7 @@ def frame(i, src='out', dst='out/frames'):
     rim, far = np.clip(ndl, 0, 1) * edge * inside, np.clip(-ndl, 0, 1) * edge * inside
     img = img + 0.40 * rim[..., None] * np.array([1.0, 0.82, 0.55], np.float32); img = img * (1 - 0.13 * far)[..., None]
     # dust puffs (in front of the slide, behind nothing: sand colour, soft)
-    D = dust(t); img = img * (1 - 0.8 * D[..., None]) + 0.8 * D[..., None] * np.array([0.98, 0.93, 0.82], np.float32)
+    for D in (dust(t, 0), dust(t, 1) * (1 - fence())): img = img * (1 - 0.8 * D[..., None]) + 0.8 * D[..., None] * np.array([0.98, 0.93, 0.82], np.float32)
     vg = 1 - 0.22 * np.clip(((XX - 540) / 780.0) ** 2 + ((YY - 960) / 1300.0) ** 2, 0, 1); img = img * vg[..., None]
     img = np.where(img < 0.80, img, 0.80 + 0.20 * (1 - np.exp(-(img - 0.80) / 0.20)))
     img = img + np.random.default_rng(i).normal(0, 0.005, (H, W, 1)).astype(np.float32)
