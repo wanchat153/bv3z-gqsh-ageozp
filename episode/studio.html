@@ -14,8 +14,8 @@ const THEMES=[ // [top, bottom, glow rgb, deco rgb]  (rotates every clip; frame 
  {n:'sunset',a:'#2a1424',b:'#0d0510',g:'220,110,70',d:'255,200,150'}];
 const TH=THEMES[DATA.theme||0];
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
-const CAP_PRE=["Same start. Same finish. Which ball wins?","Wide and shallow. Who wins now?","Seven paths this time. One winner.","A tall, narrow drop. Who wins?","Last heat. Who wins?"];
-const CAP_POST=["The curve (cycloid) wins!","The cycloid dips low, and still wins.","Of seven paths, the cycloid is fastest.","Tall or wide, the cycloid wins.","Brachistochrone: the fastest slide."];
+const CAP_PRE=["Shortest path = fastest path?","Add a third path. Who is first?","Four paths now. Still the curve?","Five paths. Which one wins?","Last race. Any path can win."];
+const CAP_POST=["No! The longer curve wins.","The curve beats the line again.","Same winner: the gold curve.","Same winner: the cycloid.","Brachistochrone: the fastest slide."];
 function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
  const r=c.createRadialGradient(540,860,60,540,860,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
  // decoration only OUTSIDE the play frame, faint
@@ -55,13 +55,14 @@ function render(t){
  const prog=lt-h.tr;let a=1;if(hi>0)a=Math.min(a,lt/.35);if(hi<H_.length-1)a=Math.min(a,(h.T-lt)/.35);a=sm(a);
  c.save();c.globalAlpha=a;
  // slot markers
- const NS=h.n,HUES=h.hues;for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(r+1),slotX(r,NS),SLOT_Y+58);
+ const NS=h.n,HUES=h.hues;for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';{const bi=h.rank.indexOf(r);if(prog>=h.fin[bi]+.5){c.fillStyle=`hsl(${HUES[bi]},80%,78%)`;c.font='700 32px system-ui,sans-serif';c.fillText(h.fin[bi].toFixed(2)+' s',slotX(r,NS),SLOT_Y+58)}}
   c.strokeStyle=r==0&&prog>=Math.min(...h.fin)?'rgba(255,255,255,.95)':'rgba(255,255,255,.22)';c.lineWidth=r==0?5:3;c.beginPath();c.arc(slotX(r,NS),SLOT_Y,R+4,0,TAU);c.stroke()}
  // ramps (thin) + travelled part lit
  for(let i=0;i<NS;i++){const cu=h.curves[i],tt=cu.tt,P=cu.P;c.strokeStyle=`hsla(${HUES[i]},60%,75%,.38)`;c.lineWidth=4;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(P[2*k],P[2*k+1]):c.moveTo(P[2*k],P[2*k+1]);c.stroke();
   if(prog>0){c.save();c.globalCompositeOperation='lighter';c.strokeStyle=`hsla(${HUES[i]},80%,66%,.34)`;c.lineWidth=5;c.beginPath();let first=true;for(let k=0;k<=N&&tt[k]<=prog;k++){first?c.moveTo(P[2*k],P[2*k+1]):c.lineTo(P[2*k],P[2*k+1]);first=false}c.stroke();c.restore()}}
  if(prog>=Math.min(...h.fin)){const wi=h.rank.indexOf(0),wu=sm((prog-Math.min(...h.fin))/.5),cu=h.curves[wi];c.save();c.globalCompositeOperation='lighter';c.strokeStyle=`hsla(${HUES[wi]},90%,75%,${.55*wu})`;c.lineWidth=9;c.shadowColor=`hsl(${HUES[wi]},90%,70%)`;c.shadowBlur=20;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(cu.P[2*k],cu.P[2*k+1]):c.moveTo(cu.P[2*k],cu.P[2*k+1]);c.stroke();c.restore()}
  ring(Ax,Ay,.95);ring(Bx,By,.95);
+ if(hi==0){c.save();c.fillStyle='rgba(255,255,255,.85)';c.font='700 28px system-ui,sans-serif';c.textAlign='center';c.fillText('START',Ax,Ay-44);c.fillText('FINISH',Bx,By+60);c.restore()}
  // balls (draw slowest first so the winner is on top)
  const ord=[...Array(NS).keys()].sort((p,q)=>h.rank[q]-h.rank[p]);
  for(const i of ord){const pts=[];for(let q=0;q<=34;q++)pts.push(ballPos(h,i,Math.max(0,lt-q*.009)));
@@ -71,7 +72,7 @@ function render(t){
  // header (always visible)
  const won=prog>=Math.min(...h.fin);
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
- c.font='800 84px system-ui,sans-serif';c.fillText('Heat '+(hi+1)+' / '+H_.length,540,95);
+ c.font='800 84px system-ui,sans-serif';c.fillText(h.n+' balls',540,95);
  c.font='700 44px system-ui,sans-serif';c.globalAlpha=a<1&&lt<.35?sm(lt/.35):1;c.fillText(won?CAP_POST[hi]:CAP_PRE[hi],540,178);c.restore()}
 window.render=render;
 window.grabPNG=t=>{render(t);return cv.toDataURL('image/png').split(',')[1]};
