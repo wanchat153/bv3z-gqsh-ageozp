@@ -49,7 +49,7 @@ function mochiBuild(s) {
   const [x0, y0] = px(MOC.u, sn.hop, MOC.q); let look = [-0.7, 0.2], raiseK = 0, raiseTip = null;
   const { w, p } = pokeW(s, 'paw', 0.22, 0.22);
   const g3 = cubeGeom(2, s), ctop = pp(g3.c.u + g3.hw * 0.55 + g3.sh, g3.ht + 0.35, g3.c.qf - 0.8);
-  if (w > 0) { const ms = MOC.s, f = -1, lx = (ctop[0] - x0) / (f * ms), ly = (ctop[1] - y0) / ms, sh = [21, -31], dx = lx - sh[0], dy = ly - sh[1], d = Math.hypot(dx, dy) || 1, L = Math.min(d, 34);
+  if (w > 0) { const ms = MOC.s, f = -1, lx = (ctop[0] - x0) / (f * ms), ly = (ctop[1] - y0) / ms, sh = [21, -31], dx = lx - sh[0], dy = ly - sh[1], d = Math.hypot(dx, dy) || 1, L = Math.min(d, 22);
     const lift = Math.sin(Math.PI * clampK(1 - Math.abs(s - p.s + 0.05) / 0.2)) * 0 + 7 * (1 - sst((s - (p.s - 0.1)) / 0.1)) * (s < p.s - 0.1 ? 1 : 0.0);      // paw above the cube before it comes down
     raiseK = w; raiseTip = [sh[0] + dx / d * L, sh[1] + dy / d * L - (w < 0.99 && s < p.s ? 6 * (1 - w) : 0)]; pose.h[2] += 0.1 * w; pose.b[4] += 0.04 * w;
     look = lookToward([x0, y0 - 190], ctop, 140); look = [-look[0] * 0.9 + 0.1, look[1]]; }

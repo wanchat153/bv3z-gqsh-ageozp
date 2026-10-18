@@ -12,7 +12,7 @@ const CUE = (function () {
   // ------------------------------------------------------------- tray + tofu cubes (7 x 5.6 x 4 cm, standing in 1.3 cm of water)
   const TR = { u0: -22, u1: 24, h: 2.4, wl: 1.5, q0: 5, q1: 15.5 };
   const CUBES = [-12.5, 0, 12.5].map((u, i) => ({ i, u, w: 11, hb: 0.6, ht: 8.6, qf: 14.6, qb: 10.6 }));
-  const SIT_U = 24.5, MQ = 18.5, SQ = 18, SAM_U = -26.5;
+  const SIT_U = 22.5, MQ = 18.5, SQ = 18, SAM_U = -26.5;
   // ------------------------------------------------------------- pokes: Mochi (far arm from the right), samurai (hand from the left). press window = paw/hand on the cube
   const POKES = [
     { s: 0.62, by: 'paw', c: 2, a: 1.0 }, { s: 1.08, by: 'paw', c: 2, a: 0.8 },
@@ -41,7 +41,7 @@ const CUE = (function () {
   }
   function press(j, s) { let k = 0; for (const p of POKES) if (p.c === j) { const t = s - p.s; if (t > -0.16 && t < 0.2) k = Math.max(k, t < 0 ? sstep(1 + t / 0.16) : 1 - sstep(t / 0.2)); } return k; }
   // ------------------------------------------------------------- the leap drop: the last wave kicks one drop off the water toward Mochi's nose (ballistic), it sticks, she sneezes
-  const DROP = { s0: 4.80, sHit: 5.10, sSneeze: 5.28, p0: [19.8, 1.5, 12.5], nose: [21.5, 12.8, 18.5], r: 0.5 };
+  const DROP = { s0: 4.80, sHit: 5.10, sSneeze: 5.28, p0: [19.8, 1.5, 12.5], nose: [19.5, 12.8, 18.5], r: 0.5 };
   DROP.T = DROP.sHit - DROP.s0; DROP.v = [(DROP.nose[0] - DROP.p0[0]) / DROP.T, (DROP.nose[1] - DROP.p0[1] + 0.5 * G * DROP.T * DROP.T) / DROP.T, (DROP.nose[2] - DROP.p0[2]) / DROP.T];
   DROP.pos = (s) => { const t = clamp(s - DROP.s0, 0, DROP.T); return [DROP.p0[0] + DROP.v[0] * t, DROP.p0[1] + DROP.v[1] * t - 0.5 * G * t * t, DROP.p0[2] + DROP.v[2] * t]; };
   // pour stream: leaves the spout, ballistic, lands in the water behind the cubes
