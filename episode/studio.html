@@ -1,17 +1,18 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Chain Reaction: Newton's cradle, 5 acts (pull 1,2,3,4, then 1+1). Frame = pure function of t. R=25 constant. 6-sample motion blur.
+// Gravity Wells: balls launched one at a time past 3 gravity wells; the well that catches each ball scores. Frame = pure function of t. R=25 constant. 6-sample motion blur.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const D=DATA,R=D.r,N=D.N,L=D.L,HZ=D.hz,PX=540,PY=590,FR=[40,300,1000,1220,48];
-const TH={a:'#14102a',b:'#07050f',g:'80,90,190',d:'170,180,255'};
+const D=DATA,R=D.r,HZ=D.hz,B=D.balls,WL=D.wells,WH=D.wh,NB=B.length,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
+const WN=['Cyan','Pink','Gold'];
+const TH={a:'#2a1030',b:'#0c0410',g:'200,80,200',d:'240,170,240'};
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
 function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 const framePath=()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],FR[4])};
 function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
  const r=c.createRadialGradient(540,910,60,540,910,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
  c.save();c.beginPath();c.rect(0,0,W,H);c.roundRect(FR[0]-2,FR[1]-2,FR[2]+4,FR[3]+4,FR[4]);c.clip('evenodd');
- c.strokeStyle=`rgba(${TH.d},.15)`;c.lineWidth=2.5;for(let k=0;k<7;k++){c.beginPath();c.arc(540,910,300+k*150,0,TAU);c.stroke()}
+ c.strokeStyle=`rgba(${TH.d},.15)`;c.lineWidth=2.5;for(let k=0;k<8;k++){c.beginPath();c.arc(540,910,420+k*140,0,TAU);c.stroke()}
  c.strokeStyle=`rgba(${TH.d},.10)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
  const rr=sr(83);for(let k=0;k<80;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
  c.restore();c.save();framePath();c.fillStyle='rgba(2,2,8,.6)';c.fill();c.restore()}
@@ -26,28 +27,39 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
   c.strokeStyle=layer?`hsla(${hh},90%,88%,${.5*f*a})`:`hsla(${hh},88%,62%,${.55*f*a})`;c.lineWidth=Math.max(1,2*R*(layer?.5:1.25)*f);c.beginPath();c.moveTo(pts[k-1][0],pts[k-1][1]);c.lineTo(pts[k][0],pts[k][1]);c.stroke()}
  c.restore()}
 
-const CAP=[['Let go. How many swing out?','1 swings out. The rest stay put.'],['Pull 2. How many now?','2 swing out. Same number in, same out.'],['Pull 3. Can you guess?','3 swing out. The count never changes.'],['Pull 4. Which one stays?','4 swing out. Only one stays.'],['One from each side. What now?','Both bounce back. The middle three stay.']];
-const TOP=['Pull 1','Pull 2','Pull 3','Pull 4','Pull 1 + 1'];
-function ang(A,i,t){const tau=t-A.start-A.hold;if(tau<=0)return A.rows[0][i];const f=Math.min(A.rows.length-1,tau*HZ),k=Math.floor(f),u=f-k,k2=Math.min(A.rows.length-1,k+1);return A.rows[k][i]+(A.rows[k2][i]-A.rows[k][i])*u}
-function pos(A,i,t){const a=ang(A,i,t),px=PX+(i-(N-1)/2)*2*R;return[px+L*Math.sin(a),PY+L*Math.cos(a),px]}
+
+function posAt(b,t){const P=b.p,n=P.length/2-1,f=Math.max(0,(t-b.t0)*HZ);if(f>n)return null;const k=Math.floor(f),u=f-k,k2=Math.min(n,k+1);return[P[2*k]+(P[2*k2]-P[2*k])*u,P[2*k+1]+(P[2*k2+1]-P[2*k+1])*u]}
+function slot(w,n){const a=(90+n*120)*Math.PI/180;return[WL[w][0]+62*Math.cos(a),WL[w][1]+62*Math.sin(a)]}
 function render(t){
  bg();
  c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
- let ai=0;for(let k=0;k<D.acts.length;k++)if(t>=D.acts[k].start)ai=k;
- const A=D.acts[ai],end=A.start+A.hold+D.after+(ai==D.acts.length-1?0.6:0),lt=t-A.start;
- let fa=Math.min(ai==0?1:sm(lt/D.fade),ai==D.acts.length-1?1:sm((end-t)/D.fade));
- c.save();c.globalAlpha=fa;
- // pivot bar + strings
- const P=[];for(let i=0;i<N;i++)P.push(pos(A,i,t));
- c.strokeStyle='rgba(255,255,255,.6)';c.lineWidth=3;for(const p of P){c.beginPath();c.moveTo(p[2],PY);c.lineTo(p[0],p[1]);c.stroke()}
- c.save();c.lineCap='round';c.shadowColor='#fff';c.shadowBlur=18;c.strokeStyle='#fff';c.lineWidth=11;c.beginPath();c.moveTo(PX-4*R-30,PY);c.lineTo(PX+4*R+30,PY);c.stroke();c.restore();
- // trails for moving balls
- for(let i=0;i<N;i++){const p=P[i],p2=pos(A,i,t-.02),sp=Math.hypot(p[0]-p2[0],p[1]-p2[1])/.02,a=Math.min(1,sp/260);if(a<.05)continue;const pts=[];for(let q=0;q<=32;q++){const pp=pos(A,i,Math.max(A.start+A.hold,t-q*.007));pts.push(pp)}trail(pts,D.hues[i],a)}
- for(let i=0;i<N;i++)sphere(P[i][0],P[i][1],D.hues[i],1);
- c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';
- c.font='800 84px system-ui,sans-serif';c.fillText(TOP[ai],540,95);
- const impact=A.start+A.hold+.85;c.font='700 44px system-ui,sans-serif';c.fillText(CAP[ai][t<impact?0:1],540,178);
- c.restore()}
+ // wells
+ const cnt=[0,0,0];for(const b of B)if(t>=b.t0+b.tc)cnt[b.w]++;
+ WL.forEach((w,i)=>{const h=WH[i];
+  c.save();c.globalCompositeOperation='lighter';for(const rad of [70,125,185]){c.strokeStyle=`hsla(${h},80%,70%,.10)`;c.lineWidth=2;c.beginPath();c.arc(w[0],w[1],rad,0,TAU);c.stroke()}
+  const g=c.createRadialGradient(w[0],w[1],0,w[0],w[1],130);g.addColorStop(0,`hsla(${h},90%,60%,.40)`);g.addColorStop(1,`hsla(${h},90%,60%,0)`);c.fillStyle=g;c.beginPath();c.arc(w[0],w[1],130,0,TAU);c.fill();c.restore();
+  c.save();c.shadowColor=`hsl(${h},90%,70%)`;c.shadowBlur=22;c.strokeStyle='#fff';c.lineWidth=5;c.beginPath();c.arc(w[0],w[1],R+1,0,TAU);c.stroke();c.restore();
+  c.save();c.fillStyle=`hsl(${h},90%,75%)`;c.beginPath();c.arc(w[0],w[1],7,0,TAU);c.fill();
+  c.font='800 52px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;c.fillText(cnt[i],w[0],w[1]+114);c.restore()});
+ // launcher marker (hollow ring, ball size)
+ c.save();c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=4;c.beginPath();c.arc(D.lx,D.ly,R+1,0,TAU);c.stroke();c.restore();
+ // persistent paths of finished balls
+ let cur=-1;for(let k=0;k<NB;k++)if(t>=B[k].t0)cur=k;
+ for(let k=0;k<=cur;k++){const b=B[k],n=b.p.length/2-1,end=Math.min(n,Math.floor(Math.max(0,t-b.t0)*HZ));c.save();c.lineCap='butt';c.lineJoin='round';c.strokeStyle=`hsla(${WH[b.w]},85%,70%,${t>=b.t0+b.tc?.30:.18})`;c.lineWidth=3;c.beginPath();c.moveTo(b.p[0],b.p[1]);for(let q=1;q<=end;q++)c.lineTo(b.p[2*q],b.p[2*q+1]);c.stroke();c.restore()}
+ // captured balls rest around their well; active ball with trail
+ const nth=[0,0,0];
+ for(let k=0;k<NB;k++){const b=B[k];if(t>=b.t0+b.tc){const s=slot(b.w,nth[b.w]++);sphere(s[0],s[1],b.h,1)}}
+ if(cur>=0){const b=B[cur];if(t<b.t0+b.tc){const p=posAt(b,t);if(p){const pts=[];for(let q=0;q<=32;q++){const pp=posAt(b,Math.max(b.t0,t-q*.012));pts.push(pp||p)}trail(pts,b.h,1);sphere(p[0],p[1],b.h,1)}}}
+ else sphere(D.lx,D.ly,B[0].h,1);
+ // waiting ball on the launcher between shots
+ if(cur>=0&&cur<NB-1&&t>=B[cur].t0+B[cur].tc&&t<B[cur+1].t0)sphere(D.lx,D.ly,B[cur+1].h,1);
+ if(cur<0)sphere(D.lx,D.ly,B[0].h,1);
+ // text
+ let ball=Math.max(0,cur),done=cur>=0&&t>=B[cur].t0+B[cur].tc,top,cap;
+ if(cur===NB-1&&done&&t>B[cur].t0+B[cur].tc+.25){const m=Math.max(...cnt),w=cnt.map((v,i)=>v==m?i:-1).filter(i=>i>=0);top='All 8 caught';cap=w.length>1?w.map(i=>WN[i]).join(' and ')+' tie with '+m+' each.':WN[w[0]]+' wins with '+m+'.'}
+ else{top='Ball '+(ball+1)+' of '+NB;cap=done?('Caught by the '+WN[B[cur].w]+' well!'):'Which well will catch it?'}
+ c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
+ c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
 window.render=render;
 const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
