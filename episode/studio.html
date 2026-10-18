@@ -49,10 +49,10 @@ function bursts(c,t){}
 function fit(c,s,w){while(c.measureText(s).width>w&&parseInt(c.font.match(/(\d+)px/)[1])>24)c.font=c.font.replace(/(\d+)px/,(m,a)=>(a-2)+'px')}
 function counter(c,t){
   const w=WV[waveOf(t)];c.save();c.textAlign='center';c.textBaseline='middle';
-  c.font="700 80px Loma,'Noto Sans Thai',sans-serif";c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+' ลูก',540,95);
-  let l1;if(t<WV[1].t0)l1='ปล่อยจาก focus กระเด้งขอบ ไปโผล่อีกจุดพอดี!';else if(t<FIN)l1='ยิงคนละทิศ แต่ถึงพร้อมกันหมด';else l1='นี่แหละ reflection property ของวงรี';
+  c.font='800 84px system-ui,sans-serif';c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+(w.n===1?' ball':' balls'),540,95);
+  let l1;if(t<WV[1].t0)l1='Leaves one focus, bounces off the wall, hits the other!';else if(t<FIN)l1='Different directions, same arrival time.';else l1='That is the reflection property of an ellipse.';
   const ph=t<WV[1].t0?0:t<FIN?1:2,st=[0,WV[1].t0,FIN][ph],al=Math.min(sm(st,st+.5,t)+(ph===0?1:0),1);
-  c.globalAlpha=Math.min(1,al);c.font="700 40px Loma,'Noto Sans Thai',sans-serif";fit(c,l1,960);c.fillStyle='#fff';c.fillText(l1,540,178);c.globalAlpha=1;
+  c.globalAlpha=Math.min(1,al);c.font='700 40px system-ui,sans-serif';fit(c,l1,960);c.fillStyle='#fff';c.fillText(l1,540,178);c.globalAlpha=1;
   c.restore()}
 function renderMain(c,t){
   bg(c,t);c.save();c.translate(CX,CY);ellipse(c,0);trails(c,t);wallMarks(c,t);foci(c,t);dots(c,t);bursts(c,t);c.restore();counter(c,t)}
