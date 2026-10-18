@@ -1,6 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0">
 <canvas id="c" width="1080" height="1920"></canvas>
-<script src="src/core.js"></script><script src="src/engine.js"></script><script src="src/chars.js"></script><script src="src/cast.js"></script><script src="src/lib.js"></script><script src="src/scale.js"></script>
+<script src="src/core.js"></script><script src="src/engine.js"></script><script src="src/chars.js"></script><script src="src/cast.js"></script><script src="src/lib.js"></script><script src="src/wheel.js"></script>
 <script>
 initStory(document.getElementById('c')); renderFrame(0);
 window.grab = (t, q = 0.9) => { renderFrame(t); return document.getElementById('c').toDataURL('image/jpeg', q).split(',')[1]; };
