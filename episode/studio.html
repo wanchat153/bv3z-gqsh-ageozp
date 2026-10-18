@@ -40,17 +40,13 @@ function foci(c,t){
   for(let q=0;q<2;q++){const f=FOC[q];let pu=0;for(const w2 of WV){const a=t-(w2.t0+w2.tau);if(w2.src===1-q&&a>=0&&a<.5)pu=Math.max(pu,Math.exp(-a/.18))}
     c.strokeStyle=`rgba(255,255,255,${.7+.3*pu})`;c.lineWidth=4+2.5*pu;c.beginPath();c.arc(f[0],f[1],18,0,TAU);c.stroke()}}
 function bursts(c,t){}
+function fit(c,s,w){while(c.measureText(s).width>w&&parseInt(c.font.match(/(\d+)px/)[1])>24)c.font=c.font.replace(/(\d+)px/,(m,a)=>(a-2)+'px')}
 function counter(c,t){
   const w=WV[waveOf(t)];c.save();c.textAlign='center';c.textBaseline='middle';
-  c.font='800 84px system-ui,sans-serif';c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+(w.n===1?' ball':' balls'),540,95);
-  const T1=WV[1].t0+0.0,T2=FIN;let l1,l2,k;
-  if(t<WV[1].t0){l1='One ball leaves a focus, bounces once…';l2='…and always passes through the other focus.'}
-  else if(t<FIN){l1='Same speed, every direction.';l2='focus → wall → focus is always the same length.'}
-  else{l1='Reflection property of the ellipse';l2='Angle in = angle out, and the path length never changes.'}
+  c.font="700 80px Loma,'Noto Sans Thai',sans-serif";c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+' ลูก',540,95);
+  let l1;if(t<WV[1].t0)l1='ลูกบอลออกจาก focus ชนขอบ แล้วผ่านอีก focus';else if(t<FIN)l1='ความเร็วเท่ากัน ทุกทิศทาง';else l1='Reflection property ของวงรี';
   const ph=t<WV[1].t0?0:t<FIN?1:2,st=[0,WV[1].t0,FIN][ph],al=Math.min(sm(st,st+.5,t)+(ph===0?1:0),1);
-  c.globalAlpha=Math.min(1,al);c.font='700 40px system-ui,sans-serif';c.fillStyle='#fff';c.fillText(l1,540,175);
-  c.globalAlpha=1;
-  
+  c.globalAlpha=Math.min(1,al);c.font="700 40px Loma,'Noto Sans Thai',sans-serif";fit(c,l1,960);c.fillStyle='#fff';c.fillText(l1,540,178);c.globalAlpha=1;
   c.restore()}
 function renderMain(c,t){
   bg(c,t);c.save();c.translate(CX,CY);ellipse(c,0);trails(c,t);wallMarks(c,t);foci(c,t);dots(c,t);bursts(c,t);c.restore();counter(c,t)}
