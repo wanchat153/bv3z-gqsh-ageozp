@@ -27,7 +27,7 @@ const DOTK = (() => {
   jump(8.6, 340); K.push([9.2, 360]); K.push([9.45, 300]); K.push([9.7, 360]); K.push([10.0, 330]);
   K.push([10.95, 380]); K.push([12.2, 262]);
   // spin chase: oscillates around the samurai, amplitude grows then dies
-  for (let t = 12.3; t < 14.8; t += 0.11) { const u = (t - 12.3) / 2.5, a = 150 * Math.sin(PI * Math.min(1, u * 1.1)) + 30; K.push([t, 300 + a * Math.sin((t - 12.3) * 11)]); }
+  for (let t = 12.3; t < 14.8; t += 0.11) { const u = (t - 12.3) / 2.5, a = 150 * Math.sin(PI * Math.min(1, u * 1.1)) + 30; K.push([t, 325 + 1.25 * a * Math.sin((t - 12.3) * 9)]); }
   K.push([14.9, 380]); K.push([18.5, 380]); K.push([DUR, 380]);
   return K;
 })();
@@ -76,7 +76,7 @@ function dotHit(t, sx, sy) {   // first thing the reflected ray touches: samurai
   const o = dirOut(dotXf(t)); let best = { x: dotXf(t), y: FLOORY, body: false };
   const bx0 = sx - 78, bx1 = sx + 78, by0 = sy - 94, by1 = GND;
   // ray from the mirror going left: param along x
-  const xr = bx1; if (xr < MX && xr > dotXf(t)) { const u = (xr - MX) / o[0], y = MY + o[1] * u; if (y >= by0 && y <= by1) best = { x: xr, y, body: true }; }
+  const xr = bx1; if (false) { const u = (xr - MX) / o[0], y = MY + o[1] * u; if (y >= by0 && y <= by1) best = { x: xr, y, body: true }; }
   return best;
 }
 // ---- Mochi ----
@@ -245,13 +245,17 @@ function mochiWithPaw(t) {
   for (let k = 0; k <= 20; k++) { const sw = k / 20, st = mochiSt(t, { swat: sw }), G = catGeom(st, t), p = G.legs.FN.paw, d = Math.hypot(p[0] - target[0], p[1] - target[1]); if (d < bd) { bd = d; best = sw; } }
   const st = mochiSt(t, { swat: best }); window._pawErr = bd; window._paw = catGeom(st, t).legs.FN.paw; window._pawT = target; return st;
 }
-function mochiArm(c, t) {
-  const E = mirrorEnds(t), C = [(MX + (E.bot[0] - MX) * 0.45) - E.n[0] * 9, (MY + (E.bot[1] - MY) * 0.45) - E.n[1] * 9], S0 = [868, TBL.y - 98], fk = flickAt(t); C[1] -= 22 * fk; C[0] += 10 * fk;
-  const mid = [(S0[0] + C[0]) / 2 + 4, (S0[1] + C[1]) / 2 + 22];
-  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
-  for (const [col, w] of [[INKC, 27], ['rgb(226,136,58)', 20]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(S0[0], S0[1]); c.quadraticCurveTo(mid[0], mid[1], C[0], C[1]); c.stroke(); }
-  c.fillStyle = '#F3D9B8'; c.strokeStyle = INKC; c.lineWidth = 3; c.beginPath(); c.arc(C[0] - 3, C[1], 12, 0, PI2); c.fill(); c.stroke();
-  c.strokeStyle = 'rgba(120,70,30,0.7)'; c.lineWidth = 2; for (const dy of [-5, 0, 5]) { c.beginPath(); c.moveTo(C[0] - 12, C[1] + dy); c.lineTo(C[0] - 6, C[1] + dy); c.stroke(); } c.restore();
+function mochiArm(c, t) {   // far arm: drawn BEHIND the body so the shoulder is hidden; tapered, with an elbow sag
+  const E = mirrorEnds(t), fk = flickAt(t), C = [(MX + (E.bot[0] - MX) * 0.45) - E.n[0] * 9 + 10 * fk, (MY + (E.bot[1] - MY) * 0.45) - E.n[1] * 9 - 22 * fk], S0 = [884, TBL.y - 84];
+  const mid = [(S0[0] + C[0]) / 2 + 6, (S0[1] + C[1]) / 2 + 20], Q = (u) => { const a = (1 - u) * (1 - u), b = 2 * u * (1 - u), d = u * u; return [a * S0[0] + b * mid[0] + d * C[0], a * S0[1] + b * mid[1] + d * C[1]]; };
+  c.save(); c.lineCap = 'round'; const N = 14;
+  for (const [col, dw] of [[INKC, 8], ['rgb(226,136,58)', 0]]) for (let k = 0; k < N; k++) { const p = Q(k / N), q = Q((k + 1.2) / N), w = lerp(30, 17, k / N) + dw; c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke(); }
+  c.strokeStyle = 'rgba(120,60,20,0.35)'; c.lineWidth = 3; for (const u of [0.35, 0.55, 0.75]) { const p = Q(u); c.beginPath(); c.moveTo(p[0] - 1, p[1] - 7); c.lineTo(p[0] + 3, p[1] + 5); c.stroke(); }
+  c.fillStyle = '#F3D9B8'; c.strokeStyle = INKC; c.lineWidth = 3; c.beginPath(); c.arc(C[0] - 3, C[1], 13, 0, PI2); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(120,70,30,0.7)'; c.lineWidth = 2; for (const dy of [-5, 0, 5]) { c.beginPath(); c.moveTo(C[0] - 13, C[1] + dy); c.lineTo(C[0] - 6, C[1] + dy); c.stroke(); } c.restore();
+}
+function beamLayer(c, t, dv, hit) {   // reflected beam is drawn UNDER the samurai, so he blocks it and the dot is hidden when it is behind him
+  if (dv < 0.02) return; c.save(); c.globalCompositeOperation = 'screen'; beamPoly(c, [MX, MY], [hit.x, hit.y], 40, 24, 0.55 * dv, '255,238,175'); c.restore();
 }
 // ---------- render ----------
 function renderFrame(T) {
@@ -263,8 +267,9 @@ function renderFrame(T) {
     ink: () => {},
     chars: (cx) => {
       table(cx); mirrorStand(cx); mirrorPlate(cx, t);
-      drawCat(cx, mst, t);
       mochiArm(cx, t);
+      drawCat(cx, mst, t);
+      beamLayer(cx, t, dv, hit);
       if (!hit.body) { for (let k = 1; k <= 4; k++) { const tp = t - 0.025 * k, xp = dotXf(tp); if (Math.abs(xp - hit.x) > 25) dotDraw(cx, { x: xp, y: hit.y }, dv * (1 - k / 5) * 0.6, false); } dotDraw(cx, hit, dv, false); }
       samLegs(cx, sam, t); samInk(cx, sam, t, 0.5); samOver(cx, Object.assign({}, sam, { band: { a: 0 }, e: { a: 0 }, sweat: 0, a: 0.28 }), t); samBand(cx, sam, t); samEyes(cx, sam, t, eyes[0], eyes[1]);
       const mw = sMouthAt(t); if (mw > 0.08) { const m = mouthG, o = 0.3 + 0.9 * mw; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.1 * (0.6 + 0.4 * mw), SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#7A1B15'; cx.beginPath(); cx.ellipse(0, SAMS * 0.02, SAMS * 0.07 * (0.6 + 0.4 * mw), SAMS * 0.07 * o, 0, 0, 7); cx.fill(); cx.restore(); }
@@ -285,7 +290,7 @@ function renderFrame(T) {
   const w0 = [WIN[0] + 40, WIN[1] + 40], aIn = 0.17;
   beamPoly(m, w0, [MX, MY], 62, 38, aIn, '190,210,255');
   // reflected beam (warm) mirror -> hit
-  if (dv > 0.02) { const e = mirrorEnds(t); beamPoly(m, [MX, MY], [hit.x, hit.y], 40, 26, 0.3 * dv, '255,238,175');
+  if (dv > 0.02) { const e = mirrorEnds(t); 
     // dust motes drifting in both beams
     for (let k = 0; k < 34; k++) { const u = (hsh1(k * 3.7) + t * (0.03 + 0.05 * hsh1(k))) % 1, a = k < 12 ? [w0, [MX, MY]] : [[MX, MY], [hit.x, hit.y]], wob = 18 * (hsh1(k * 9.1) - 0.5) * 2, x = lerp(a[0][0], a[1][0], u) + wob + 5 * Math.sin(t * 1.3 + k), y = lerp(a[0][1], a[1][1], u) + 12 * Math.sin(t * 0.9 + k * 2), al = (k < 12 ? 0.5 : 0.7 * dv) * Math.sin(PI * u) * (0.6 + 0.4 * Math.sin(t * 2 + k)); m.fillStyle = `rgba(255,248,215,${al})`; m.beginPath(); m.arc(x, y, 1.2 + 1.2 * hsh1(k * 5.3), 0, PI2); m.fill(); }
     // soft pool of light around the dot, tinting the floor
