@@ -42,7 +42,7 @@ function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 function curvePos(cu,tl){const tt=cu.tt,P=cu.P,N=tt.length-1;if(tl<=0)return[P[0],P[1]];if(tl>=tt[N])return[P[2*N],P[2*N+1]];
  let lo=0,hi=N;while(hi-lo>1){const m=(lo+hi)>>1;if(tt[m]<=tl)lo=m;else hi=m}
  const u=(tl-tt[lo])/(tt[hi]-tt[lo]);return[P[2*lo]+(P[2*hi]-P[2*lo])*u,P[2*lo+1]+(P[2*hi+1]-P[2*lo+1])*u]}
-function slotX(rank,n){return 540+(rank-(n-1)/2)*92}
+function slotX(rank,n){return 540+(rank-(n-1)/2)*108}
 function ballPos(H1,i,lt){const tl=lt-H1.tr,f=H1.fin[i],cu=H1.curves[i];
  if(tl<f)return curvePos(cu,tl);
  const e=sm((tl-f)/.5),bx=H1.bx_,by=H1.by_;return[bx+(slotX(H1.rank[i],H1.n)-bx)*e,by+(SLOT_Y-by)*e]}
@@ -55,7 +55,7 @@ function render(t){
  const prog=lt-h.tr;let a=1;if(hi>0)a=Math.min(a,lt/.35);if(hi<H_.length-1)a=Math.min(a,(h.T-lt)/.35);a=sm(a);
  c.save();c.globalAlpha=a;
  // slot markers
- const NS=h.n,HUES=h.hues;for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';{const bi=h.rank.indexOf(r);if(prog>=h.fin[bi]+.5){c.fillStyle=`hsl(${HUES[bi]},80%,78%)`;c.font='700 32px system-ui,sans-serif';c.fillText(h.fin[bi].toFixed(2)+' s',slotX(r,NS),SLOT_Y+58)}}
+ const NS=h.n,HUES=h.hues;for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';{const bi=h.rank.indexOf(r);if(prog>=h.fin[bi]+.5){c.fillStyle=`hsl(${HUES[bi]},80%,78%)`;c.font='700 28px system-ui,sans-serif';c.fillText(h.fin[bi].toFixed(2)+' s',slotX(r,NS),SLOT_Y+58)}}
   c.strokeStyle=r==0&&prog>=Math.min(...h.fin)?'rgba(255,255,255,.95)':'rgba(255,255,255,.22)';c.lineWidth=r==0?5:3;c.beginPath();c.arc(slotX(r,NS),SLOT_Y,R+4,0,TAU);c.stroke()}
  // ramps (thin) + travelled part lit
  for(let i=0;i<NS;i++){const cu=h.curves[i],tt=cu.tt,P=cu.P;c.strokeStyle=`hsla(${HUES[i]},60%,75%,.38)`;c.lineWidth=4;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(P[2*k],P[2*k+1]):c.moveTo(P[2*k],P[2*k+1]);c.stroke();
