@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
       - run: npm install --no-audit --no-fund
-      - run: pip install numpy pillow
+      - run: pip install numpy pillow scipy
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
       - name: frames s..e (Chrome) + light pass (Python)
         working-directory: ${{ inputs.episode_dir }}
