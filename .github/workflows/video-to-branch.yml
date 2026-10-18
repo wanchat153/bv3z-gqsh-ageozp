@@ -14,5 +14,5 @@ jobs:
         with: { name: video, path: v, run-id: '${{ inputs.run_id }}', github-token: '${{ secrets.GITHUB_TOKEN }}' }
       - run: |
           cd v && git init -q -b render-out && git config user.name bot && git config user.email bot@users.noreply.github.com
-          git add out.mp4 && git commit -qm "video from run ${{ inputs.run_id }}"
+          if [ $(stat -c %s out.mp4) -gt 90000000 ]; then split -b 60M -d out.mp4 out.mp4.part_ && rm out.mp4 && git add out.mp4.part_*; else git add out.mp4; fi && git commit -qm "video from run ${{ inputs.run_id }}"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" render-out
