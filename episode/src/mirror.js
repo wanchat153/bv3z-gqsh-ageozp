@@ -6,7 +6,7 @@
 // Physics: the mirror tilt is SOLVED from where the dot must land (reflection law), so mirror, beam, dot and Mochi's paw always agree.
 const DUR = 19.2, PI = Math.PI;                        // 3 x LOOP (core.js LOOP = 6.4)
 const GND = 1440;                                       // ground line for the samurai and the dot
-const MX = 770, MY = 1205, MLEN = 126;                 // mirror pivot (on a stand on the low table) and plate length
+const MX = 770, MY = 1205, MLEN = 150;                 // mirror pivot (on a stand on the low table) and plate length
 const TBL = { x0: 640, x1: 1040, y: 1330 };            // low table top (Mochi sits on it)
 const WIN = [300, 560, 118];                           // round moon window (beam source) x, y, r
 const PIL = 100;                                       // pillar face x (left wall)
@@ -31,7 +31,13 @@ const DOTK = (() => {
   K.push([14.9, 380]); K.push([18.5, 380]); K.push([DUR, 380]);
   return K;
 })();
-const dotXf = (t) => { const K = DOTK; if (t <= K[0][0]) return K[0][1]; for (let i = 1; i < K.length; i++) if (t <= K[i][0]) { const a = K[i - 1], b = K[i], u = (t - a[0]) / (b[0] - a[0] || 1); return a[1] + (b[1] - a[1]) * (u * u * (3 - 2 * u)); } return K[K.length - 1][1]; };
+const JT = [1.55, 2.08, 3.12, 3.95, 4.85, 5.65, 6.55, 8.6, 10.95];
+const wobX = (t) => { let w = 0; for (const tj of JT) { const d = t - tj - 0.1; if (d > 0 && d < 0.5) w += 16 * Math.exp(-d / 0.1) * Math.sin(38 * d); } return w; };
+const flickAt = (t) => Math.max(...JT.map((q) => pulse(t, q - 0.03, 0.05)));
+const SMUGT = [2.45, 3.45, 4.3, 5.2, 6.05, 6.9, 7.9, 9.0, 11.6];
+const WIG = (t) => { let w = 0; for (const [ta] of POUNCE) w = Math.max(w, wnd(ta - 0.6, ta - 0.1, t, 0.08)); return w; };
+const dotXb = (t) => { const K = DOTK; if (t <= K[0][0]) return K[0][1]; for (let i = 1; i < K.length; i++) if (t <= K[i][0]) { const a = K[i - 1], b = K[i], u = (t - a[0]) / (b[0] - a[0] || 1); return a[1] + (b[1] - a[1]) * (u * u * (3 - 2 * u)); } return K[K.length - 1][1]; };
+const dotXf = (t) => dotXb(t) + wobX(t);
 const dotVis = (t) => Math.max(ss(0.3, 0.6, t) * (1 - ss(T_OFF1 - 0.08, T_OFF1, t)), ss(T_ON2, T_ON2 + 0.25, t) * (1 - ss(T_OFF2 - 0.1, T_OFF2, t)));
 
 // ---- samurai x (ground contact), face, hop, lean, lying ----
@@ -76,13 +82,13 @@ function dotHit(t, sx, sy) {   // first thing the reflected ray touches: samurai
 // ---- Mochi ----
 const swatAt = (t) => { const c = mirrorEnds(t); return clamp((c.top[1] - 1180) / 60, 0, 1); };
 const sweatS = (t) => Math.max(0.5 * wnd(2.9, 7.6, t, 0.6), 0.7 * wnd(T_BUMP, T_CALM + 0.6, t, 0.3), 0.8 * wnd(T_SPIN0, T_FALL + 0.5, t, 0.4));
-const T_CAT_LAUGH = [3.2, 4.1, 5.8, 7.8, 10.1];
+const T_CAT_LAUGH = SMUGT;
 
 // ---- events for the sound track: [t, type, amp, x, opts] ----
 const EVF = (() => {
   const E = [];
   const tink = (t, x) => E.push([t, 'tink', 0.5, x]);
-  tink(0.3, 380);
+  tink(0.3, 380); for (const tj of JT) E.push([tj - 0.03, 'tap', 0.35, 880]);
   for (const [ta, tl, xl] of POUNCE) { E.push([ta - 0.06, 'crouch', 0.5, xl]); E.push([ta, 'hop', 0.6, xl]); E.push([tl, 'land', 0.8, xl]); }
   for (let i = 1; i < DOTK.length; i++) { const a = DOTK[i - 1], b = DOTK[i]; if (b[0] < 8.5 && b[0] - a[0] > 0.05 && b[0] - a[0] < 0.15 && Math.abs(b[1] - a[1]) > 60) tink(a[0], b[1]); }
   E.push([T_BUMP, 'bonk', 1.0, 150], [T_BUMP + 0.5, 'star', 0.6, 190], [T_BUMP + 1.2, 'star', 0.5, 190], [T_BUMP + 2.2, 'sigh', 0.5, 200]);
@@ -159,14 +165,15 @@ function beamPoly(m, p0, p1, w0, w1, a, col) {
 }
 function dotDraw(c, hit, a, onBody) {
   if (a < 0.02) return; c.save(); c.globalCompositeOperation = 'screen'; c.translate(hit.x, hit.y); if (!onBody) c.scale(1, 0.5);
-  const g = c.createRadialGradient(0, 0, 2, 0, 0, 52); g.addColorStop(0, `rgba(255,255,240,${a})`); g.addColorStop(0.35, `rgba(255,238,170,${0.8 * a})`); g.addColorStop(1, 'rgba(255,220,130,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 52, 0, PI2); c.fill();
-  c.fillStyle = `rgba(255,255,250,${a})`; c.beginPath(); c.arc(0, 0, 17, 0, PI2); c.fill(); c.restore();
+  const g = c.createRadialGradient(0, 0, 2, 0, 0, 64); g.addColorStop(0, `rgba(255,255,240,${a})`); g.addColorStop(0.35, `rgba(255,238,170,${0.8 * a})`); g.addColorStop(1, 'rgba(255,220,130,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 64, 0, PI2); c.fill();
+  c.fillStyle = `rgba(255,255,250,${a})`; c.beginPath(); c.arc(0, 0, 25, 0, PI2); c.fill(); c.strokeStyle = `rgba(255,250,210,${0.7 * a})`; c.lineWidth = 3; c.beginPath(); c.arc(0, 0, 36, 0, PI2); c.stroke(); c.restore();
 }
 // ---------- samurai ----------
 function samPlan(t) {
   const xs = samXf(t), f = faceAt(t), lie = lieAt(t), [sq, sf] = spinSx(t), spinning = t >= T_SPIN0 && t < T_FALL - 0.25;
   let rot = 0, crouch = 0, face = f;
   for (const [ta, tl] of POUNCE) { if (t > ta && t < tl) rot += f * 0.3 * Math.sin(PI * (t - ta) / (tl - ta)); crouch = Math.max(crouch, wnd(ta - 0.12, ta + 0.02, t, 0.05), 0.8 * pulse(t, tl + 0.04, 0.07)); }
+  const wg = WIG(t); rot += 0.13 * wg * Math.sin(t * 46); crouch = Math.max(crouch, 0.55 * wg);
   rot += 0.3 * Math.exp(-(t - T_BUMP) * 7) * Math.cos(14 * (t - T_BUMP)) * (t >= T_BUMP ? 1 : 0) + 0.08 * dizzy(t) * Math.sin(t * 5.5);
   rot += lie * 1.42 * 1;
   const fall = t >= T_FALL - 0.25 && t < T_FALL + 0.2 ? 0 : 0;
@@ -226,9 +233,9 @@ const sMouthAt = (t) => { let m = 0; for (const [ta] of POUNCE) m = Math.max(m, 
 // ---------- Mochi ----------
 function mochiSt(t, E) {
   const sit = Math.max(0, 0), mx = 900, my = TBL.y - 8, ms = 2.05;
-  const smug = Math.max(...T_CAT_LAUGH.map((q) => pulse(t, q, 0.3))), yawn = wnd(T_YAWN, T_YAWN + 0.9, t, 0.25), blink = pulse(t, 2.4, 0.06) + pulse(t, 6.9, 0.06) + pulse(t, 11.6, 0.06) + pulse(t, 17.4, 0.06) + pulse(t, 9.0, 0.06) + pulse(t, 13.2, 0.06);
+  const smug = Math.min(1, 1.2 * Math.max(...T_CAT_LAUGH.map((q) => pulse(t, q, 0.45)))), yawn = wnd(T_YAWN, T_YAWN + 0.9, t, 0.25), blink = pulse(t, 2.4, 0.06) + pulse(t, 6.9, 0.06) + pulse(t, 11.6, 0.06) + pulse(t, 17.4, 0.06) + pulse(t, 9.0, 0.06) + pulse(t, 13.2, 0.06);
   const shock = pulse(t, T_BUMP + 0.05, 0.25) + pulse(t, T_FALL, 0.3), look = [-0.95, 0.12 + (t > T_FALL ? 0.1 : 0)];
-  const base = mochi(mx, my, ms, t, { look, wide: 0.1 + 0.6 * shock, tail: 0.3 + 0.25 * shock, tilt: 0.05 + 0.12 * smug, sleep: Math.min(1, 0.45 * smug + 0.95 * yawn + 0.9 * blink) });
+  const base = mochi(mx, my, ms, t, { look, wide: 0.1 + 0.6 * shock, tail: 0.3 + 0.25 * shock, tilt: 0.05 + 0.12 * smug, sleep: Math.min(1, 0.55 * smug + 0.95 * yawn + 0.9 * blink) });
   base.breath = 0.02 * Math.sin(t * 2 * PI / 6.4 * 3); base.tailPh = t * 2 * PI / 6.4 * 2; base.earTw = 0.05 * Math.sin(t * 2 * PI / 6.4 * 5) + 0.35 * shock * Math.sin(t * 20);
   base.mouth = { open: clamp(0.85 * yawn + 0.3 * wnd(T_FALL, T_FALL + 0.5, t, 0.1)) }; if (E) base.pose = mochiPose(E.swat);
   return base;
@@ -239,7 +246,7 @@ function mochiWithPaw(t) {
   const st = mochiSt(t, { swat: best }); window._pawErr = bd; window._paw = catGeom(st, t).legs.FN.paw; window._pawT = target; return st;
 }
 function mochiArm(c, t) {
-  const E = mirrorEnds(t), C = [(MX + (E.bot[0] - MX) * 0.45) - E.n[0] * 9, (MY + (E.bot[1] - MY) * 0.45) - E.n[1] * 9], S0 = [868, TBL.y - 98], flick = 1 - 0.0;
+  const E = mirrorEnds(t), C = [(MX + (E.bot[0] - MX) * 0.45) - E.n[0] * 9, (MY + (E.bot[1] - MY) * 0.45) - E.n[1] * 9], S0 = [868, TBL.y - 98], fk = flickAt(t); C[1] -= 22 * fk; C[0] += 10 * fk;
   const mid = [(S0[0] + C[0]) / 2 + 4, (S0[1] + C[1]) / 2 + 22];
   c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
   for (const [col, w] of [[INKC, 27], ['rgb(226,136,58)', 20]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(S0[0], S0[1]); c.quadraticCurveTo(mid[0], mid[1], C[0], C[1]); c.stroke(); }
@@ -258,7 +265,7 @@ function renderFrame(T) {
       table(cx); mirrorStand(cx); mirrorPlate(cx, t);
       drawCat(cx, mst, t);
       mochiArm(cx, t);
-      if (!hit.body) dotDraw(cx, hit, dv, false);
+      if (!hit.body) { for (let k = 1; k <= 4; k++) { const tp = t - 0.025 * k, xp = dotXf(tp); if (Math.abs(xp - hit.x) > 25) dotDraw(cx, { x: xp, y: hit.y }, dv * (1 - k / 5) * 0.6, false); } dotDraw(cx, hit, dv, false); }
       samLegs(cx, sam, t); samInk(cx, sam, t, 0.5); samOver(cx, Object.assign({}, sam, { band: { a: 0 }, e: { a: 0 }, sweat: 0, a: 0.28 }), t); samBand(cx, sam, t); samEyes(cx, sam, t, eyes[0], eyes[1]);
       const mw = sMouthAt(t); if (mw > 0.08) { const m = mouthG, o = 0.3 + 0.9 * mw; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.1 * (0.6 + 0.4 * mw), SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#7A1B15'; cx.beginPath(); cx.ellipse(0, SAMS * 0.02, SAMS * 0.07 * (0.6 + 0.4 * mw), SAMS * 0.07 * o, 0, 0, 7); cx.fill(); cx.restore(); }
       samArms(cx, sam, t, hands, 0.17);
@@ -278,13 +285,13 @@ function renderFrame(T) {
   const w0 = [WIN[0] + 40, WIN[1] + 40], aIn = 0.17;
   beamPoly(m, w0, [MX, MY], 62, 38, aIn, '190,210,255');
   // reflected beam (warm) mirror -> hit
-  if (dv > 0.02) { const e = mirrorEnds(t); beamPoly(m, [MX, MY], [hit.x, hit.y], 34, 22, 0.2 * dv, '255,236,170');
+  if (dv > 0.02) { const e = mirrorEnds(t); beamPoly(m, [MX, MY], [hit.x, hit.y], 40, 26, 0.3 * dv, '255,238,175');
     // dust motes drifting in both beams
     for (let k = 0; k < 34; k++) { const u = (hsh1(k * 3.7) + t * (0.03 + 0.05 * hsh1(k))) % 1, a = k < 12 ? [w0, [MX, MY]] : [[MX, MY], [hit.x, hit.y]], wob = 18 * (hsh1(k * 9.1) - 0.5) * 2, x = lerp(a[0][0], a[1][0], u) + wob + 5 * Math.sin(t * 1.3 + k), y = lerp(a[0][1], a[1][1], u) + 12 * Math.sin(t * 0.9 + k * 2), al = (k < 12 ? 0.5 : 0.7 * dv) * Math.sin(PI * u) * (0.6 + 0.4 * Math.sin(t * 2 + k)); m.fillStyle = `rgba(255,248,215,${al})`; m.beginPath(); m.arc(x, y, 1.2 + 1.2 * hsh1(k * 5.3), 0, PI2); m.fill(); }
     // soft pool of light around the dot, tinting the floor
     const gl = m.createRadialGradient(hit.x, hit.y, 10, hit.x, hit.y, 150); gl.addColorStop(0, `rgba(255,224,150,${0.3 * dv})`); gl.addColorStop(1, 'rgba(255,220,130,0)'); m.fillStyle = gl; m.fillRect(0, 0, 1080, 1920);
     // glint on the mirror
-    const gx = MX - 20, gy = MY - 10; m.fillStyle = `rgba(255,255,255,${0.7 * dv})`; m.beginPath(); m.arc(gx, gy, 6, 0, PI2); m.fill(); m.strokeStyle = `rgba(255,255,255,${0.6 * dv})`; m.lineWidth = 2.5; m.beginPath(); m.moveTo(gx - 16, gy); m.lineTo(gx + 16, gy); m.moveTo(gx, gy - 16); m.lineTo(gx, gy + 16); m.stroke(); }
+    const fl = flickAt(t), gx = MX - 22, gy = MY - 8, R = 16 + 34 * fl; m.fillStyle = `rgba(255,255,255,${dv * (0.7 + 0.3 * fl)})`; m.beginPath(); m.arc(gx, gy, 6 + 6 * fl, 0, PI2); m.fill(); m.strokeStyle = `rgba(255,255,255,${dv * (0.6 + 0.4 * fl)})`; m.lineWidth = 2.5 + 2 * fl; m.beginPath(); m.moveTo(gx - R, gy); m.lineTo(gx + R, gy); m.moveTo(gx, gy - R); m.lineTo(gx, gy + R); m.stroke(); m.moveTo(gx - R * 0.6, gy - R * 0.6); m.lineTo(gx + R * 0.6, gy + R * 0.6); m.moveTo(gx - R * 0.6, gy + R * 0.6); m.lineTo(gx + R * 0.6, gy - R * 0.6); m.stroke(); }
   m.globalCompositeOperation = 'source-over'; m.restore();
 }
 function initStory(canvas) { deepFreeze(P_SIT); initEngine(canvas); initCast(); }
