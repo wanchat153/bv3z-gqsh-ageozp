@@ -1,0 +1,60 @@
+name: render-lit
+# Canvas2D frames (grab.mjs) + Python numpy/Pillow light pass (light.py), split by frame range. parts = 0 -> auto: ceil(frames/48), max 20 (small clips use few machines).
+on:
+  workflow_dispatch:
+    inputs:
+      seconds: { description: 'video length in seconds', default: '6.4' }
+      parts: { description: 'parallel jobs (0 = auto, about 48 frames per job)', default: '0' }
+      fps: { description: 'frames per second', default: '60' }
+      wx: { description: 'watermark x, or none', default: '380' }
+      wy: { description: 'watermark y', default: '480' }
+      episode_dir: { description: 'folder with studio.html, grab.mjs, light.py, audio.flac', default: 'episode' }
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: |
+          python3 - <<PY >> $GITHUB_OUTPUT
+          import json, math
+          nf=round(${{ inputs.seconds }}*${{ inputs.fps }}); p=int(${{ inputs.parts }}); n=min(nf, p if p>0 else min(20, max(1, math.ceil(nf/48))))
+          print("matrix="+json.dumps({"include":[{"i":i,"s":nf*i//n,"e":nf*(i+1)//n} for i in range(n)]}))
+          PY
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-audit --no-fund
+      - run: pip install numpy pillow
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: frames s..e (Chrome) + light pass (Python)
+        working-directory: ${{ inputs.episode_dir }}
+        env: { CHROME: /usr/bin/google-chrome, NODE_PATH: '${{ github.workspace }}/node_modules' }
+        run: |
+          ln -s ${{ github.workspace }}/node_modules node_modules
+          node grab.mjs ${{ matrix.s }} ${{ matrix.e }}
+          python3 light.py ${{ matrix.s }} ${{ matrix.e }}
+          mkdir -p ../out/p && ffmpeg -v error -y -framerate ${{ inputs.fps }} -start_number ${{ matrix.s }} -i out/frames/f%04d.png -frames:v $(( ${{ matrix.e }} - ${{ matrix.s }} )) -c:v libx264 -crf 10 -preset veryfast -g ${{ inputs.fps }} -keyint_min ${{ inputs.fps }} -sc_threshold 0 -bf 0 -pix_fmt yuv420p -an ../out/p/part.mp4
+      - uses: actions/upload-artifact@v4
+        with: { name: 'part-${{ matrix.i }}', path: out/p/part.mp4, retention-days: 1, compression-level: 0 }
+  finish:
+    needs: [plan, render]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - uses: actions/download-artifact@v4
+        with: { path: parts, pattern: 'part-*' }
+      - run: |
+          for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
+          bash tools/finish.sh parts ${{ inputs.episode_dir }}/audio.flac out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
+      - uses: actions/upload-artifact@v4
+        with: { name: video, path: out.mp4, retention-days: 14 }
