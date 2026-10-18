@@ -1,81 +1,62 @@
-<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#000}</style></head><body>
-<canvas id="c" width="1080" height="1920"></canvas>
-<script src="wave.js"></script>
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
+<script src="data.js"></script>
 <script>
-const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),ctx=cv.getContext('2d');
-const A=P.A,B=P.B,C=P.C,CX=540,CY=P.cy,DUR=P.dur,FIN=P.fin,WV=P.waves,H0=P.hue0;
-const cl=(x,a,b)=>Math.max(a,Math.min(b,x)),sm=(a,b,x)=>{const u=cl((x-a)/(b-a),0,1);return u*u*(3-2*u)};
-const rnd=k=>{const x=Math.sin(k*127.1+311.7)*43758.5453;return x-Math.floor(x)};
-const FOC=[[0,-C],[0,C]]; // local coords, y down; src 0 = top focus
-function hit(x,y,dx,dy){const a=dx*dx/(B*B)+dy*dy/(A*A),b=2*(x*dx/(B*B)+y*dy/(A*A)),c=x*x/(B*B)+y*y/(A*A)-1;const s=(-b+Math.sqrt(b*b-4*a*c))/(2*a);return[x+s*dx,y+s*dy,s]}
-// precompute balls: each has src focus, wall point, hue
-const balls=[];WV.forEach((w,wi)=>{const [sx,sy]=FOC[w.src],[tx,ty]=FOC[1-w.src];for(let k=0;k<w.n;k++){const th=w.rot+TAU*k/w.n,dx=Math.cos(th),dy=Math.sin(th),[px,py,d1]=hit(sx,sy,dx,dy);balls.push({wi,k,sx,sy,px,py,tx,ty,d1,hue:(H0+k/w.n*300+wi*17)%360})}});
-const waveOf=t=>{for(let i=WV.length-1;i>=0;i--)if(t>=WV[i].t0)return i;return 0};
-function ballPos(b,t){const w=WV[b.wi],e=(t-w.t0)*w.v;if(e<0)return null;if(e<b.d1){const u=e/b.d1;return[b.sx+(b.px-b.sx)*u,b.sy+(b.py-b.sy)*u,b.px-b.sx,b.py-b.sy]}
-  const d2=2*A-b.d1;if(e<=2*A){const u=(e-b.d1)/d2;return[b.px+(b.tx-b.px)*u,b.py+(b.ty-b.py)*u,b.tx-b.px,b.ty-b.py]}return null}
-function bg(c,t){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,`hsl(${250+(P.seed%4)*12},48%,12%)`);g.addColorStop(1,`hsl(${270+(P.seed%4)*12},52%,5%)`);c.fillStyle=g;c.fillRect(0,0,W,H);
-  const r=c.createRadialGradient(540,900,60,540,900,900);r.addColorStop(0,'rgba(70,80,170,.20)');r.addColorStop(1,'rgba(70,80,170,0)');c.fillStyle=r;c.fillRect(0,0,W,H)}
-function ellipse(c,glow){c.save();
-  c.shadowColor='rgba(60,235,255,.95)';c.shadowBlur=34;c.strokeStyle='rgba(70,225,255,.9)';c.lineWidth=9;c.beginPath();c.ellipse(0,0,B,A,0,0,TAU);c.stroke();
-  c.shadowBlur=14;c.strokeStyle='rgba(190,250,255,.95)';c.lineWidth=4.5;c.beginPath();c.ellipse(0,0,B,A,0,0,TAU);c.stroke();c.restore()}
-function trails(c,t){
-  c.globalCompositeOperation='source-over';c.lineCap='round';c.lineJoin='round';
-  for(const b of balls){const w=WV[b.wi];if(t<w.t0)continue;const done=t>=w.t0+w.tau;
-    const fr=clampDraw(b,t);const base=.55*Math.min(1,Math.pow(9/w.n,.4));
-    const al=done?base*(.72+.28*Math.exp(-(t-(w.t0+w.tau))/.7)):base;
-    c.lineWidth=(w.n<=16?3.4:w.n<=64?2.6:2.0);
-    c.strokeStyle=`hsla(${b.hue},68%,66%,${al})`;c.beginPath();c.moveTo(b.sx,b.sy);
-    if(fr.wall){c.lineTo(b.px,b.py);if(fr.x!=null)c.lineTo(fr.x,fr.y)}else c.lineTo(fr.x,fr.y);c.stroke()}
-  c.globalCompositeOperation='source-over'}
-function clampDraw(b,t){const p=ballPos(b,t);if(!p)return{wall:true,x:b.tx,y:b.ty};const w=WV[b.wi],e=(t-w.t0)*w.v;if(e<b.d1)return{wall:false,x:p[0],y:p[1]};return{wall:true,x:p[0],y:p[1]}}
-function posAt(b,e){if(e<=0)return[b.sx,b.sy];if(e<b.d1){const u=e/b.d1;return[b.sx+(b.px-b.sx)*u,b.sy+(b.py-b.sy)*u]}
-  const d2=2*A-b.d1;if(e<=2*A){const u=(e-b.d1)/d2;return[b.px+(b.tx-b.px)*u,b.py+(b.ty-b.py)*u]}return[b.tx,b.ty]}
-function ballR(n){return n<=8?18:Math.max(7,18*Math.pow(8/n,.3))}
-function dots(c,t){
-  for(const b of balls){const p=ballPos(b,t);if(!p)continue;const w=WV[b.wi],e=(t-w.t0)*w.v,R=ballR(w.n),TL=Math.min(150,R*8+30),NS=40,tw=Math.min(1,Math.pow(10/w.n,.3));
-    // glowing comet tail along the true path (additive, two layers: soft bloom + bright core)
-    c.save();c.globalCompositeOperation='lighter';c.lineCap='butt';c.lineJoin='round';
-    for(let layer=0;layer<2;layer++){let prev=[p[0],p[1]];
-      for(let k=1;k<=NS;k++){const u=k/NS,q=posAt(b,e-TL*u),f=Math.pow(1-u,1.4);
-        if(layer===0){c.strokeStyle=`hsla(${b.hue},85%,60%,${.30*tw*f})`;c.lineWidth=Math.max(1,2*R*1.15*f)}
-        else{c.strokeStyle=`hsla(${b.hue},90%,86%,${.65*tw*f})`;c.lineWidth=Math.max(1,2*R*.42*f)}
-        c.beginPath();c.moveTo(prev[0],prev[1]);c.lineTo(q[0],q[1]);c.stroke();prev=q}}
-    // soft halo
-    const ha=c.createRadialGradient(p[0],p[1],R*.6,p[0],p[1],R*2.3);ha.addColorStop(0,`hsla(${b.hue},90%,65%,${.38*tw})`);ha.addColorStop(1,`hsla(${b.hue},90%,60%,0)`);c.fillStyle=ha;c.beginPath();c.arc(p[0],p[1],R*2.3,0,TAU);c.fill();
-    c.restore();
-    // glossy sphere: deep body, rim light, bounce light, specular
-    const sg=c.createRadialGradient(p[0]-R*.36,p[1]-R*.42,R*.05,p[0]-R*.08,p[1]-R*.1,R*1.1);
-    sg.addColorStop(0,`hsl(${b.hue},65%,90%)`);sg.addColorStop(.3,`hsl(${b.hue},68%,66%)`);sg.addColorStop(.72,`hsl(${b.hue},62%,38%)`);sg.addColorStop(1,`hsl(${b.hue},58%,20%)`);
-    c.fillStyle=sg;c.beginPath();c.arc(p[0],p[1],R,0,TAU);c.fill();
-    c.save();c.beginPath();c.arc(p[0],p[1],R,0,TAU);c.clip();
-    const bl=c.createRadialGradient(p[0]+R*.42,p[1]+R*.5,0,p[0]+R*.42,p[1]+R*.5,R*.85);bl.addColorStop(0,`hsla(${(b.hue+25)%360},90%,72%,.55)`);bl.addColorStop(1,`hsla(${(b.hue+25)%360},90%,72%,0)`);c.fillStyle=bl;c.fillRect(p[0]-R,p[1]-R,2*R,2*R);
-    const rim=c.createRadialGradient(p[0],p[1],R*.78,p[0],p[1],R);rim.addColorStop(0,'rgba(255,255,255,0)');rim.addColorStop(1,`hsla(${b.hue},80%,82%,.5)`);c.fillStyle=rim;c.fillRect(p[0]-R,p[1]-R,2*R,2*R);c.restore();
-    c.strokeStyle=`hsla(${b.hue},55%,14%,.75)`;c.lineWidth=Math.max(1,R*.09);c.beginPath();c.arc(p[0],p[1],R-.3,0,TAU);c.stroke();
-    const hg=c.createRadialGradient(p[0]-R*.4,p[1]-R*.46,0,p[0]-R*.4,p[1]-R*.46,R*.42);hg.addColorStop(0,'rgba(255,255,255,.98)');hg.addColorStop(.5,'rgba(255,255,255,.45)');hg.addColorStop(1,'rgba(255,255,255,0)');
-    c.fillStyle=hg;c.beginPath();c.arc(p[0]-R*.4,p[1]-R*.46,R*.42,0,TAU);c.fill();
-    c.fillStyle='rgba(255,255,255,.7)';c.beginPath();c.arc(p[0]+R*.38,p[1]+R*.34,R*.08,0,TAU);c.fill()}}
-function wallMarks(c,t){
-  c.save();c.globalCompositeOperation='lighter';
-  for(const b of balls){const w=WV[b.wi],tw=w.t0+b.d1/w.v,a=t-tw;if(a<0||a>.4)continue;const k=Math.exp(-a/.1),s=(5+16*k)*Math.min(1,Math.pow(10/w.n,.2));
-    c.strokeStyle=`hsla(${b.hue},80%,90%,${.95*k})`;c.lineWidth=2;c.lineCap='round';c.beginPath();c.moveTo(b.px-s,b.py);c.lineTo(b.px+s,b.py);c.moveTo(b.px,b.py-s);c.lineTo(b.px,b.py+s);c.stroke();
-    c.fillStyle=`rgba(255,255,255,${.9*k})`;c.beginPath();c.arc(b.px,b.py,2+3*k,0,TAU);c.fill()}
-  c.restore()}
-function foci(c,t){
-  for(let q=0;q<2;q++){const f=FOC[q];let pu=0;for(const w2 of WV){const a=t-(w2.t0+w2.tau);if(w2.src===1-q&&a>=0&&a<.5)pu=Math.max(pu,Math.exp(-a/.18))}
-    c.strokeStyle=`rgba(200,250,255,${.75+.25*pu})`;c.lineWidth=4+2.5*pu;c.beginPath();c.arc(f[0],f[1],18,0,TAU);c.stroke()}}
-function bursts(c,t){}
-function fit(c,s,w){while(c.measureText(s).width>w&&parseInt(c.font.match(/(\d+)px/)[1])>24)c.font=c.font.replace(/(\d+)px/,(m,a)=>(a-2)+'px')}
-function counter(c,t){
-  const w=WV[waveOf(t)];c.save();c.textAlign='center';c.textBaseline='middle';
-  c.font='800 84px system-ui,sans-serif';c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+(w.n===1?' ball':' balls'),540,95);
-  let l1;if(t<WV[1].t0)l1='Leaves one focus, bounces off the wall, hits the other!';else if(t<FIN)l1='Different directions, same arrival time.';else l1='That is the reflection property of an ellipse.';
-  const ph=t<WV[1].t0?0:t<FIN?1:2,st=[0,WV[1].t0,FIN][ph],al=Math.min(sm(st,st+.5,t)+(ph===0?1:0),1);
-  c.globalAlpha=Math.min(1,al);c.font='700 40px system-ui,sans-serif';fit(c,l1,960);c.fillStyle='#fff';c.fillText(l1,540,178);c.globalAlpha=1;
-  c.restore()}
-function renderMain(c,t){
-  bg(c,t);c.save();c.translate(CX,CY);ellipse(c,0);trails(c,t);wallMarks(c,t);foci(c,t);dots(c,t);bursts(c,t);c.restore();counter(c,t)}
-function renderFrame(c,t){renderMain(c,t);if(t>DUR-.5){c.fillStyle=`rgba(8,5,25,${sm(DUR-.5,DUR-.02,t)})`;c.fillRect(0,0,W,H)}}
-window.grab=(t,q=.92)=>{renderFrame(ctx,t);return cv.toDataURL('image/jpeg',q).split(',')[1]};
-window.grabPNG=(t)=>{renderFrame(ctx,t);return cv.toDataURL('image/png').split(',')[1]};
-window.READY=true;
+// 5 slopes race (brachistochrone). Frame = pure function of t. Ball radius is CONSTANT (R=25).
+const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
+const R=25,HUES=DATA.hues,H_=DATA.heats,NS=5,SLOT_Y=1425,FR=[40,250,1000,1260];
+const CAP_PRE=["Same start. Same finish. Which ball wins?","Taller drop. Same question.","Now the curve dips below the finish. Who wins?","Narrow and steep. Who wins this one?","Last heat. Who wins?"];
+const CAP_POST=["The curve (cycloid) wins!","A curve beats the straight line.","It dips below the finish, still first.","Steep start = speed early.","Brachistochrone: the fastest slide."];
+function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,'#14102a');g.addColorStop(1,'#07050f');c.fillStyle=g;c.fillRect(0,0,W,H);
+ const r=c.createRadialGradient(540,860,60,540,860,900);r.addColorStop(0,'rgba(80,90,190,.20)');r.addColorStop(1,'rgba(80,90,190,0)');c.fillStyle=r;c.fillRect(0,0,W,H)}
+function neon(path,w=8){c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=w+3;path();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=w*.55;path();c.stroke();c.restore()}
+function sphere(x,y,h,a){c.save();c.globalAlpha=a;
+ const sg=c.createRadialGradient(x-R*.36,y-R*.42,R*.05,x-R*.08,y-R*.1,R*1.1);sg.addColorStop(0,`hsl(${h},65%,90%)`);sg.addColorStop(.3,`hsl(${h},70%,66%)`);sg.addColorStop(.72,`hsl(${h},64%,40%)`);sg.addColorStop(1,`hsl(${h},60%,22%)`);
+ c.fillStyle=sg;c.beginPath();c.arc(x,y,R,0,TAU);c.fill();
+ c.save();c.beginPath();c.arc(x,y,R,0,TAU);c.clip();const bl=c.createRadialGradient(x+R*.42,y+R*.5,0,x+R*.42,y+R*.5,R*.85);bl.addColorStop(0,`hsla(${(h+25)%360},90%,72%,.55)`);bl.addColorStop(1,`hsla(${(h+25)%360},90%,72%,0)`);c.fillStyle=bl;c.fillRect(x-R,y-R,2*R,2*R);c.restore();
+ c.strokeStyle=`hsla(${h},55%,14%,.8)`;c.lineWidth=R*.09;c.beginPath();c.arc(x,y,R-.3,0,TAU);c.stroke();
+ const hg=c.createRadialGradient(x-R*.4,y-R*.46,0,x-R*.4,y-R*.46,R*.42);hg.addColorStop(0,'rgba(255,255,255,.98)');hg.addColorStop(.5,'rgba(255,255,255,.45)');hg.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=hg;c.beginPath();c.arc(x-R*.4,y-R*.46,R*.42,0,TAU);c.fill();c.restore()}
+function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap='butt';const n=pts.length-1;
+ for(let layer=0;layer<2;layer++)for(let k=1;k<=n;k++){const u=k/n,f=Math.pow(1-u,1.1),hh=(h+u*50)%360;
+  c.strokeStyle=layer?`hsla(${hh},90%,88%,${.55*f*a})`:`hsla(${hh},88%,62%,${.62*f*a})`;c.lineWidth=Math.max(1,2*R*(layer?.5:1.25)*f);c.beginPath();c.moveTo(pts[k-1][0],pts[k-1][1]);c.lineTo(pts[k][0],pts[k][1]);c.stroke()}
+ c.restore()}
+function ring(x,y,a){c.save();c.globalAlpha=a;c.strokeStyle='#fff';c.shadowColor='rgba(255,255,255,.9)';c.shadowBlur=14;c.lineWidth=4;c.beginPath();c.arc(x,y,R,0,TAU);c.stroke();c.restore()}
+function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
+function curvePos(cu,tl){const tt=cu.tt,P=cu.P,N=tt.length-1;if(tl<=0)return[P[0],P[1]];if(tl>=tt[N])return[P[2*N],P[2*N+1]];
+ let lo=0,hi=N;while(hi-lo>1){const m=(lo+hi)>>1;if(tt[m]<=tl)lo=m;else hi=m}
+ const u=(tl-tt[lo])/(tt[hi]-tt[lo]);return[P[2*lo]+(P[2*hi]-P[2*lo])*u,P[2*lo+1]+(P[2*hi+1]-P[2*lo+1])*u]}
+function slotX(rank){return 540+(rank-2)*92}
+function ballPos(H1,i,lt){const tl=lt-H1.tr,f=H1.fin[i],cu=H1.curves[i];
+ if(tl<f)return curvePos(cu,tl);
+ const e=sm((tl-f)/.5),bx=H1.bx_,by=H1.by_;return[bx+(slotX(H1.rank[i])-bx)*e,by+(SLOT_Y-by)*e]}
+function heatIndex(t){let k=0;for(let i=0;i<H_.length;i++)if(t>=H_[i].S)k=i;return k}
+function render(t){
+ bg();neon(()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],48)},8);
+ const hi=heatIndex(t),h=H_[hi],lt=t-h.S;h.bx_=h.mir?h.ax:h.bx;h.by_=h.by; // end ring x
+ // endpoints: in gen, start A is at (ax,ay) for non-mirrored; paths already mirrored in data so use curve endpoints
+ const c0=h.curves[0],N=c0.tt.length-1;const Ax=c0.P[0],Ay=c0.P[1],Bx=c0.P[2*N],By=c0.P[2*N+1];h.bx_=Bx;h.by_=By;
+ let a=1;if(hi>0)a=Math.min(a,lt/.35);if(hi<H_.length-1)a=Math.min(a,(h.T-lt)/.35);a=sm(a);
+ const prog=lt-h.tr;
+ c.save();c.globalAlpha=a;
+ // slot markers
+ for(let r=0;r<NS;r++){c.fillStyle='rgba(255,255,255,.55)';c.font='700 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(r+1),slotX(r),SLOT_Y+58);
+  c.strokeStyle='rgba(255,255,255,.22)';c.lineWidth=3;c.beginPath();c.arc(slotX(r),SLOT_Y,R+3,0,TAU);c.stroke()}
+ // ramps (thin) + travelled part lit
+ for(let i=0;i<NS;i++){const cu=h.curves[i],tt=cu.tt,P=cu.P;c.strokeStyle='rgba(255,255,255,.26)';c.lineWidth=3;c.beginPath();for(let k=0;k<=N;k++)k?c.lineTo(P[2*k],P[2*k+1]):c.moveTo(P[2*k],P[2*k+1]);c.stroke();
+  if(prog>0){c.save();c.globalCompositeOperation='lighter';c.strokeStyle=`hsla(${HUES[i]},80%,66%,.34)`;c.lineWidth=5;c.beginPath();let first=true;for(let k=0;k<=N&&tt[k]<=prog;k++){first?c.moveTo(P[2*k],P[2*k+1]):c.lineTo(P[2*k],P[2*k+1]);first=false}c.stroke();c.restore()}}
+ ring(Ax,Ay,.95);ring(Bx,By,.95);
+ // balls (draw slowest first so the winner is on top)
+ const ord=[...Array(NS).keys()].sort((p,q)=>h.rank[q]-h.rank[p]);
+ for(const i of ord){const pts=[];for(let q=0;q<=34;q++)pts.push(ballPos(h,i,Math.max(0,lt-q*.009)));
+  trail(pts,HUES[i],1);}
+ for(const i of ord){const p=ballPos(h,i,lt);sphere(p[0],p[1],HUES[i],1)}
+ c.restore();
+ // header (always visible)
+ const won=prog>=Math.min(...h.fin);
+ c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.96)';
+ c.font='800 84px system-ui,sans-serif';c.fillText('Heat '+(hi+1)+' / '+H_.length,540,95);
+ c.font='700 40px system-ui,sans-serif';c.globalAlpha=a<1&&lt<.35?sm(lt/.35):1;c.fillText(won?CAP_POST[hi]:CAP_PRE[hi],540,178);c.restore()}
+window.render=render;
+window.grabPNG=t=>{render(t);return cv.toDataURL('image/png').split(',')[1]};
+window.grab=t=>{render(t);return cv.toDataURL('image/jpeg',.92).split(',')[1]};
+window.DUR=DATA.dur;window.READY=true;
 </script></body></html>
