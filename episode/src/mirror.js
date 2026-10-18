@@ -37,9 +37,16 @@ const WIG = (t) => { let w = 0; for (const [ta] of POUNCE) w = Math.max(w, wnd(t
 const dotXb = (t) => { const K = DOTK; if (t <= K[0][0]) return K[0][1]; for (let i = 1; i < K.length; i++) if (t <= K[i][0]) { const a = K[i - 1], b = K[i], u = (t - a[0]) / (b[0] - a[0] || 1); return a[1] + (b[1] - a[1]) * (u * u * (3 - 2 * u)); } return K[K.length - 1][1]; };
 const spinEnv = (t) => wnd(T_SPIN0, T_FALL - 0.1, t, 0.45);
 const spinPhi = (t) => 2 * PI * 0.8 * (t - T_SPIN0);
-const dotXf = (t) => { const e = spinEnv(t), b = dotXb(t) + wobX(t); return e > 0 ? lerp(b, samXf(t) + 150 * Math.cos(spinPhi(t)), e) : b; };
+const dotXf = (t) => { const e = spinEnv(t), b = dotXb(t) + wobX(t); return e > 0 ? lerp(b, 300 + 160 * Math.cos(spinPhi(t)), e) : b; };
 const dotYf = (t) => { const e = spinEnv(t); return e > 0 ? lerp(GND - 2, GND + 8 + 50 * Math.sin(spinPhi(t)), e) : GND - 2; };
 const dotPos = (t) => [dotXf(t), dotYf(t)];
+const FLIPS = [1.77, 2.75, 3.67, 4.42, 5.37, 6.08, 6.92, T_CALM, T_WALK - 0.2, T_TURN];
+// ---- chase: the samurai runs after the orbiting dot (first-order pursuit, speed-limited -> he never catches it), faces it, walk phase follows distance ----
+const PURS = (() => { const dt = 1 / 240, n = Math.round((T_FALL - T_SPIN0) / dt), X = new Float32Array(n + 1), F = new Int8Array(n + 1), PH = new Float32Array(n + 1), V = new Float32Array(n + 1);
+  let x = 190, f = 1, ph = 0; for (let i = 0; i <= n; i++) { const t = T_SPIN0 + i * dt, dx = dotXf(t) - x; if (Math.abs(dx) > 28 && Math.sign(dx) !== f) { f = Math.sign(dx); FLIPS.push(t); } const v = Math.max(-560, Math.min(560, 5 * dx)); X[i] = x; F[i] = f; PH[i] = ph; V[i] = v; x = Math.max(185, x + v * dt); ph += Math.abs(v) * dt / 130 * 2 * Math.PI; }
+  return { X, F, PH, V, dt, n }; })();
+const pursAt = (t) => { const i = Math.max(0, Math.min(PURS.n, Math.round((t - T_SPIN0) / PURS.dt))); return { x: PURS.X[i], face: PURS.F[i], ph: PURS.PH[i], v: PURS.V[i] }; };
+const X_FALL = pursAt(T_FALL).x, F_FALL = pursAt(T_FALL).face; if (F_FALL !== 1) FLIPS.push(T_FALL);
 const dotVis = (t) => Math.max(ss(0.3, 0.6, t) * (1 - ss(T_OFF1 - 0.08, T_OFF1, t)), ss(T_ON2, T_ON2 + 0.25, t) * (1 - ss(T_OFF2 - 0.1, T_OFF2, t)));
 
 // ---- samurai x (ground contact), face, hop, lean, lying ----
@@ -48,21 +55,18 @@ function samXf(t) {
   let x = SX0;
   for (const [ta, tl, xl] of POUNCE) { if (t >= tl) x = xl; else if (t > ta) { x = lerp(x, xl, eio((t - ta) / (tl - ta))); break; } else break; }
   if (t >= T_BUMP) x = 190 + 30 * Math.exp(-(t - T_BUMP) * 9) * Math.cos((t - T_BUMP) * 16) * -1 + 28 * Math.exp(-(t - T_BUMP) * 6);
-  if (t >= T_SPIN0) { const u = ss(T_SPIN0, T_FALL, t); x = lerp(190, 330, u) + 22 * Math.sin((t - T_SPIN0) * 6) * (1 - 0.6 * u); }
-  if (t >= T_FALL) x = 330 + 70 * ss(T_FALL, T_FALL + 0.45, t);
-  if (t >= T_WALK) x = lerp(400, SX0, eio((t - T_WALK) / (T_TURN - 0.3 - T_WALK)));
+  if (t >= T_SPIN0) x = pursAt(t).x;
+  if (t >= T_FALL) x = X_FALL + 70 * ss(T_FALL, T_FALL + 0.45, t);
+  if (t >= T_WALK) x = lerp(X_FALL + 70, SX0, eio((t - T_WALK) / (T_TURN - 0.3 - T_WALK)));
   if (t >= T_TURN - 0.3) x = SX0;
   return x;
 }
 function faceAt(t) {   // +1 looks right, -1 left; flip 0.08 s before each take-off; spin = fast flips (sx squash handles the turn)
-  if (t < 1.77) return 1; let f = 1;
+  if (t >= T_SPIN0 && t < T_FALL) return pursAt(t).face; if (t < 1.77) return 1; let f = 1;
   const pf = [[1.77, -1], [2.75, 1], [3.67, -1], [4.42, 1], [5.37, -1], [6.08, 1], [6.92, -1], [T_CALM, 1], [T_WALK - 0.2, -1], [T_TURN, 1]];
   for (const [tt, ff] of pf) if (t >= tt) f = ff; return f;
 }
-const FLIPS = [1.77, 2.75, 3.67, 4.42, 5.37, 6.08, 6.92, T_CALM, T_WALK - 0.2, T_TURN];
 const turnPulse = (t) => Math.max(...FLIPS.map((q) => pulse(t, q, 0.045)));
-const SPIN = (t) => (t >= T_SPIN0 && t < T_FALL) ? (t - T_SPIN0) : 0;
-function spinSx(t) { if (!(t >= T_SPIN0 && t < T_FALL - 0.25)) return [1, 0]; const ph = (t - T_SPIN0) * (7 + 5 * ss(T_SPIN0, T_FALL, t)); return [Math.max(0.35, Math.abs(Math.cos(ph))), Math.cos(ph) >= 0 ? 1 : -1]; }
 const lieAt = (t) => t < T_FALL - 0.25 ? 0 : (t < T_SIT ? ss(T_FALL - 0.25, T_FALL + 0.2, t) : 1 - ss(T_SIT, T_SIT + 0.7, t));
 const hopAt = (t) => { let h = 0; for (const [ta, tl] of POUNCE) h += arc(t, ta, 34 + 0.04 * (POUNCE.indexOf([ta, tl]) + 1) * 0 + (tl - ta) * 90, tl - ta);
   h += arc(t, T_TOUCH, 70, 0.4) + arc(t, T_TOUCH + 0.4, 18, 0.25) + arc(t, T_CHEER + 0.1, 12, 0.3) + arc(t, T_CHEER + 0.45, 10, 0.3); return h; };
@@ -89,9 +93,9 @@ const EVF = (() => {
   for (let i = 1; i < DOTK.length; i++) { const a = DOTK[i - 1], b = DOTK[i]; if (b[0] < 8.5 && b[0] - a[0] > 0.05 && b[0] - a[0] < 0.15 && Math.abs(b[1] - a[1]) > 60) tink(a[0], b[1]); }
   E.push([T_BUMP, 'bonk', 1.0, 150], [T_BUMP + 0.5, 'star', 0.6, 190], [T_BUMP + 1.2, 'star', 0.5, 190], [T_BUMP + 2.2, 'sigh', 0.5, 200]);
   E.push([T_PEEK, 'tink', 0.4, 330], [T_OFF1, 'blink', 0.5, 330], [T_CHEER, 'giggle', 0.5, 900], [T_ON2, 'tink', 0.5, 380], [T_TOUCH, 'squeak', 0.9, 240]);
-  for (let t = T_SPIN0; t < T_FALL - 0.3; t += 0.45) E.push([t, 'whirl', 0.4, 300], [t + 0.2, 'tink', 0.35, 300 + 150 * Math.sin((t - T_SPIN0) * 11)]);
+  for (let t = T_SPIN0; t < T_FALL - 0.3; t += 0.22) E.push([t, 'step', 0.35, pursAt(t).x]); for (let t = T_SPIN0 + 0.2; t < T_FALL - 0.3; t += 0.45) E.push([t, 'tink', 0.35, dotXf(t)]);
   E.push([T_FALL, 'fall', 1.0, 380], [T_FALL + 0.35, 'thump', 0.8, 420], [T_YAWN, 'yawn', 0.6, 900], [T_SIT + 0.2, 'grumble', 0.5, 400], [T_OFF3, 'tink', 0.2, 330]);
-  for (let t = T_WALK; t < T_TURN - 0.3; t += 0.27) E.push([t, 'step', 0.4, lerp(400, SX0, (t - T_WALK) / (T_TURN - T_WALK))]);
+  for (let t = T_WALK; t < T_TURN - 0.3; t += 0.27) E.push([t, 'step', 0.4, lerp(X_FALL + 70, SX0, (t - T_WALK) / (T_TURN - T_WALK))]);
   return E.sort((a, b) => a[0] - b[0]);
 })();
 // ================= scene.js — drawing; every frame is a pure function of t (cues.js holds all motion) =================
@@ -166,22 +170,23 @@ function dotDraw(c, hit, a, onBody) {
 }
 // ---------- samurai ----------
 function samPlan(t) {
-  const xs = samXf(t), f = faceAt(t), lie = lieAt(t), [sq, sf] = spinSx(t), spinning = t >= T_SPIN0 && t < T_FALL - 0.25;
+  const xs = samXf(t), f = faceAt(t), lie = lieAt(t), spinning = t >= T_SPIN0 && t < T_FALL - 0.25, pu = spinning ? pursAt(t) : null;
   let rot = 0, crouch = 0, face = f;
   for (const [ta, tl] of POUNCE) { if (t > ta && t < tl) rot += f * 0.3 * Math.sin(PI * (t - ta) / (tl - ta)); crouch = Math.max(crouch, wnd(ta - 0.12, ta + 0.02, t, 0.05), 0.8 * pulse(t, tl + 0.04, 0.07)); }
   const wg = WIG(t); rot += 0.13 * wg * Math.sin(t * 46); crouch = Math.max(crouch, 0.55 * wg);
   rot += 0.3 * Math.exp(-(t - T_BUMP) * 7) * Math.cos(14 * (t - T_BUMP)) * (t >= T_BUMP ? 1 : 0) + 0.08 * dizzy(t) * Math.sin(t * 5.5);
   rot += lie * 1.42 * 1;
   const fall = t >= T_FALL - 0.25 && t < T_FALL + 0.2 ? 0 : 0;
-  const hop = hopAt(t) + (t > T_TOUCH && t < T_TOUCH + 0.4 ? 0 : 0), tremble = (wnd(T_CALM, T_PEEK + 0.2, t, 0.2) + wnd(T_ON2, T_TOUCH, t, 0.3) * 0.8 + wnd(1.2, 1.8, t, 0.2) * 0.5) * 1.5 * Math.sin(t * 55);
+  let hopb = 0;
+  if (spinning) { rot += face * 0.14 * clamp(Math.abs(pu.v) / 500); hopb = 7 * Math.abs(Math.sin(pu.ph)); }
+  const hop = hopAt(t) + hopb + (t > T_TOUCH && t < T_TOUCH + 0.4 ? 0 : 0), tremble = (wnd(T_CALM, T_PEEK + 0.2, t, 0.2) + wnd(T_ON2, T_TOUCH, t, 0.3) * 0.8 + wnd(1.2, 1.8, t, 0.2) * 0.5) * 1.5 * Math.sin(t * 55);
   const D2 = SAMS * 1.58, x = xs + D2 * Math.sin(rot) + tremble, y = GND - D2 * Math.cos(rot) - hop - 55 * lie * 0 + 0 + (crouch ? 8 * crouch : 0);
-  const walking = t >= T_WALK && t < T_TURN - 0.3;
-  if (spinning) face = sf;
-  return { xs, x, y, rot, face, sx: spinning ? sq : 1 - 0.7 * turnPulse(t), sy: 1 - 0.1 * crouch, hop, lie, walking, tremble, spinning };
+  const walking = (t >= T_WALK && t < T_TURN - 0.3) || spinning, walkPh = spinning ? pu.ph : (t - T_WALK) * 9;
+  return { xs, x, y, rot, face, sx: 1 - 0.7 * turnPulse(t), sy: 1 - 0.1 * crouch, hop, lie, walking, walkPh, tremble, spinning };
 }
 function samAt(t) {
   const P = samPlan(t), sweat = sweatS(t), pre = (1 - ss(1.2, 1.6, t)) * 0;
-  const st = samState(0, { x: P.x, y: P.y, ground: P.y + SAMS * 1.58 * Math.cos(P.rot) + 0, S: SAMS, face: P.face, sx: P.sx, sy: P.sy, rot: P.rot, walk: P.walking ? (t - T_WALK) * 9 : null, band: { a: 1, wind: 0.2 + 0.25 * Math.min(1, Math.abs(P.hop) / 40) + 0.1 * Math.sin(t * 3) }, sweat: Math.min(1, sweat) });
+  const st = samState(0, { x: P.x, y: P.y, ground: P.y + SAMS * 1.58 * Math.cos(P.rot) + 0, S: SAMS, face: P.face, sx: P.sx, sy: P.sy, rot: P.rot, walk: P.walking ? P.walkPh : null, band: { a: 1, wind: 0.2 + 0.25 * Math.min(1, Math.abs(P.hop) / 40) + 0.1 * Math.sin(t * 3) }, sweat: Math.min(1, sweat) });
   return { st, P };
 }
 function samHandsAt(S_, t) {
@@ -195,11 +200,12 @@ function samHandsAt(S_, t) {
   back = lerp2(back, [-0.5, 0.78], clamp(calm)); front = lerp2(front, [0.5, 0.78], clamp(calm));
   const ch = wnd(T_CHEER, T_ON2 - 0.1, t, 0.2); back = lerp2(back, [-1.0, -0.1], ch);
   const ts = wnd(T_ON2, T_TOUCH, t, 0.2) * 0.8; back = lerp2(back, [-0.55, 0.8], ts); front = lerp2(front, [0.55, 0.8], ts);
-  const flail = pulse(t, T_BUMP + 0.1, 0.25) + wnd(T_SPIN0, T_FALL, t, 0.2) * 0.9; const sw = Math.sin((t - T_SPIN0) * 13) * 0.3;
+  const flail = pulse(t, T_BUMP + 0.1, 0.25); const sw = Math.sin((t - T_SPIN0) * 13) * 0.3;
   back = lerp2(back, [-1.3, 0.3 + sw * 1.2], clamp(flail)); front = lerp2(front, [1.3, 0.3 - sw * 1.2], clamp(flail));
   const lieA = S_.P.lie; back = lerp2(back, [-1.3, 0.2], lieA); front = lerp2(front, [1.3, 0.25], lieA);
   const frust = wnd(T_SIT + 0.5, T_WALK, t, 0.2); front = lerp2(front, [0.7, 0.55], frust); back = lerp2(back, [-0.7, 0.55], frust);
-  if (P.walking) { const w = Math.sin((t - T_WALK) * 9); back = [-1.2 + 0.08 * w, 0.8 + 0.1 * w]; front = [1.2 - 0.08 * w, 0.8 - 0.1 * w]; }
+  const chs = wnd(T_SPIN0, T_FALL - 0.2, t, 0.2); front = lerp2(front, [1.15, 0.15], 0.5 * chs);
+  if (P.walking) { const w = Math.sin(P.walkPh); back = [-1.2 + 0.08 * w, 0.8 + 0.1 * w]; front = [1.2 - 0.08 * w, 0.8 - 0.1 * w]; }
   const raw = [L(back[0], back[1]), L(front[0], front[1])], lim = 0.72 * SAMS, out = raw.map((h, i) => { const dx = h[0] - sh[i][0], dy = h[1] - sh[i][1], d = Math.hypot(dx, dy); return d > lim ? [sh[i][0] + dx * lim / d, sh[i][1] + dy * lim / d] : h; });
   window._raw = raw; window._sh = sh; window._hands = out; return out;
 }
@@ -216,7 +222,7 @@ function samEyesAt(t, S_, hit, fish) {
   set(T_OFF1, T_CHEER, { wide: 0.2 }); set(T_CHEER, T_ON2 - 0.2, { happy: 0.9 });
   set(T_ON2, T_TOUCH, { wide: 0.85 }); set(T_TOUCH, T_TOUCH + 0.25, { wide: 1 });
   set(T_SIT, T_WALK, { angry: 0.9, squeeze: 0.2 }); set(T_WALK, T_TURN - 0.3, { squeeze: 0.45 }); set(T_TURN - 0.3, DUR, { closed: 1 });
-  if (t >= T_SPIN0 && t < T_FALL) { const a = t * 9; tg = [c0[0] + 80 * Math.cos(a), c0[1] + 60 * Math.sin(a)]; Object.assign(ov, { wide: 0.6, squeeze: 0.3 }); }
+  if (t >= T_SPIN0 && t < T_FALL) Object.assign(ov, { wide: 0.7, angry: 0.35 });
   if (t >= T_FALL - 0.25 && t < T_SIT) { Object.assign(ov, { closed: 1, squeeze: 0.9 }); }
   if (t >= T_SIT && t < T_WALK) tg = mochiP; if (t >= T_OFF1 && t < T_CHEER) tg = mochiP; if (t >= T_CHEER && t < T_ON2) tg = [c0[0] + 140 * P.face, c0[1] - 20];
   if (t >= T_WALK && t < T_TURN - 0.3) tg = [c0[0] - 140, c0[1]];
