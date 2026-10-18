@@ -31,7 +31,7 @@ function sparkle4(ctx, x, y, r, a) { ctx.save(); ctx.globalAlpha = a; ctx.fillSt
 // ------------------------------------------------------------------ palette
 Object.assign(COL, { floorW: '#efd5a6', floorL: '#dcb985', floorS: '#c99f68', engawa: '#c8925a', engawaT: '#dba96f', tab: '#a9754a', tabT: '#c99564', pot: '#6e5f6a', potL: '#8a7a86', potD: '#4a3f48', broth: '#f1c46a', brothD: '#d99f3f', egg: '#fff1d6', eggS: '#ecd2a6', steam: '#ffffff' });
 // ------------------------------------------------------------------ room: shoji wall behind, wide plank floor in front (drawn in world px, under the pan/zoom camera)
-const WALL_Y = 1330, FX0 = -520, FX1 = 1640, FY1 = 2300;
+const WALL_Y = CUE.WALL_Y, FX0 = -520, FX1 = 1640, FY1 = 2300;
 function drawFloor(ctx) {
   ctx.fillStyle = COL.floorW; ctx.fillRect(FX0, WALL_Y, FX1 - FX0, FY1 - WALL_Y);
   const PH = 4.2 * C.DQ * SC, j0 = Math.floor(WALL_Y / PH);
@@ -56,34 +56,23 @@ function drawWall(ctx) {
   }
   ctx.fillStyle = '#a9754a'; ctx.fillRect(x0, top - 26, x1 - x0, 26); ctx.fillStyle = '#8d5f3a'; ctx.fillRect(x0, WALL_Y - 30, x1 - x0, 30);     // beam + skirting
   
-  // a round window (moon); the room's only lamp is the candle (lit by light.py)
-  const wx = pp(2, 0, 0)[0], wy = 1060; ctx.fillStyle = '#c9e4f2'; ctx.beginPath(); ctx.arc(wx, wy, 120, 0, 7); ctx.fill(); ctx.lineWidth = 14; ctx.strokeStyle = '#8d5f3a'; ctx.stroke();
-  ctx.strokeStyle = '#8d5f3a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(wx - 120, wy); ctx.lineTo(wx + 120, wy); ctx.moveTo(wx, wy - 120); ctx.lineTo(wx, wy + 120); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.ellipse(wx - 40, wy - 45, 46, 20, -0.5, 0, 7); ctx.fill();
 }
 function woodGrain(ctx, x0, y0, x1, y1, base, n, seed) {
   ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip(); ctx.strokeStyle = drk(base, 0.18); ctx.lineWidth = 1.4; ctx.globalAlpha = 0.4;
   for (let i = 0; i < n; i++) { const y = y0 + (y1 - y0) * (i + 0.5) / n + (CUE.hash(seed, i) - 0.5) * 5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.bezierCurveTo(x0 + (x1 - x0) * 0.3, y + 3, x0 + (x1 - x0) * 0.7, y - 3, x1, y + (CUE.hash(seed, i + 9) - 0.5) * 3); ctx.stroke(); }
   ctx.restore();
 }
-// ------------------------------------------------------------------ the candle: iron stand + saucer + a fat washi candle (no flame here: light.py draws flame, glow, smoke)
-const CD = CUE.CANDLE;
-function wickPx() { return pp(CD.u, CD.wickH, CD.q); }
-function drawCandle(ctx) {
-  const q = CD.q, iron = '#4a4650', ironL = '#6d6a76';
-  softShadow(ctx, CD.u, q + 0.3, 4.2, 1.6, 0.3);
-  const b0 = pp(CD.u, 0, q), b1 = pp(CD.u, 1.1, q);
-  ctx.beginPath(); ctx.ellipse(b0[0], b0[1] - 7, 4.2 * SC, 1.5 * C.DQ * SC * 1.3, 0, 0, 7); ctx.fillStyle = iron; ctx.fill(); ctx.lineWidth = OUTW; ctx.strokeStyle = OUT; ctx.stroke();          // base disc
-  rrect(ctx, b0[0] - 0.45 * SC, pp(CD.u, 8.4, q)[1], 0.9 * SC, b0[1] - pp(CD.u, 8.4, q)[1] - 4, 3, iron);                                                                                        // stem
-  ctx.strokeStyle = ironL; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(b0[0] - 0.15 * SC, pp(CD.u, 8.2, q)[1] + 6); ctx.lineTo(b0[0] - 0.15 * SC, b0[1] - 12); ctx.stroke();
-  const sc = pp(CD.u, 8.6, q);                                                                                                                                                                    // saucer (drip tray)
-  ctx.beginPath(); ctx.ellipse(sc[0], sc[1], 3.0 * SC, 0.9 * C.DQ * SC * 1.5, 0, 0, 7); ctx.fillStyle = iron; ctx.fill(); ctx.lineWidth = OUTW; ctx.strokeStyle = OUT; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(sc[0], sc[1] - 2, 2.5 * SC, 0.7 * C.DQ * SC * 1.5, 0, 0, 7); ctx.fillStyle = ironL; ctx.fill();
-  const cw = 1.5 * SC, cb = pp(CD.u, 8.9, q), ct = pp(CD.u, 12.6, q);                                                                                                                              // candle body
-  ctx.beginPath(); ctx.moveTo(cb[0] - cw, cb[1]); ctx.lineTo(cb[0] - cw * 0.92, ct[1]); ctx.ellipse(cb[0], ct[1], cw * 0.92, 0.5 * C.DQ * SC * 1.5, 0, Math.PI, 0, true); ctx.lineTo(cb[0] + cw, cb[1]); ctx.ellipse(cb[0], cb[1], cw, 0.5 * C.DQ * SC * 1.5, 0, 0, Math.PI); ctx.closePath();
-  ctx.fillStyle = grad(ctx, cb[0] - cw, 0, cb[0] + cw, 0, [[0, '#fff7e4'], [0.55, '#f6e6c4'], [1, '#d9c299']]); ctx.fill(); ctx.lineWidth = OUTW; ctx.strokeStyle = OUT; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(cb[0], ct[1], cw * 0.92, 0.5 * C.DQ * SC * 1.5, 0, 0, 7); ctx.fillStyle = '#fff2cf'; ctx.fill(); ctx.stroke();                                                            // wax top
-  ctx.beginPath(); ctx.ellipse(cb[0], ct[1] + 1, cw * 0.55, 0.28 * C.DQ * SC * 1.5, 0, 0, 7); ctx.fillStyle = '#f3dba0'; ctx.fill();                                                                // melted pool
-  for (const [dx, ln] of [[-0.55, 22], [0.35, 34], [0.8, 14]]) { ctx.beginPath(); ctx.moveTo(cb[0] + dx * cw, ct[1] + 4); ctx.lineTo(cb[0] + dx * cw, ct[1] + 4 + ln); ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.strokeStyle = '#fff7e4'; ctx.stroke(); }  // wax drips
-  const wk = wickPx(); ctx.strokeStyle = '#2a1f30'; ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cb[0], ct[1] - 2); ctx.quadraticCurveTo(cb[0] + 1, (ct[1] + wk[1]) / 2, wk[0] + 2, wk[1] + 3); ctx.stroke();      // wick
+// ------------------------------------------------------------------ the paper lantern (andon) on the floor in front: wooden frame + washi panels (light.py adds the glow)
+const LN = CUE.LANT;
+function lanternBox() { const p0 = pp(LN.u, 0, LN.q), w = 4.6 * SC; return { cx: p0[0], base: p0[1], hw: w, h: 15 * SC }; }
+function drawLantern(ctx) {
+  const L = lanternBox(), wood = '#8d5f3a', woodL = '#b98a5a';
+  softShadow(ctx, LN.u, LN.q + 0.4, 6.5, 2.2, 0.35);
+  const x0 = L.cx - L.hw, x1 = L.cx + L.hw, yb = L.base - 14, yt = L.base - L.h;
+  rrect(ctx, x0 - 5, yb, 2 * L.hw + 10, 14, 4, wood);                                                      // base block
+  rrect(ctx, x0, yt + 12, 2 * L.hw, yb - yt - 12, 6, '#fff3d4');                                           // paper body
+  ctx.strokeStyle = wood; ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.strokeRect(x0, yt + 12, 2 * L.hw, yb - yt - 12);
+  for (let k = 1; k < 3; k++) { const x = x0 + 2 * L.hw * k / 3; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(x, yt + 14); ctx.lineTo(x, yb - 2); ctx.stroke(); }
+  for (let k = 1; k < 4; k++) { const y = yt + 12 + (yb - yt - 12) * k / 4; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0 + 2, y); ctx.lineTo(x1 - 2, y); ctx.stroke(); }
+  rrect(ctx, x0 - 7, yt, 2 * L.hw + 14, 12, 4, wood); ctx.strokeStyle = woodL; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(x0 - 2, yt + 3); ctx.lineTo(x1 + 2, yt + 3); ctx.stroke();   // cap
 }
