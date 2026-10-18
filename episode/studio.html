@@ -4,8 +4,8 @@
 // 5 slopes race (brachistochrone). Frame = pure function of t. Ball radius is CONSTANT (R=25).
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
 const R=25,HUES=DATA.hues,H_=DATA.heats,NS=5,SLOT_Y=1425,FR=[40,250,1000,1260];
-const CAP_PRE=["Same start. Same finish. Which ball wins?","Taller drop. Same question.","Now the curve dips below the finish. Who wins?","Narrow and steep. Who wins this one?","Last heat. Who wins?"];
-const CAP_POST=["The curve (cycloid) wins!","A curve beats the straight line.","It dips below the finish, still first.","Steep start = speed early.","Brachistochrone: the fastest slide."];
+const CAP_PRE=["Same start. Same finish. Which ball wins?","Taller drop. Same question.","Now the curve dips below the finish. Who wins?","Wavy, bowed, deep. Who wins this one?","Last heat. Who wins?"];
+const CAP_POST=["The curve (cycloid) wins!","A curve beats the straight line.","Dipping below the finish still wins.","Wavy, bowed, deep: all slower.","Brachistochrone: the fastest slide."];
 const THEMES=[ // [top, bottom, glow rgb, deco rgb]  (rotates every clip; frame stays white neon)
  {n:'indigo',a:'#14102a',b:'#07050f',g:'80,90,190',d:'170,180,255'},
  {n:'ocean teal',a:'#06222b',b:'#03090d',g:'40,150,160',d:'150,235,240'},
