@@ -26,19 +26,19 @@ function trails(c,t){
   c.globalCompositeOperation='source-over'}
 function clampDraw(b,t){const p=ballPos(b,t);if(!p)return{wall:true,x:b.tx,y:b.ty};const w=WV[b.wi],e=(t-w.t0)*w.v;if(e<b.d1)return{wall:false,x:p[0],y:p[1]};return{wall:true,x:p[0],y:p[1]}}
 function dots(c,t){
-  for(const b of balls){const p=ballPos(b,t);if(!p)continue;const L=Math.hypot(p[2],p[3])||1,dx=p[2]/L,dy=p[3]/L,nx=-dy,ny=dx,TL=120,R=22;
+  for(const b of balls){const p=ballPos(b,t);if(!p)continue;const L=Math.hypot(p[2],p[3])||1,dx=p[2]/L,dy=p[3]/L,nx=-dy,ny=dx,TL=105,R=18;
     // comet tail: tapered, fading flame behind the ball
     const ex=p[0]-dx*TL,ey=p[1]-dy*TL;const g=c.createLinearGradient(p[0],p[1],ex,ey);g.addColorStop(0,`hsla(${b.hue},75%,68%,.75)`);g.addColorStop(.5,`hsla(${b.hue},70%,60%,.28)`);g.addColorStop(1,`hsla(${b.hue},65%,55%,0)`);
     c.fillStyle=g;c.beginPath();c.moveTo(p[0]+nx*R*.85,p[1]+ny*R*.85);c.lineTo(ex,ey);c.lineTo(p[0]-nx*R*.85,p[1]-ny*R*.85);c.closePath();c.fill();
     c.fillStyle=`hsl(${b.hue},58%,66%)`;c.beginPath();c.arc(p[0],p[1],R,0,TAU);c.fill();
     c.strokeStyle=`hsl(${b.hue},50%,26%)`;c.lineWidth=3.5;c.stroke();
-    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1.2;c.beginPath();c.arc(p[0],p[1],15.5,0,TAU);c.stroke()}}
+    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1.2;c.beginPath();c.arc(p[0],p[1],12.6,0,TAU);c.stroke()}}
 function wallMarks(c,t){
   for(const b of balls){const w=WV[b.wi],tw=w.t0+b.d1/w.v,a=t-tw;if(a<0)continue;
     const k=Math.exp(-a/.35);c.fillStyle=`hsla(${b.hue},60%,${78+14*k}%,${.8+.2*k})`;c.beginPath();c.arc(b.px,b.py,4.2+4*k,0,TAU);c.fill()}}
 function foci(c,t){
   for(let q=0;q<2;q++){const f=FOC[q];let pu=0;for(const w2 of WV){const a=t-(w2.t0+w2.tau);if(w2.src===1-q&&a>=0&&a<.5)pu=Math.max(pu,Math.exp(-a/.18))}
-    c.strokeStyle=`rgba(255,255,255,${.7+.3*pu})`;c.lineWidth=4+2.5*pu;c.beginPath();c.arc(f[0],f[1],22,0,TAU);c.stroke()}}
+    c.strokeStyle=`rgba(255,255,255,${.7+.3*pu})`;c.lineWidth=4+2.5*pu;c.beginPath();c.arc(f[0],f[1],18,0,TAU);c.stroke()}}
 function bursts(c,t){}
 function counter(c,t){
   const w=WV[waveOf(t)];c.save();c.textAlign='center';c.textBaseline='middle';
