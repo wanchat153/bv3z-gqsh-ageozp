@@ -26,8 +26,6 @@ const DOTK = (() => {
   jump(1.55, 170); jump(2.08, 420); jump(3.12, 290); jump(3.95, 520); jump(4.85, 360); jump(5.65, 540); jump(6.55, 150);
   jump(8.6, 340); K.push([9.2, 360]); K.push([9.45, 300]); K.push([9.7, 360]); K.push([10.0, 330]);
   K.push([10.95, 380]); K.push([12.2, 262]);
-  // spin chase: oscillates around the samurai, amplitude grows then dies
-  for (let t = 12.3; t < 14.8; t += 0.11) { const u = (t - 12.3) / 2.5, a = 150 * Math.sin(PI * Math.min(1, u * 1.1)) + 30; K.push([t, 325 + 1.25 * a * Math.sin((t - 12.3) * 9)]); }
   K.push([14.9, 380]); K.push([18.5, 380]); K.push([DUR, 380]);
   return K;
 })();
@@ -37,7 +35,11 @@ const flickAt = (t) => Math.max(...JT.map((q) => pulse(t, q - 0.03, 0.05)));
 const SMUGT = [2.45, 3.45, 4.3, 5.2, 6.05, 6.9, 7.9, 9.0, 11.6];
 const WIG = (t) => { let w = 0; for (const [ta] of POUNCE) w = Math.max(w, wnd(ta - 0.6, ta - 0.1, t, 0.08)); return w; };
 const dotXb = (t) => { const K = DOTK; if (t <= K[0][0]) return K[0][1]; for (let i = 1; i < K.length; i++) if (t <= K[i][0]) { const a = K[i - 1], b = K[i], u = (t - a[0]) / (b[0] - a[0] || 1); return a[1] + (b[1] - a[1]) * (u * u * (3 - 2 * u)); } return K[K.length - 1][1]; };
-const dotXf = (t) => dotXb(t) + wobX(t);
+const spinEnv = (t) => wnd(T_SPIN0, T_FALL - 0.1, t, 0.45);
+const spinPhi = (t) => 2 * PI * 0.8 * (t - T_SPIN0);
+const dotXf = (t) => { const e = spinEnv(t), b = dotXb(t) + wobX(t); return e > 0 ? lerp(b, samXf(t) + 150 * Math.cos(spinPhi(t)), e) : b; };
+const dotYf = (t) => { const e = spinEnv(t); return e > 0 ? lerp(GND - 2, GND + 8 + 50 * Math.sin(spinPhi(t)), e) : GND - 2; };
+const dotPos = (t) => [dotXf(t), dotYf(t)];
 const dotVis = (t) => Math.max(ss(0.3, 0.6, t) * (1 - ss(T_OFF1 - 0.08, T_OFF1, t)), ss(T_ON2, T_ON2 + 0.25, t) * (1 - ss(T_OFF2 - 0.1, T_OFF2, t)));
 
 // ---- samurai x (ground contact), face, hop, lean, lying ----
@@ -68,17 +70,11 @@ const dizzy = (t) => wnd(T_BUMP + 0.15, T_CALM, t, 0.3) + 0.9 * wnd(T_SPIN0 + 1.
 
 // ---- the beam: dot hit (floor or samurai body), mirror tilt solved from the reflection law ----
 const FLOORY = GND - 2;
-function dirOut(xd) { const dx = xd - MX, dy = FLOORY - MY, l = Math.hypot(dx, dy); return [dx / l, dy / l]; }
-function mirrorN(t) { const o = dirOut(dotXf(t)), nx = o[0] - D_IN[0], ny = o[1] - D_IN[1], l = Math.hypot(nx, ny); return [nx / l, ny / l]; }   // plate normal (toward the light)
+function dirOut(xd, yd = FLOORY) { const dx = xd - MX, dy = yd - MY, l = Math.hypot(dx, dy); return [dx / l, dy / l]; }
+function mirrorN(t) { const o = dirOut(dotXf(t), dotYf(t)), nx = o[0] - D_IN[0], ny = o[1] - D_IN[1], l = Math.hypot(nx, ny); return [nx / l, ny / l]; }   // plate normal (toward the light)
 function mirrorBeta(t) { const n = mirrorN(t); return Math.atan2(n[1], n[0]); }
 function mirrorEnds(t) { const n = mirrorN(t), tv = [-n[1], n[0]]; if (tv[1] > 0) { tv[0] = -tv[0]; tv[1] = -tv[1]; } return { top: [MX + tv[0] * MLEN / 2, MY + tv[1] * MLEN / 2], bot: [MX - tv[0] * MLEN / 2, MY - tv[1] * MLEN / 2], n }; }
-function dotHit(t, sx, sy) {   // first thing the reflected ray touches: samurai body (box) or the floor
-  const o = dirOut(dotXf(t)); let best = { x: dotXf(t), y: FLOORY, body: false };
-  const bx0 = sx - 78, bx1 = sx + 78, by0 = sy - 94, by1 = GND;
-  // ray from the mirror going left: param along x
-  const xr = bx1; if (false) { const u = (xr - MX) / o[0], y = MY + o[1] * u; if (y >= by0 && y <= by1) best = { x: xr, y, body: true }; }
-  return best;
-}
+function dotHit(t) { const p = dotPos(t); return { x: p[0], y: p[1], body: false, front: spinEnv(t) > 0.05 && p[1] > GND + 14 }; }
 // ---- Mochi ----
 const swatAt = (t) => { const c = mirrorEnds(t); return clamp((c.top[1] - 1180) / 60, 0, 1); };
 const sweatS = (t) => Math.max(0.5 * wnd(2.9, 7.6, t, 0.6), 0.7 * wnd(T_BUMP, T_CALM + 0.6, t, 0.3), 0.8 * wnd(T_SPIN0, T_FALL + 0.5, t, 0.4));
@@ -254,13 +250,14 @@ function mochiArm(c, t) {   // far arm: drawn BEHIND the body so the shoulder is
   c.fillStyle = '#F3D9B8'; c.strokeStyle = INKC; c.lineWidth = 3; c.beginPath(); c.arc(C[0] - 3, C[1], 13, 0, PI2); c.fill(); c.stroke();
   c.strokeStyle = 'rgba(120,70,30,0.7)'; c.lineWidth = 2; for (const dy of [-5, 0, 5]) { c.beginPath(); c.moveTo(C[0] - 13, C[1] + dy); c.lineTo(C[0] - 6, C[1] + dy); c.stroke(); } c.restore();
 }
+function dotWithTrail(cx, t, hit, dv) { for (let k = 1; k <= 4; k++) { const tp = t - 0.025 * k, pp = dotPos(tp); if (Math.hypot(pp[0] - hit.x, pp[1] - hit.y) > 25) dotDraw(cx, { x: pp[0], y: pp[1] }, dv * (1 - k / 5) * 0.6, false); } dotDraw(cx, hit, dv, false); }
 function beamLayer(c, t, dv, hit) {   // reflected beam is drawn UNDER the samurai, so he blocks it and the dot is hidden when it is behind him
   if (dv < 0.02) return; c.save(); c.globalCompositeOperation = 'screen'; beamPoly(c, [MX, MY], [hit.x, hit.y], 40, 24, 0.55 * dv, '255,238,175'); c.restore();
 }
 // ---------- render ----------
 function renderFrame(T) {
   const t = ((T % DUR) + DUR) % DUR, S_ = samAt(t), sam = S_.st, hands = samHandsAt(S_, t), P = S_.P, mst = mochiWithPaw(t);
-  const dv = dotVis(t), dxT = dotXf(t), hit = dotHit(t, P.xs + (P.x - P.xs), P.y);
+  const dv = dotVis(t), dxT = dotXf(t), hit = dotHit(t);
   const eyes = samEyesAt(t, S_, hit), g = samGeom(sam, t), mouthG = g.X(0.16, 0.74), bump = pulse(t, T_BUMP + 0.05, 0.25);
   composeFrame([540, 960, 1], { noHalo: true,
     pre: (cx) => { bgRoom(cx, t); pillar(cx, bump); paperShadow(cx, P.xs, GND + 10, 140, 0.5 * (1 - 0.5 * P.lie)); paperShadow(cx, 870, GND + 8, 230, 0.42); },
@@ -270,11 +267,11 @@ function renderFrame(T) {
       mochiArm(cx, t);
       drawCat(cx, mst, t);
       beamLayer(cx, t, dv, hit);
-      if (!hit.body) { for (let k = 1; k <= 4; k++) { const tp = t - 0.025 * k, xp = dotXf(tp); if (Math.abs(xp - hit.x) > 25) dotDraw(cx, { x: xp, y: hit.y }, dv * (1 - k / 5) * 0.6, false); } dotDraw(cx, hit, dv, false); }
+      if (!hit.front) dotWithTrail(cx, t, hit, dv);
       samLegs(cx, sam, t); samInk(cx, sam, t, 0.5); samOver(cx, Object.assign({}, sam, { band: { a: 0 }, e: { a: 0 }, sweat: 0, a: 0.28 }), t); samBand(cx, sam, t); samEyes(cx, sam, t, eyes[0], eyes[1]);
       const mw = sMouthAt(t); if (mw > 0.08) { const m = mouthG, o = 0.3 + 0.9 * mw; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.1 * (0.6 + 0.4 * mw), SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#7A1B15'; cx.beginPath(); cx.ellipse(0, SAMS * 0.02, SAMS * 0.07 * (0.6 + 0.4 * mw), SAMS * 0.07 * o, 0, 0, 7); cx.fill(); cx.restore(); }
       samArms(cx, sam, t, hands, 0.17);
-      if (hit.body) dotDraw(cx, hit, dv, true);
+      if (hit.front) dotWithTrail(cx, t, hit, dv);
       // stars while dizzy
       const dz = clamp(dizzy(t)), Hc = g.X(0.0, -1.2); if (dz > 0.05) for (let k = 0; k < 3; k++) { const a = t * 3.6 + k * 2.094; star(cx, Hc[0] + 62 * Math.cos(a), Hc[1] - 30 + 13 * Math.sin(a), 11, t * 2 + k, dz); }
       // impact dust at the pillar
