@@ -1,19 +1,20 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Gravity Wells: balls launched one at a time past 3 gravity wells; the well that catches each ball scores. Frame = pure function of t. R=25 constant. 6-sample motion blur.
+// Color War: 40 balls, 5 colours; touching balls of different colours -> one adopts the other's colour (50/50). Last colour wins. Frame = pure function of t. R=25 constant. 30 fps, 6-sample motion blur.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const D=DATA,R=D.r,HZ=D.hz,B=D.balls,WL=D.wells,WH=D.wh,NB=B.length,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
-const WN=['Cyan','Pink','Gold'];
-const TH={a:'#2a1030',b:'#0c0410',g:'200,80,200',d:'240,170,240'};
+const D=DATA,R=D.r,HZ=D.hz,N=D.n,WH=D.wh,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
+const NAMES=['Cyan','Pink','Gold','Green','Violet'];
+const THEMES=[{a:'#0c2316',b:'#040b07',g:'60,160,90',d:'170,240,190'},{a:'#1c2a0c',b:'#080d03',g:'150,190,50',d:'215,240,150'}];
+const TH={a:'#2a1e0c',b:'#0d0803',g:'210,150,50',d:'255,220,150'};   // amber dusk theme
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
 function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 const framePath=()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],FR[4])};
 function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
- const r=c.createRadialGradient(540,910,60,540,910,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
+ const r=c.createRadialGradient(540,960,60,540,960,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
  c.save();c.beginPath();c.rect(0,0,W,H);c.roundRect(FR[0]-2,FR[1]-2,FR[2]+4,FR[3]+4,FR[4]);c.clip('evenodd');
- c.strokeStyle=`rgba(${TH.d},.15)`;c.lineWidth=2.5;for(let k=0;k<8;k++){c.beginPath();c.arc(540,910,420+k*140,0,TAU);c.stroke()}
- c.strokeStyle=`rgba(${TH.d},.10)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+ c.strokeStyle=`rgba(${TH.d},.14)`;c.lineWidth=2.5;for(let k=0;k<8;k++){c.beginPath();c.arc(540,960,420+k*140,0,TAU);c.stroke()}
+ c.strokeStyle=`rgba(${TH.d},.09)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
  const rr=sr(83);for(let k=0;k<80;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
  c.restore();c.save();framePath();c.fillStyle='rgba(2,2,8,.6)';c.fill();c.restore()}
 function sphere(x,y,h,a){c.save();c.globalAlpha=a;
@@ -28,40 +29,33 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
  c.restore()}
 
 
-function posAt(b,t){const P=b.p,n=P.length/2-1,f=Math.max(0,(t-b.t0)*HZ);if(f>n)return null;const k=Math.floor(f),u=f-k,k2=Math.min(n,k+1);return[P[2*k]+(P[2*k2]-P[2*k])*u,P[2*k+1]+(P[2*k2+1]-P[2*k+1])*u]}
-function slot(w,n){const a=(90+n*120)*Math.PI/180;return[WL[w][0]+62*Math.cos(a),WL[w][1]+62*Math.sin(a)]}
+
+// per-ball colour change lists
+const CH=Array.from({length:N},()=>[]);for(const [t,b,o,n] of D.chg)CH[b].push([t,o,n]);
+const FADE=.28;
+function state(i,t){let col=D.c0[i],prev=col,u=1;for(const [tc,o,n] of CH[i]){if(tc<=t){prev=o;col=n;u=sm((t-tc)/FADE)}else break}return [prev,col,u]}
+function pos(i,t){const P=D.p[i],f=Math.max(0,Math.min(P.length/2-1.001,t*HZ)),k=Math.floor(f),u=f-k;return[P[2*k]+(P[2*k+2]-P[2*k])*u,P[2*k+1]+(P[2*k+3]-P[2*k+1])*u]}
 function render(t){
  bg();
  c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
- // wells
- const cnt=[0,0,0];for(const b of B)if(t>=b.t0+b.tc)cnt[b.w]++;
- WL.forEach((w,i)=>{const h=WH[i];
-  c.save();c.globalCompositeOperation='lighter';for(const rad of [70,125,185]){c.strokeStyle=`hsla(${h},80%,70%,.10)`;c.lineWidth=2;c.beginPath();c.arc(w[0],w[1],rad,0,TAU);c.stroke()}
-  const g=c.createRadialGradient(w[0],w[1],0,w[0],w[1],130);g.addColorStop(0,`hsla(${h},90%,60%,.40)`);g.addColorStop(1,`hsla(${h},90%,60%,0)`);c.fillStyle=g;c.beginPath();c.arc(w[0],w[1],130,0,TAU);c.fill();c.restore();
-  c.save();c.shadowColor=`hsl(${h},90%,70%)`;c.shadowBlur=22;c.strokeStyle='#fff';c.lineWidth=5;c.beginPath();c.arc(w[0],w[1],R+1,0,TAU);c.stroke();c.restore();
-  c.save();c.fillStyle=`hsl(${h},90%,75%)`;c.beginPath();c.arc(w[0],w[1],7,0,TAU);c.fill();
-  c.font='800 52px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;c.fillText(cnt[i],w[0],w[1]+114);c.restore()});
- // launcher marker (hollow ring, ball size)
- c.save();c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=4;c.beginPath();c.arc(D.lx,D.ly,R+1,0,TAU);c.stroke();c.restore();
- // persistent paths of finished balls
- let cur=-1;for(let k=0;k<NB;k++)if(t>=B[k].t0)cur=k;
- for(let k=0;k<=cur;k++){const b=B[k],n=b.p.length/2-1,end=Math.min(n,Math.floor(Math.max(0,t-b.t0)*HZ));c.save();c.lineCap='butt';c.lineJoin='round';c.strokeStyle=`hsla(${WH[b.w]},85%,70%,${t>=b.t0+b.tc?.30:.18})`;c.lineWidth=3;c.beginPath();c.moveTo(b.p[0],b.p[1]);for(let q=1;q<=end;q++)c.lineTo(b.p[2*q],b.p[2*q+1]);c.stroke();c.restore()}
- // captured balls rest around their well; active ball with trail
- const nth=[0,0,0];
- for(let k=0;k<NB;k++){const b=B[k];if(t>=b.t0+b.tc){const s=slot(b.w,nth[b.w]++);sphere(s[0],s[1],b.h,1)}}
- if(cur>=0){const b=B[cur];if(t<b.t0+b.tc){const p=posAt(b,t);if(p){const pts=[];for(let q=0;q<=32;q++){const pp=posAt(b,Math.max(b.t0,t-q*.012));pts.push(pp||p)}trail(pts,b.h,1);sphere(p[0],p[1],b.h,1)}}}
- else sphere(D.lx,D.ly,B[0].h,1);
- // waiting ball on the launcher between shots
- if(cur>=0&&cur<NB-1&&t>=B[cur].t0+B[cur].tc&&t<B[cur+1].t0)sphere(D.lx,D.ly,B[cur+1].h,1);
- if(cur<0)sphere(D.lx,D.ly,B[0].h,1);
+ // colour shares (smooth) for the bar
+ const share=[0,0,0,0,0],S=[];for(let i=0;i<N;i++){const s=state(i,t);S.push(s);share[s[0]]+=1-s[2];share[s[1]]+=s[2]}
+ // balls: trails then spheres
+ for(let i=0;i<N;i++){const [pc,cc,u]=S[i],p=pos(i,t),pts=[];for(let q=0;q<=14;q++)pts.push(pos(i,Math.max(0,t-q*.0085)));trail(pts,WH[cc],.8)}
+ for(let i=0;i<N;i++){const [pc,cc,u]=S[i],p=pos(i,t);if(u<1)sphere(p[0],p[1],WH[pc],1);sphere(p[0],p[1],WH[cc],u>=1?1:u)}
+ // bar
+ let x=90;const BW=900,BY=300,BH=44;
+ c.save();for(let k=0;k<5;k++){const w=share[k]/N*BW;if(w<1)continue;c.fillStyle=`hsl(${WH[k]},62%,56%)`;c.beginPath();c.roundRect(x,BY,Math.max(2,w-5),BH,12);c.fill();
+  if(w>60){c.fillStyle='rgba(10,10,25,.85)';c.font='800 30px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(Math.round(share[k]),x+(w-5)/2,BY+BH/2+1)}x+=w}c.restore();
  // text
- let ball=Math.max(0,cur),done=cur>=0&&t>=B[cur].t0+B[cur].tc,top,cap;
- if(cur===NB-1&&done&&t>B[cur].t0+B[cur].tc+.25){const m=Math.max(...cnt),w=cnt.map((v,i)=>v==m?i:-1).filter(i=>i>=0);top='All 8 caught';cap=w.length>1?w.map(i=>WN[i]).join(' and ')+' tie with '+m+' each.':WN[w[0]]+' wins with '+m+'.'}
- else{top='Ball '+(ball+1)+' of '+NB;cap=done?('Caught by the '+WN[B[cur].w]+' well!'):'Which well will catch it?'}
+ let alive=5;for(const k in D.dead)if(D.dead[k]<=t)alive--;
+ let top,cap;
+ if(t>=D.tend){top=NAMES[D.winner]+' wins';cap='One colour takes over the box.'}
+ else{top=alive+' colours';cap='Touch and the colour spreads.';let lastK=-1,lastT=-1;for(const k in D.dead){if(D.dead[k]<=t&&D.dead[k]>lastT){lastT=D.dead[k];lastK=+k}}if(lastK>=0&&t-lastT<2.2)cap=NAMES[lastK]+' is out!'}
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
  c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
 window.render=render;
-const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
+const FPSV=+(new URLSearchParams(location.search).get('fps')||30),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
 function blurFrame(t){for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0)}
 window.grabPNG=t=>{blurFrame(t);return cv.toDataURL('image/png').split(',')[1]};
