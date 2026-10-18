@@ -15,14 +15,15 @@ function samBase(w) {
   if (w < 3.38) h = PLAT.h; else if (w < 3.72) h = KSp([[3.38, 4], [3.50, 5.2], [3.72, 0]], w);
   if (w > 3.26 && w < 3.38) sy = 1 - 0.10 * sst((w - 3.26) / 0.12);
   if (w >= 3.72 && w < 3.96) sy = 1 - 0.15 * Math.sin(Math.PI * (w - 3.72) / 0.24);
-  if (w > 12.4 && w < 12.9) sy = 1 + 0.05 * Math.sin(Math.PI * (w - 12.4) / 0.5);
+  if (w > 12.33 && w < 12.57) { const k = (w - 12.45) / 0.12; h = Math.max(h, 8.0 * (1 - k * k)); }                       // hop to reach the egg on Mochi's head (arm reach is only ~0.72 S)
+  if (w >= 12.57 && w < 12.8) sy = 1 - 0.12 * Math.sin(Math.PI * (w - 12.57) / 0.23);
   let lean = 0;
   if (w > 3.7 && w < 4.9) lean = 0.05 * Math.sin((w - 3.7) * 9);                     // staggering under the juggled egg
   if (w > 7.86 && w < 8.5) lean = -0.1 * Math.sin(Math.PI * ramp(w, 7.86, 8.5)) ;     // recoils when the paw hits
   if (w > 18.5 && w < 19.3) lean = -0.03;
   if (w >= 23.85 && w < 25.7) {                                                      // the dive
-    cc = KSp([[23.85, 11.1], [23.95, 9.4], [24.02, 9.6], [24.12, 9.0], [24.22, 8.2], [24.30, 5.8], [24.36, 4.9], [24.6, 4.9], [24.9, 4.9], [25.25, 8.5], [25.6, 11.1], [25.7, 11.1]], w);
-    rot = KSp([[23.95, 0], [24.12, 1.5], [24.3, 1.5708], [24.9, 1.5708], [25.25, 0.5], [25.45, -0.1], [25.6, 0], [25.7, 0]], w);
+    cc = KSp([[23.85, 11.1], [23.95, 9.4], [24.02, 9.2], [24.12, 8.6], [24.22, 8.0], [24.30, 7.6], [24.6, 7.6], [24.9, 7.6], [25.25, 9.2], [25.6, 11.1], [25.7, 11.1]], w);
+    rot = KSp([[23.95, 0], [24.12, 0.8], [24.3, 0.95], [24.9, 0.95], [25.25, 0.45], [25.5, 0.0], [25.7, 0]], w);
     sy = w < 24.02 ? 0.88 : w < 24.3 ? 1.2 : (w < 24.5 ? 1.02 : 1);
   }
   const breath = 0.012 * Math.sin(w * 3.2);
@@ -32,7 +33,7 @@ function samBase(w) {
   if (CUE.samWalkOn(w)) st.walk = CUE.phAt(CUE.samPh, w);
   return { st, u, h, dive: cc != null, cc };
 }
-const holdPx = (w, sm) => { sm = sm || samBase(w); const g = samGeom(sm.st, w); return g.X(1.05, 0.92); };
+const holdPx = (w, sm) => { sm = sm || samBase(w); const g = samGeom(sm.st, w); const hi = ramp(w, 12.45, 12.66) * (1 - ramp(w, 13.1, 13.6)); return g.X(0.95 + 0.0 * hi, 0.85 - 1.2 * hi); };   // held high while Mochi's face is next to it
 // ================================================================= MOCHI (floor, table, pot)
 const P_PAW = clonePose(P_POUNCE); P_PAW.L.FN = [20, 6, 64, -9]; P_PAW.L.FF = [14, 6, 56, -4];
 const P_SWATJ = clonePose(P_STAND); P_SWATJ.L = { FN: [17, 9, 52, -14], FF: [10, 9, 42, -9], HN: [-19, 9, -14, -7], HF: [-25, 9, -22, -4] }; P_SWATJ.b[4] = -0.1; P_SWATJ.h = [34, -66, -0.1, 1];
@@ -123,7 +124,6 @@ function arc(w, w0, T, a, b) {                                                  
   const g = GR * SC, t = w - w0, vx = (b[0] - a[0]) / T, vy = (b[1] - a[1] - 0.5 * g * T * T) / T; return [a[0] + vx * t, a[1] + vy * t + 0.5 * g * t * t]; }
 const EU = [[17.05, 6.0], [18.25, 6.0], [18.9, 5.0], [19.4, 4.6], [20.6, 4.6], [21.2, 3.2], [21.7, 2.7], [22.8, 2.7], [23.2, 1.4], [23.6, 0.2], [24.0, -0.55], [24.2, -1.0]];
 const tableEggPx = (w) => { const u = KSp(EU, w), p = px(u, TAB.egg, TAB.eggQ); return [p[0], p[1], u]; };
-function diveHands(w, sm) { const g = samGeom(sm.st, w), a = g.X(0.5, -2.0), b = g.X(0.5, -2.5); return [a, b]; }
 function eggAt(w) {
   let p, ang = 0, sq = 1, layer = 'front', a = 1;
   const S = SAMS;
@@ -133,43 +133,45 @@ function eggAt(w) {
   else if (w < 4.50) { p = arc(w, 4.12, 0.38, holdPx(4.12), holdPx(4.50)); ang = -0.35 + (w - 4.12) * 7; }
   else if (w < 7.87) { p = holdPx(w); ang = 0.04 * Math.sin(w * 3.1); }
   else if (w < 8.28) { p = arc(w, 7.87, 0.41, holdPx(7.87), eggRest(8.28)); ang = (w - 7.87) * 12; }
-  else if (w < 12.3) { p = eggRest(w); ang = damp(w, 8.28, 0.22, 0.5, 0.42) + damp(w, 9.6, 0.1, 0.4, 0.5) + damp(w, 10.6, 0.14, 0.4, 0.5) + damp(w, 11.7, 0.35, 0.5, 0.5); sq = 1 - 0.08 * pulse(w, 8.3, 0.05); }
-  else if (w < 12.8) { const k = ramp(w, 12.3, 12.8), a0 = eggRest(12.3), b0 = holdPx(12.8); p = [lerpK(a0[0], b0[0], k), lerpK(a0[1], b0[1], k) - 22 * Math.sin(Math.PI * k)]; }
+  else if (w < 12.45) { p = eggRest(w); ang = damp(w, 8.28, 0.22, 0.5, 0.42) + damp(w, 9.6, 0.1, 0.4, 0.5) + damp(w, 10.6, 0.14, 0.4, 0.5) + damp(w, 11.7, 0.35, 0.5, 0.5); sq = 1 - 0.08 * pulse(w, 8.3, 0.05); }
+  else if (w < 12.8) { const k = ramp(w, 12.45, 12.66), a0 = eggRest(12.45), b0 = holdPx(w); p = [lerpK(a0[0], b0[0], k), lerpK(a0[1], b0[1], k) - 14 * Math.sin(Math.PI * k)]; }
   else if (w < 16.7) { p = holdPx(w); ang = 0.04 * Math.sin(w * 3.1); }
   else if (w < 17.05) { const k = ramp(w, 16.7, 17.05), a0 = holdPx(16.7), b0 = tableEggPx(17.05); p = [lerpK(a0[0], b0[0], k), lerpK(a0[1], b0[1], k) - 10 * Math.sin(Math.PI * k)]; layer = 'front'; }
   else if (w < 24.2) { const t = tableEggPx(w); p = [t[0], t[1]]; ang = 0.32 * Math.sin((t[2] - 6.0) * 1.3) + damp(w, 17.05, 0.12, 0.2, 0.3) + (w > 23.9 ? 0.5 * ramp(w, 23.9, 24.2) : 0); if (w > 24.0) p[1] += 6 * ramp(w, 24.0, 24.2); }
-  else if (w < 24.31) { const a0 = tableEggPx(24.199); const sm = samBase(24.31), hh = diveHands(24.31, sm), tg = [(hh[0][0] + hh[1][0]) / 2, (hh[0][1] + hh[1][1]) / 2 - 30]; a0[1] += 6; p = arc(w, 24.2, 0.11, a0, tg); ang = 0.5 + (w - 24.2) * 5; }
-  else if (w < 25.0) { const sm = samBase(w), hh = diveHands(w, sm); p = [(hh[0][0] + hh[1][0]) / 2, (hh[0][1] + hh[1][1]) / 2 - 30]; ang = 0.5 * (1 - ramp(w, 24.31, 24.6)) + 0.05; sq = 1 - 0.12 * pulse(w, 24.33, 0.04); }
-  else if (w < 25.3) { const sm = samBase(w), hh = diveHands(w, sm), k = ramp(w, 25.0, 25.3), a0 = [(hh[0][0] + hh[1][0]) / 2, (hh[0][1] + hh[1][1]) / 2 - 30], b0 = holdPx(w, sm); p = [lerpK(a0[0], b0[0], k), lerpK(a0[1], b0[1], k)]; }
-  else if (w < 27.88) { p = holdPx(w); ang = 0.04 * Math.sin(w * 3.1); }
-  else if (w < 28.22) { const tg = px(28.6, POT.h - 1.3, POT.q); p = arc(w, 27.88, 0.34, holdPx(27.88), tg); ang = (w - 27.88) * 8; if (w > 28.12) layer = 'pot'; }
+  else if (w < 24.31) { const a0 = tableEggPx(24.199), b = bowlAt(24.31); a0[1] += 6; p = arc(w, 24.2, 0.11, a0, [b[0], b[1] - 8]); ang = 0.5 + (w - 24.2) * 5; }
+  else if (w < 27.88) { const b = bowlAt(w), t = w - 24.31, k1 = clampK(b[2] / 0.95, 0, 1), c = Math.cos(b[2]), sn = Math.sin(b[2]), ox = 34 * k1, oy = -8 - 8 * k1, wb = 3.5 * Math.exp(-t / 0.25) * Math.sin(TAU * t / 0.11); p = [b[0] + wb + ox * c - oy * sn, b[1] + ox * sn + oy * c]; ang = b[2] * 0.6 + 0.3 * Math.exp(-t / 0.3) * Math.sin(TAU * t / 0.13); layer = 'bowl'; sq = 1 - 0.1 * pulse(w, 24.33, 0.04); }
+  else if (w < 28.22) { const b0 = bowlAt(27.88), c = Math.cos(b0[2]), sn = Math.sin(b0[2]), tg = px(28.6, POT.h - 1.3, POT.q); p = arc(w, 27.88, 0.34, [b0[0] + 34 * c + 8 * sn, b0[1] + 34 * sn - 16 * c], tg); ang = (w - 27.88) * 8; if (w > 28.12) layer = 'pot'; }
   else { const u = 28.6, bob = damp(w, 28.22, 1.6, 0.45, 0.55); p = px(u + 0.1 * Math.sin(w * 3), POT.h - 1.9 - bob * 0.35 + 0.18 * Math.sin(w * 2.4), POT.q + 1.6); layer = 'pot'; ang = 0.2 * Math.sin(w * 2.1) + 0.2; }
   return { p, ang, sq, layer, a };
 }
 function eggRest(w) { const t = headTop(w); return [t[0], t[1] - EGG_R - 3]; }
 // ================================================================= samurai hands / expression (depends on the egg)
 function samFinal(w) {
-  const sm = samBase(w), st = sm.st, f = st.face, g = samGeom(st, w), S = SAMS, egg = eggAt(w), E = egg.p, hold = g.X(1.05, 0.92);
-  const idleL = g.X(-1.3, 0.95), idleR = g.X(1.3, 0.95);
-  const cradle = (e) => [[e[0] - 22 * f, e[1] + 16], [e[0] + 22 * f, e[1] + 16]];
+  const sm = samBase(w), st = sm.st, f = st.face, g = samGeom(st, w), S = SAMS, egg = eggAt(w), E = egg.p, hold = holdPx(w, sm);
+  const sh1 = g.X(0.85, 0.5), sh2 = g.X(-0.85, 0.5);
+  const idleB = g.X(-1.18, 1.02 + 0.03 * Math.sin(w * 2.1 + 1) + (st.walk != null ? 0.06 * Math.sin(st.walk) : 0)), idleF = g.X(1.18, 1.02 + 0.03 * Math.sin(w * 2.1));
+  const L2 = (a, b, k) => [lerpK(a[0], b[0], k), lerpK(a[1], b[1], k)];
   let hands = null, look = [0.3, 0.1], wide = 0, closed = 0, sweat = 0, squeeze = 0;
-  const rubL = Math.sin(TAU * 2.4 * w);
-  if (w < 3.45 || (w >= 4.5 && w < 7.87) || (w >= 12.8 && w < 16.7) || (w >= 25.3 && w < 27.7)) hands = cradle(hold);
-  else if (w < 4.5) hands = cradle([E[0], E[1] + 4]);
-  else if (w < 8.9) { const k = ramp(w, 7.87, 8.0); hands = [[lerpK(hold[0] - 22 * f, hold[0] + 34 * f, k), lerpK(hold[1] + 16, hold[1] - 60, k)], [lerpK(hold[0] + 22 * f, hold[0] + 62 * f, k), lerpK(hold[1] + 16, hold[1] - 40, k)]]; }
-  else if (w < 12.3) { const k = ramp(w, 8.9, 11.5), tx = E[0], ty = E[1]; hands = [[lerpK(hold[0] + 34 * f, tx - 52 * f, k), lerpK(hold[1] - 60, ty + 10, k)], [lerpK(hold[0] + 62 * f, tx + 52 * f, k), lerpK(hold[1] - 40, ty + 10, k)]]; }
-  else if (w < 12.8) hands = cradle(E);
-  else if (w < 17.0) hands = cradle(E);
-  else if (w < 17.5) { const k = ramp(w, 17.05, 17.25), br = g.X(0.8, -0.35); const a = [lerpK(hold[0] - 22 * f, br[0] + 8 * Math.sin(w * 14) * f, k), lerpK(hold[1] + 16, br[1], k)]; hands = [a, idleL]; if (w > 17.3) hands = [[br[0] + 12 * Math.sin((w - 17.3) * 16) * f, br[1]], g.X(-1.3, 0.95)]; }
-  else if (w < 21.5) hands = null;
-  else if (w < 23.98) {
-    const bp = bowlAt(w), c = [bp[0], bp[1]]; hands = [[c[0] - 30 * f, c[1] + 8], [c[0] + 30 * f, c[1] + 8]];
-  }
-  else if (w < 25.0) hands = diveHands(w, sm);
-  else if (w < 25.3) { const k = ramp(w, 25.0, 25.3), d = diveHands(w, sm), c = cradle(hold); hands = [[lerpK(d[0][0], c[0][0], k), lerpK(d[0][1], c[0][1], k)], [lerpK(d[1][0], c[1][0], k), lerpK(d[1][1], c[1][1], k)]]; }
-  else if (w < 28.6) { const k = ramp(w, 27.7, 27.9) * (1 - ramp(w, 28.2, 28.6)), c = cradle(hold); hands = [[c[0][0] + 34 * f * k, c[0][1] - 52 * k], [c[1][0] + 46 * f * k, c[1][1] - 40 * k]]; }
-  else hands = null;
+  const holdF = [hold[0] - 3 * f, hold[1] + 19], holdOne = [holdF, idleB];                     // ONE hand carries the egg, the other arm hangs (reach limit ~0.72 S per arm)
+  const up = [g.X(1.35, 0.1), g.X(-1.35, 0.1)], chest = [g.X(0.55, 0.6 + 0.02 * Math.sin(w * 17)), g.X(-0.55, 0.6 + 0.02 * Math.sin(w * 17 + 1))];
+  if (w < 3.45) hands = holdOne;
+  else if (w < 4.5) { let dip = 0; for (const tc of [3.45, 3.80, 4.12]) dip -= 7 * Math.exp(-Math.pow((w - tc) / 0.05, 2)); for (const tc of [3.80, 4.12, 4.50]) dip += 5 * Math.exp(-Math.pow((w - tc) / 0.06, 2)); hands = [[holdF[0], holdF[1] + dip], idleB]; }
+  else if (w < 7.87) hands = holdOne;
+  else if (w < 8.9) hands = [L2(holdF, up[0], ramp(w, 7.87, 8.0)), L2(idleB, up[1], ramp(w, 7.87, 8.0))];
+  else if (w < 12.28) { const k = ramp(w, 8.9, 9.4); hands = [L2(up[0], chest[0], k), L2(up[1], chest[1], k)]; }
+  else if (w < 12.45) { const k = ramp(w, 12.28, 12.45), gr = [[E[0] - 22 * f, E[1] + 6], g.X(-0.6, 0.15)]; hands = [L2(chest[0], gr[0], k), L2(chest[1], gr[1], k)]; }
+  else if (w < 12.8) { const k = ramp(w, 12.45, 12.66); hands = [[E[0] + lerpK(-22 * f, -3 * f, k), E[1] + lerpK(6, 19, k)], L2(g.X(-0.6, 0.15), idleB, k)]; }
+  else if (w < 17.05) hands = holdOne;
+  else if (w < 17.5) { const k = ramp(w, 17.05, 17.25), wv = g.X(1.1, -0.02); const a = [wv[0] + (w > 17.3 ? 12 * Math.sin((w - 17.3) * 16) * f : 0), wv[1]]; hands = [L2(holdF, a, k), L2(idleB, g.X(-1.2, 0.35), k)]; }
+  else if (w < 17.85 && w >= 17.5) { const k = ramp(w, 17.5, 17.85), wv = g.X(1.1, -0.02), a = [wv[0] + 12 * Math.sin((w - 17.3) * 16) * f * (1 - k), wv[1]]; hands = [L2(a, idleF, k), L2(g.X(-1.2, 0.35), idleB, k)]; }
+  else if (w < 21.45) hands = null;
+  else if (w < 23.88) { const rub = Math.sin(TAU * 2.4 * w), bp = bowlAt(w), ka = ramp(w, 21.45, 21.85); hands = [L2(idleF, [bp[0] - 0.36 * S * f + 9 * rub * ka * f, bp[1] + 0.12 * S + 4 * ka * Math.cos(TAU * 2.4 * w)], ka), L2(idleB, g.X(-1.1, 0.8), ka)]; }
+  else { const b = bowlAt(w), c = Math.cos(b[2]), sn = Math.sin(b[2]), o = (x, y) => [b[0] + x * c - y * sn, b[1] + x * sn + y * c]; const kd = ramp(w, 23.88, 24.04), rubP = [b[0] - 0.36 * S * f + 9 * Math.sin(TAU * 2.4 * 23.88) * f, b[1] + 0.12 * S + 4 * Math.cos(TAU * 2.4 * 23.88)]; let F = (w < 25.0 && w >= 23.88) ? L2(rubP, [b[0] - 0.42 * S * f, b[1] + 24], kd) : (w < 25.7 && w >= 25.0) ? L2([b[0] - 0.42 * S * f, b[1] + 24], o(0, 46), ramp(w, 25.0, 25.7)) : o(0, 46);
+    const Bk = (w >= 23.88 && w < 25.0) ? L2(g.X(-1.1, 0.8), [sh2[0] - 0.45 * S * f, sh2[1] - 0.4 * S], kd) : L2([sh2[0] - 0.45 * S * f, sh2[1] - 0.4 * S], idleB, ramp(w, 24.9, 25.4)); hands = [F, Bk]; }
   if (!hands && st.walk == null) hands = [g.X(1.18, 1.02 + 0.03 * Math.sin(w * 2.1)), g.X(-1.18, 1.02 + 0.03 * Math.sin(w * 2.1 + 1))];
+  if (!hands) hands = [idleF, idleB];
+  window._rawHands = hands;
+  { const lim = 0.72 * S, cl = (hd, sh) => { const dx = hd[0] - sh[0], dy = hd[1] - sh[1], d = Math.hypot(dx, dy); return d > lim ? [sh[0] + dx * lim / d, sh[1] + dy * lim / d] : hd; }; hands = [cl(hands[0], sh1), cl(hands[1], sh2)]; }   // safety: an arm never stretches
   // eyes
   const eggLook = (p) => lookTo(f, [st.x, st.y], p, 150);
   if (w < 3.3) look = [0.1, 0.5]; else if (w < 4.6) { look = eggLook(E); wide = 0.8; } else if (w < 7.6) { look = w < 6.4 ? [0.1, 0.45] : [0.8, 0.25]; wide = ramp(w, 6.4, 7.0) * 0.3; }
@@ -190,15 +192,15 @@ function samFinal(w) {
 }
 // ---- bowl: rests on the stool, lifted at 20.3, polished until the dive, flies off at 23.98, wobbles on the floor
 function bowlAt(w) {
-  const sp = px(STOOL.u, STOOL.h + 0.1, STOOL.q);
-  if (w < 21.5) return [sp[0], sp[1] - 0, 0, 'rest'];
-  const sm = samBase(w), g = samGeom(sm.st, w), hold = g.X(1.0, 0.55);
-  if (w < 21.9) { const k = ramp(w, 21.5, 21.9); return [lerpK(sp[0], hold[0], k), lerpK(sp[1], hold[1], k) - 14 * Math.sin(Math.PI * k), 0, 'lift']; }
-  if (w < 23.98) return [hold[0] + 5 * Math.sin(TAU * 2.4 * w), hold[1] + 3 * Math.cos(TAU * 2.4 * w), 0.07 * Math.sin(TAU * 2.4 * w + 1), 'held'];
-  const h0 = g.X(1.0, 0.55), fl = px(-24.5, 0.0, 18.6);
-  if (w < 24.3) { const p = arc(w, 23.98, 0.32, [h0[0], h0[1]], [fl[0], fl[1]]); return [p[0], p[1], -(w - 23.98) * 14, 'fly']; }
-  const t = w - 24.3, wob = 0.45 * Math.exp(-t / 0.18) * Math.sin(TAU * t / 0.09);
-  return [fl[0], fl[1], wob, 'floor'];
+  const sp = px(STOOL.u, STOOL.h + 0.1, STOOL.q), S = SAMS, GY = px(0, 0, SQ)[1], am = ramp(w, 21.6, 22.0);
+  if (w < 23.88) return [sp[0] + 1.6 * am * Math.sin(TAU * 2.4 * w), sp[1], 0.04 * am * Math.sin(TAU * 2.4 * w + 1), 'rest'];     // polished where it stands (stool): one hand rubs, the bowl rocks
+  const FBf = (ww) => { const s2 = samBase(ww), g2 = samGeom(s2.st, ww), sh = g2.X(0.85, 0.5); return [sh[0] + 1.08 * S * s2.st.face, GY - 38]; };
+  const carry = (ww) => { const s2 = samBase(ww), g2 = samGeom(s2.st, ww), c = g2.X(1.15, 0.55); return [c[0], c[1]]; };
+  const t = w - 24.3, wob = w > 24.3 ? 0.45 * Math.exp(-t / 0.18) * Math.sin(TAU * t / 0.09) : 0;
+  if (w < 24.6) { const k = ramp(w, 23.88, 24.22), fb = FBf(w); return [lerpK(sp[0], fb[0], k), lerpK(sp[1], fb[1], k) - 22 * Math.sin(Math.PI * k), wob, 'fly']; }
+  if (w < 25.55) { const k = ramp(w, 24.95, 25.55), a = FBf(24.6), b = carry(w); return [lerpK(a[0], b[0], k), lerpK(a[1], b[1], k) - 10 * Math.sin(Math.PI * k), wob, 'floor']; }
+  const c = carry(w), k1 = ramp(w, 27.70, 27.88) * (1 - ramp(w, 27.92, 28.25)), f = samBase(w).st.face;
+  return [c[0] + 0.2 * S * f * k1, c[1] - 0.3 * S * k1, 0.95 * f * k1, 'carry'];
 }
 // ================================================================= layers
 function shadows(ctx, w, sf, cat, egg) {
@@ -226,6 +228,7 @@ function frontLayer(ctx, w, sf, cat) {
   if (cat._mode === 'pot') { ctx.save(); ctx.beginPath(); const { cx, rx } = potBody(); ctx.rect(cx - rx * 0.78, 0, rx * 3, 3000); ctx.clip(); drawPotFront(ctx); ctx.restore(); }
   const eg = sf.egg; if (eg.layer === 'front') drawEgg(ctx, eg.p[0], eg.p[1], eg.ang, eg.sq);
   const b = bowlAt(w); if (b[3] !== 'rest') drawBowl(ctx, b[0], b[1], b[2]);
+  if (eg.layer === 'bowl') { ctx.save(); ctx.beginPath(); ctx.rect(b[0] - 400, b[1] - 400, 800, 400 + 6); ctx.clip(); drawEgg(ctx, eg.p[0], eg.p[1], eg.ang, eg.sq); ctx.restore(); }
   drawSteam(ctx, w, cat._mode === 'pot' ? 0.8 : 1);
   dust(ctx, -26.4, 0, SQ + 0.6, w, 3.72, 1); dust(ctx, 0.6, 0, MQ + 0.4, w, 7.96, 0.8); dust(ctx, 17.8, TAB.h, 9.5, w, 17.08, 0.7); dust(ctx, -3.0, 0, SQ + 0.6, w, 24.3, 1.6); dust(ctx, -0.5, 0, MQ + 0.4, w, 24.98, 0.8);
   if (w > 24.0 && w < 24.5) for (let i = 0; i < 4; i++) { const p0 = px(-9 + 7 * (w - 24.0) / 0.3 - i * 2.2, 5 + 1.4 * i, SQ + 0.4); line(ctx, [[p0[0] - 60, p0[1]], [p0[0] - 12, p0[1]]], 'rgba(61,48,66,0.35)', 2.4); }       // speed lines behind the dive
