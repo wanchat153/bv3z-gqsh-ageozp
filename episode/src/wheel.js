@@ -3,17 +3,17 @@
 // Pure functions of t. Wheel speed w(t) and lamp brightness L(t) come from a tiny simulation (torque - drag), run until it is periodic.
 // Story: Mochi runs in a wheel -> the lantern is bright, the samurai draws. She tires -> the lantern dims. He dangles a dried fish on a rod -> she sprints, the lantern flares.
 // She bites the fish and braces to eat -> the wheel stops, the lantern dies. He begs; she sighs and starts running again; the light returns; he picks up the brush.
-const DUR = 6.4, PI = Math.PI;   // LOOP = 6.4 comes from core.js
+const DUR = 12.8, PI = Math.PI;   // 2 x LOOP (core.js LOOP = 6.4), so every periodic helper still closes
 const WX = 690, WY = 1130, RIN = 215, ROUT = 244, NSP = 8;          // wheel hub, inner (running) radius, outer radius, spokes
 const SXC = 170, SYC = 1203, MS = 2.4;                              // samurai x / body-centre y, Mochi scale
 const TB = { x0: 290, x1: 470, y: 1292 };                           // low table (top y)
 const LAMP = [392, 930];                                            // lantern centre
 const DYN = [786, 826];                                             // dynamo pulley centre (above the wheel)
-const T_LURE = 3.15, T_SEE = 3.95, T_BITE = 4.85, T_BEG = 5.45, T_BACK = 5.95;
+const T_TIRE = 2.0, T_STUM = 4.3, T_LURE = 5.3, T_SEE = 6.5, T_BITE = 8.7, T_BRACE = 9.45, T_BEG = 9.9, T_BACK = 11.1;   // beats of the 12.8 s loop
 // ---- effort of the runner (0..1.4) ----
-const U_KEYS = [[0, 1], [1.15, 1], [1.8, 0.3], [3.45, 0.3], [4.1, 1.35], [4.84, 1.35], [4.86, 0], [5.85, 0], [5.95, 2.4], [6.3, 1.1], [6.4, 1.0]];
-const uAt = (t) => { if (t >= 4.84 && t < 5.9) return t < 4.86 ? 1.35 : 0; return clamp(ks1(U_KEYS, t), 0, 1.6); };
-const brace = (t) => wnd(T_BITE, 5.5, t, 0.08);
+const U_KEYS = [[0, 1], [T_TIRE, 1], [3.2, 0.28], [T_STUM - 0.05, 0.28], [T_STUM, 0], [4.7, 0], [5.0, 0.25], [6.5, 0.25], [6.95, 1.35], [T_BITE - 0.02, 1.35], [T_BITE, 0], [11.0, 0], [11.15, 2.4], [11.9, 1.1], [12.8, 1.0]];
+const uAt = (t) => { if (t >= T_BITE - 0.02 && t < 11.0) return t < T_BITE ? 1.35 : 0; return clamp(ks1(U_KEYS, t), 0, 1.6); };
+const brace = (t) => wnd(T_BITE, T_BRACE, t, 0.08);
 const AW = 5.4, CW = 2.4, WMAX = 2.2;
 const gL = (w) => Math.pow(clamp(w / WMAX, 0, 1.7), 1.25);
 const SIM = (() => {
@@ -23,7 +23,7 @@ const SIM = (() => {
     let th = 0, ph = 0;
     for (let i = 0; i <= n; i++) {
       const t = Math.min(i * dt, DUR - 1e-6); W[i] = w; LL[i] = L; TH[i] = th; PH[i] = ph;
-      const u = uAt(t), c = CW + 4.5 * brace(t); w += (AW * u - c * w) * dt; if (w < 0) w = 0;
+      const u = uAt(t), c = CW + 4.5 * brace(t) + 3 * wnd(T_STUM, T_STUM + 0.4, t, 0.1); w += (AW * u - c * w) * dt; if (w < 0) w = 0;
       const g = gL(w); L += ((g - L) / (g > L ? 0.10 : 0.16)) * dt;
       th += w * dt; const run = 0.35 + 0.65 * ss(0.5, 1.2, w); ph += (w * RIN / (MS * 2) / (90 / 2.1)) * 2 * PI * run * dt;   // gait phase follows wheel speed (stride 90/2.1 local units)
     }
@@ -35,41 +35,43 @@ const sim = (a, t) => { const x = clamp(t, 0, DUR) / SIM.dt, i = Math.min(Math.f
 const wAt = (t) => sim(SIM.W, t), lampAt = (t) => sim(SIM.L, t), thAt = (t) => sim(SIM.TH, t), phAt = (t) => sim(SIM.PH, t);
 const lampVis = (t) => { const L = lampAt(t), fl = (1 - clamp(L * 1.5)) * (0.5 + 0.5 * Math.sin(t * 53) * Math.sin(t * 17 + 1)); return clamp(L * (1 - 0.35 * fl), 0, 1.4); };
 // ---- Mochi on the wheel floor: angle psi from the bottom (positive = forward = screen left) ----
+const hsh1 = (a) => { const x = Math.sin(a * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 const pulse = (t, t0, d = 0.06) => Math.exp(-(((t - t0) / d) ** 2));
 function psiAt(t) {
   const w = wAt(t); let psi = 0.17 * clamp(w / WMAX, 0, 1.3) + 0.12 * pulse(t, T_BITE - 0.04, 0.07);
   const carry = ss(T_BITE, T_BITE + 0.2, t) * (1 - ss(T_BITE + 0.22, T_BITE + 0.75, t));   // braced, she is carried up the back of the wheel
-  return lerp(psi, -0.8, carry) + 0.05 * pulse(t, 5.45, 0.12) - 0.04 * pulse(t, 5.6, 0.1);
+  const stum = ss(T_STUM, T_STUM + 0.12, t) * (1 - ss(T_STUM + 0.25, T_STUM + 0.9, t));      // tired: she trips and slides back
+  return lerp(lerp(psi, -0.8, carry), -0.42, stum) + 0.05 * pulse(t, T_BEG, 0.12) - 0.04 * pulse(t, T_BEG + 0.15, 0.1);
 }
 // ---- samurai right hand (world) ----
-const BRUSH = [SXC + 150, SYC + 70], RODB = [SXC + 158, SYC + 82], RODH = [SXC + 152, SYC + 4];
+const BRUSH = [SXC + 150, SYC + 70], RODB = [SXC + 158, SYC + 82], RODH = [SXC + 152, SYC + 12];
 function handKeys() {
   const K = [];
   for (const m of [-1, 0, 1]) { const o = m * DUR; const a = (t, p) => K.push([o + t, p[0], p[1]]);
-    a(0, BRUSH); a(2.9, BRUSH); a(3.2, RODB); a(3.35, RODB); a(3.85, RODH); a(4.82, [RODH[0], RODH[1] - 4]); a(5.0, RODB); a(5.2, [SXC + 100, SYC + 95]);
-    a(5.5, [SXC + 112, SYC + 4]); a(5.75, [SXC + 104, SYC + 14]); a(5.95, [SXC + 112, SYC + 6]); a(6.2, BRUSH); a(6.4, BRUSH);
+    a(0, BRUSH); a(T_LURE - 0.35, BRUSH); a(T_LURE - 0.05, RODB); a(T_LURE + 0.1, RODB); a(T_LURE + 0.85, RODH); a(T_BITE - 0.03, [RODH[0], RODH[1] - 4]); a(T_BITE + 0.15, RODB); a(T_BITE + 0.35, [SXC + 100, SYC + 95]);
+    a(T_BEG, [SXC + 112, SYC + 4]); a(T_BEG + 0.8, [SXC + 104, SYC + 14]); a(T_BACK, [SXC + 112, SYC + 6]); a(T_BACK + 0.9, BRUSH); a(12.8, BRUSH);
   }
   return K.sort((x, y) => x[0] - y[0]);
 }
 const HK = handKeys();
-const handAt = (t) => { const h = KS(HK, t), k = 0.4 + 0.6 * clamp(lampAt(t) + 0.2), am = 13 * k * (t < 3 ? 1 - ss(2.6, 2.95, t) : ss(6.2, 6.4, t)), w = 2 * PI / DUR;
+const handAt = (t) => { const h = KS(HK, t), k = 0.4 + 0.6 * clamp(lampAt(t) + 0.2), am = 13 * k * (t < 6 ? 1 - ss(T_LURE - 0.7, T_LURE - 0.35, t) : ss(T_BACK + 0.6, T_BACK + 0.9, t)), w = 2 * PI / DUR;
   return [h[0] + am * Math.sin(17 * w * t), h[1] + 0.23 * am * Math.sin(34 * w * t + 1)]; };
-const rodHeld = (t) => t >= T_LURE + 0.05 && t < 5.0;     // rod in the hand
-const brushHeld = (t) => t < 3.1 || t >= 6.1;
+const rodHeld = (t) => t >= T_LURE + 0.0 && t < T_BITE + 0.2;     // rod in the hand
+const brushHeld = (t) => t < T_LURE - 0.2 || t >= T_BACK + 0.8;
 // ---- events for the sound track: [t, type, amp, x, opts] ----
 const EVF = (() => {
   const E = [];
-  for (let t = 0.12; t < T_LURE - 0.1; t += 0.21) E.push([t, 'brush', 0.35 * (0.3 + lampAt(t)), SXC + 230]);
-  E.push([3.12, 'tap', 0.5, SXC + 200], [3.45, 'creak', 0.4, SXC + 300], [T_SEE - 0.1, 'mew', 0.55, WX]);
+  for (let t = 0.12; t < T_LURE - 0.5; t += 0.21) E.push([t, 'brush', 0.35 * (0.3 + lampAt(t)), SXC + 230]);
+  for (let t = 2.6; t < T_SEE - 0.1; t += 0.9 + 0.5 * hsh1(t)) E.push([t, 'pant', 0.5, WX - 120]);
+  E.push([T_STUM, 'stumble', 0.8, WX], [T_STUM + 0.05, 'gasp', 0.6, SXC], [T_LURE - 0.1, 'tap', 0.5, SXC + 200], [T_LURE + 0.35, 'creak', 0.4, SXC + 300], [T_SEE - 0.1, 'mew', 0.55, WX]);
   E.push([T_BITE - 0.03, 'zap', 0.9, LAMP[0]], [T_BITE, 'chomp', 1.0, WX - 140], [T_BITE + 0.02, 'wheelstop', 0.9, WX]);
-  for (let k = 0; k < 4; k++) E.push([5.1 + 0.2 * k, 'chew', 0.45, WX - 120]);
-  E.push([4.93, 'gasp', 0.7, SXC], [5.0, 'tap', 0.6, SXC + 200]);
-  E.push([5.3, 'lampoff', 0.9, LAMP[0]], [T_BEG, 'beg', 0.5, SXC], [5.75, 'sigh', 0.6, WX], [T_BACK, 'lampon', 0.7, LAMP[0]], [6.2, 'tap', 0.4, SXC + 200]);
+  for (let k = 0; k < 5; k++) E.push([T_BITE + 0.4 + 0.22 * k, 'chew', 0.45, WX - 120]);
+  E.push([T_BITE + 0.1, 'gasp', 0.7, SXC], [T_BITE + 0.3, 'tap', 0.6, SXC + 200]);
+  E.push([T_BITE + 0.95, 'lampoff', 0.9, LAMP[0]], [T_BEG, 'beg', 0.5, SXC], [T_BEG + 0.9, 'sigh', 0.6, WX], [T_BACK + 0.1, 'lampon', 0.7, LAMP[0]], [T_BACK + 1.0, 'tap', 0.4, SXC + 200]);
   return E.sort((a, b) => a[0] - b[0]);
 })();
 // ================= scene.js — drawing; everything is a pure function of t (cues.js holds all motion) =================
 const WOODL = '#D2A56A', WOODM = '#A9743F', WOODD = '#5E3B20', BRASS = '#D8B452', BRASSD = '#9C7A2C';
-const hsh1 = (a) => { const x = Math.sin(a * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 // ---------- background: a night workshop (grading by the lantern is applied after the frame) ----------
 function bgRoom(c, t) {
   const g = c.createLinearGradient(0, 0, 0, FL); g.addColorStop(0, '#CFE4D6'); g.addColorStop(1, '#A9CDB9'); c.fillStyle = g; c.fillRect(-300, -300, 1680, FL + 300);
@@ -154,8 +156,8 @@ function brushDraw(c, held, hand) {
 const ROD_L = 185, A_HELD = -0.3;
 function rodState(t) {
   const held = rodHeld(t), hand = handAt(t);
-  const butt = held ? [hand[0] + 2 * Math.sin(t * 40) * ss(3.9, 4.2, t), hand[1]] : [SXC + 160, TB.y - 5];
-  const A = ks1([[3.2, 0], [3.9, A_HELD], [4.84, A_HELD], [5.0, 0.12], [5.05, 0]], t) + (held ? 0.02 * Math.sin(t * 30) * ss(4.0, 4.4, t) : 0);
+  const butt = held ? [hand[0] + 2 * Math.sin(t * 40) * ss(T_SEE, T_SEE + 0.3, t), hand[1]] : [SXC + 160, TB.y - 5];
+  const A = ks1([[T_LURE, 0], [T_LURE + 0.85, A_HELD], [T_BITE - 0.02, A_HELD], [T_BITE + 0.15, 0.12], [T_BITE + 0.2, 0]], t) + (held ? 0.02 * Math.sin(t * 30) * ss(T_SEE + 0.1, T_SEE + 0.5, t) : 0);
   const tip = [butt[0] + ROD_L * Math.cos(A), butt[1] + ROD_L * Math.sin(A)];
   return { butt, tip, A };
 }
@@ -173,17 +175,18 @@ function fishDraw(c, x, y, rot, s, a = 1) {
 // ---------- samurai ----------
 const samPulse = pulse;
 function samAt(t) {
-  const lamp = lampAt(t), cheer = wnd(4.1, 4.85, t, 0.15), shock = pulse(t, T_BITE + 0.1, 0.12), bow = wnd(T_BEG, 5.85, t, 0.15);
-  const draw = (t < 3.05 ? 1 - ss(2.6, 3.0, t) : ss(6.05, 6.35, t));
-  const hop = arc(t, 4.2, 14, 0.3) + arc(t, 4.52, 10, 0.3) + 14 * shock;
-  const rot = (0.045 + 0.09 * (1 - clamp(lamp))) * draw + 0.03 * Math.sin(t * 5) * cheer - 0.1 * shock + 0.06 * bow * Math.sin(t * 9) + 0.04 * bow;
+  const lamp = lampAt(t), cheer = wnd(T_SEE + 0.7, T_BITE, t, 0.25), shock = pulse(t, T_BITE + 0.1, 0.12), bow = wnd(T_BEG, T_BEG + 0.95, t, 0.2), worry = pulse(t, T_STUM + 0.1, 0.25);
+  const draw = (t < 6 ? 1 - ss(T_LURE - 0.7, T_LURE - 0.2, t) : ss(T_BACK + 0.5, T_BACK + 1.0, t));
+  const lean = (0.045 + 0.09 * (1 - clamp(lamp))) * draw;
+  const hop = arc(t, 7.7, 7, 0.3) + arc(t, 8.05, 5, 0.3) + 14 * shock + 8 * worry;
+  const rot = lean + 0.03 * Math.sin(t * 5) * cheer - 0.1 * shock + 0.06 * bow * Math.sin(t * 9) + 0.04 * bow - 0.07 * worry;
   const D2 = SAMS * 1.58, y = FL - D2 * Math.cos(rot) - hop, x = SXC + D2 * Math.sin(rot);
-  const sweat = Math.max(0.35 * wnd(2.3, 3.2, t, 0.4), 0.5 * shock);
+  const sweat = Math.max(0.35 * wnd(2.6, 5.4, t, 0.8), 0.5 * shock);
   return { st: samState(0, { x, y, ground: y + D2 * Math.cos(rot), S: SAMS, face: 1, sx: 1, sy: 1, rot, walk: null, band: { a: 1, wind: 0.18 + 0.1 * Math.sin(t * 3) }, sweat }), cheer, shock, bow };
 }
 function samHands(S_, t) {
   const g = samGeom(S_.st, t), sh = [g.X(-0.85, 0.5), g.X(0.85, 0.5)], hr = handAt(t);
-  const rest = g.X(-1.36, 0.88), up = [g.X(-1.12, 0.1)[0], SYC - 18], ch = S_.cheer, plead = g.X(-0.7, 0.2);
+  const rest = g.X(-1.36, 0.88), up = [g.X(-1.12, 0.1)[0], SYC - 6], ch = S_.cheer, plead = g.X(-0.7, 0.2);
   let L = [lerp(rest[0], up[0], ch), lerp(rest[1], up[1], ch)]; const b = S_.bow; L = [lerp(L[0], plead[0], b), lerp(L[1], plead[1], b)];
   const raw = [L, hr.slice()], lim = 0.72 * SAMS, out = raw.map((h, i) => { const dx = h[0] - sh[i][0], dy = h[1] - sh[i][1], d = Math.hypot(dx, dy); return d > lim ? [sh[i][0] + dx * lim / d, sh[i][1] + dy * lim / d] : h; });
   window._raw = raw; window._sh = sh; window._hands = out; return out;
@@ -191,14 +194,17 @@ function samHands(S_, t) {
 function samEyesAt(t, S_, fish) {
   const st = S_.st, g = samGeom(st, t), P = [g.X(-0.46, 0.26), g.X(0.16, 0.26)], lamp = lampAt(t);
   let tg = [SXC + 300, TB.y - 4];
-  if (t >= 3.05 && t < T_SEE) tg = [WX - 150, 1230]; if (t >= T_SEE && t < T_BITE) tg = fish; if (t >= T_BITE && t < T_BITE + 0.2) tg = [WX - 140, 1230];
-  if (t >= T_BITE + 0.2 && t < T_BEG) tg = [LAMP[0], LAMP[1]]; if (t >= T_BEG && t < 6.0) tg = [WX - 120, 1260]; if (t >= 6.0 && t < 6.25) tg = [WX - 150, 1230];
+  if (t >= 2.5 && t < 3.3) tg = [LAMP[0], LAMP[1]];
+  if (t >= T_STUM - 0.05 && t < T_LURE) tg = [WX - 130, 1260];
+  if (t >= T_LURE && t < T_SEE) tg = [WX - 150, 1230]; if (t >= T_SEE && t < T_BITE) tg = fish; if (t >= T_BITE && t < T_BITE + 0.2) tg = [WX - 140, 1230];
+  if (t >= T_BITE + 0.2 && t < T_BEG) tg = [LAMP[0], LAMP[1]]; if (t >= T_BEG && t < T_BACK) tg = [WX - 120, 1260]; if (t >= T_BACK && t < T_BACK + 0.5) tg = [WX - 150, 1230];
   const ov = {}, set = (a, b, o) => { if (t >= a && t < b) Object.assign(ov, o); };
-  const dimsq = clamp((0.7 - lamp) / 0.5); set(0, 3.05, { squeeze: 0.6 * dimsq }); set(6.1, 6.4, { squeeze: 0.6 * dimsq });
-  set(4.1, T_BITE, { happy: 0.9, wide: 0.3 }); set(T_BITE, T_BEG, { wide: 1, open: 1 }); set(T_BEG, 5.95, { sad: 0.8, open: 1 });
+  const dimsq = clamp((0.7 - lamp) / 0.5); set(0, T_LURE - 0.4, { squeeze: 0.6 * dimsq }); set(T_BACK + 0.6, 12.8, { squeeze: 0.6 * dimsq });
+  set(T_STUM, T_LURE, { wide: 0.8, sad: 0.6 });
+  set(T_SEE + 0.7, T_BITE, { happy: 0.9, wide: 0.3 }); set(T_BITE, T_BEG, { wide: 1, open: 1 }); set(T_BEG, T_BACK, { sad: 0.8, open: 1 });
   return P.map((p) => { const dx = tg[0] - p[0], dy = tg[1] - p[1], l = Math.hypot(dx, dy) || 1; return Object.assign({ open: 0.9, wide: 0.2, sad: 0, look: [clamp(dx / l * 1.05, -1, 1), clamp(dy / l * 1.05, -1, 1)], closed: 0, squeeze: 0, happy: 0, angry: 0 }, ov); });
 }
-const sMouthAt = (t) => Math.max(0.9 * wnd(T_BITE + 0.05, T_BEG - 0.1, t, 0.1), 0.35 * wnd(T_BEG, 5.9, t, 0.15), 0.6 * wnd(4.15, 4.8, t, 0.12));
+const sMouthAt = (t) => Math.max(0.9 * wnd(T_BITE + 0.05, T_BEG - 0.1, t, 0.1), 0.35 * wnd(T_BEG, T_BACK - 0.2, t, 0.15), 0.6 * wnd(T_SEE + 0.7, T_BITE - 0.05, t, 0.15), 0.7 * pulse(t, T_STUM + 0.1, 0.2));
 // ---------- Mochi in the wheel ----------
 function mixPose(A, B, k) {
   const P = clonePose(A), m = (a, b) => a.map((v, i) => v + (b[i] - v) * k); P.b = m(A.b, B.b); P.h = m(A.h, B.h); P.tl = m(A.tl, B.tl); P.ear = m(A.ear, B.ear);
@@ -206,29 +212,31 @@ function mixPose(A, B, k) {
 }
 function mochiRun(t) {
   const w = wAt(t), psi = psiAt(t), kr = ss(0.35, 1.5, w), ph = phAt(t), carried = ss(T_BITE, T_BITE + 0.2, t) * (1 - ss(T_BITE + 0.22, T_BITE + 0.75, t));
-  const x = WX - RIN * Math.sin(psi), y = WY + RIN * Math.cos(psi);
-  const tired = clamp((0.9 - w) / 0.6) * (1 - ss(T_SEE - 0.1, T_SEE + 0.1, t)) , spr = ss(T_SEE, T_SEE + 0.25, t) * (1 - ss(T_BITE, T_BITE + 0.05, t));
-  let P = mixPose(P_STAND, P_RUN, kr); P.h = [P.h[0], P.h[1] + 7 * tired, P.h[2], P.h[3]];
-  const amp = lerp(8, 20, kr), lift = lerp(4, 14, kr); P = walkPose(P, ph, amp * (1 - carried * 0.8), lift * (1 - carried * 0.8));
-  const bite = wnd(T_BITE - 0.08, T_BITE + 0.04, t, 0.03), chew = wnd(5.0, 5.85, t, 0.1) * (0.5 + 0.5 * Math.sin((t - 5.0) * 26));
-  const look = t >= T_SEE - 0.15 && t < T_BITE ? [-1, -0.05] : [-0.7, 0.2 - 0.3 * tired];
-  const st = { mouth: { open: clamp(0.5 * tired + 0.95 * bite + 0.45 * Math.max(0, chew) * ss(T_BITE + 0.1, T_BITE + 0.2, t)) }, face: -1, kind: 'kit', col: ORG.k1, sd: 3, rot: -psi + 0.05 * carried, x, y, s: MS, pose: P,
-    e: { sleep: 0, open: t >= T_BITE + 0.08 && t < 5.9 ? 0.18 : 1 - 0.5 * tired, wide: 0.15 + 0.6 * spr, look, dil: 0.5 + 0.4 * spr, sparkle: 1 }, breath: 0.02 * Math.sin(t * 7 + 1) * (1 + 2 * tired), tailWig: 0.12 + 0.5 * spr, tailPh: t * 5, earTw: 0.05 * Math.sin(t * 5),
-    blush: 0.5, hTilt: 0.05 - 0.12 * tired, mode: 'walk' };
-  return st;
+  const nx0 = Math.sin(psi), ny0 = -Math.cos(psi), x0 = WX - RIN * nx0, y0 = WY + RIN * Math.cos(psi);
+  const tired = wnd(T_TIRE + 0.2, T_SEE + 0.3, t, 0.9), exh = wnd(T_STUM - 0.4, T_SEE + 0.1, t, 0.5), spr = ss(T_SEE + 0.3, T_SEE + 0.7, t) * (1 - ss(T_BITE, T_BITE + 0.05, t));
+  let P = mixPose(P_STAND, P_RUN, kr); P.h = [P.h[0] - 4 * exh, P.h[1] + 12 * tired + 8 * exh + 3 * Math.sin(t * 3.2) * tired, P.h[2], P.h[3]]; P.b = [P.b[0], P.b[1] + 5 * exh, P.b[2], P.b[3], P.b[4]];
+  const amp = lerp(8, 20, kr) * (1 - 0.35 * tired), lift = lerp(4, 14, kr) * (1 - 0.5 * tired); P = walkPose(P, ph, amp * (1 - carried * 0.8), lift * (1 - carried * 0.8));
+  const bite = wnd(T_BITE - 0.08, T_BITE + 0.04, t, 0.03), chew = wnd(T_BITE + 0.3, T_BEG, t, 0.1) * (0.5 + 0.5 * Math.sin((t - T_BITE) * 26));
+  const eating = t >= T_BITE + 0.08 && t < T_BEG;
+  const look = t >= T_SEE - 0.15 && t < T_BITE ? [-1, -0.05] : [-0.7, 0.2 - 0.5 * tired];
+  const pantOpen = tired * (0.55 + 0.35 * Math.sin(t * 9));
+  const st = { mouth: { open: clamp(pantOpen + 0.95 * bite + 0.45 * Math.max(0, chew) * ss(T_BITE + 0.1, T_BITE + 0.2, t)) }, face: -1, kind: 'kit', col: ORG.k1, sd: 3, rot: -psi + 0.05 * carried, x: x0, y: y0, s: MS, pose: P, sx: 1, sy: 1 - 0.1 * exh,
+    e: { sleep: eating ? 0 : 0.5 * tired, open: eating ? 0.18 : 1 - 0.2 * tired, wide: 0.15 + 0.6 * spr, look, dil: 0.5 + 0.4 * spr, sparkle: 1 }, breath: 0.02 * Math.sin(t * 7 + 1) + 0.05 * tired * Math.sin(t * 8), tailWig: 0.12 + 0.5 * spr - 0.1 * tired, tailPh: t * 5, earTw: 0.05 * Math.sin(t * 5),
+    blush: 0.5, hTilt: 0.05 - 0.14 * tired, mode: 'walk' };
+  // keep every paw on or above the running surface (no legs through the wheel)
+  const G = catGeom(st, t); let pen = -1e9; for (const id in G.legs) { const p = G.legs[id].paw; pen = Math.max(pen, -((p[0] - x0) * nx0 + (p[1] - y0) * ny0) + 5 * MS); }
+  st.x += pen * nx0; st.y += pen * ny0; return st;
 }
 // ---------- render ----------
 function renderFrame(T) {
-  const t = ((T % LOOP) + LOOP) % LOOP, S_ = samAt(t), sam = S_.st, hands = samHands(S_, t), R = rodState(t), mst = mochiRun(t), G = catGeom(mst, t), mouthP = G.HX(34, 5);
+  const t = ((T % DUR) + DUR) % DUR, S_ = samAt(t), sam = S_.st, hands = samHands(S_, t), R = rodState(t), mst = mochiRun(t), G = catGeom(mst, t), mouthP = G.HX(34, 5);
   // fish position
   let fish, fr = 0, fs = 1, fa = 1;
-  const lure = clamp(ss(3.3, 3.75, t)), pend = (() => { const dt = 0.02, a = rodState(t - dt).tip, b = rodState(t + dt).tip, vx = (b[0] - a[0]) / (2 * dt); const be = clamp(-vx / 900, -0.5, 0.5) + 0.07 * Math.sin(t * 6.5) * (1 - 0.6 * ss(3.9, 4.3, t)); return [R.tip[0] + 58 * Math.sin(be), R.tip[1] + 58 * Math.cos(be), be]; })();
+  const lure = clamp(ss(T_LURE + 0.2, T_LURE + 0.85, t)), pend = (() => { const dt = 0.02, a = rodState(t - dt).tip, b = rodState(t + dt).tip, vx = (b[0] - a[0]) / (2 * dt); const be = clamp(-vx / 900, -0.5, 0.5) + 0.07 * Math.sin(t * 6.5) * (1 - 0.6 * ss(T_SEE, T_SEE + 0.4, t)); return [R.tip[0] + 58 * Math.sin(be), R.tip[1] + 58 * Math.cos(be), be]; })();
   const restF = [TB.x0 + 150, TB.y - 9];
-  if (t < T_BITE) { fish = [lerp(restF[0], pend[0], lure), lerp(restF[1], pend[1], lure)]; fr = lerp(0.12, -pend[2] * 0.6 + 1.45, lure * 0.0 + (t > 3.7 ? 1 : 0) * 0); fr = lerp(0.1, -1.5707 + pend[2] * 0.3, lure); }
-  else if (t < 5.85) { fish = [mouthP[0] - 22, mouthP[1] + 8]; fr = 0.1 * Math.sin(t * 20); fs = 1 - 0.7 * ss(5.0, 5.8, t); }
-  else { fish = restF; fr = 0.1; fs = ss(5.45, 5.7, t) > 0 ? 1 : 0; fa = ss(5.45, 5.75, t); }
-  if (t >= 5.85 || (t < 3.3 && t >= 0)) { fish = restF; fr = 0.1; fs = 1; fa = t < 3.3 ? 1 : ss(5.45, 5.75, t); }
-  if (t >= 5.85) fa = 1;
+  if (t < T_BITE) { fish = [lerp(restF[0], pend[0], lure), lerp(restF[1], pend[1], lure)]; fr = lerp(0.1, -1.5707 + pend[2] * 0.3, lure); }
+  else if (t < T_BEG) { fish = [mouthP[0] - 22, mouthP[1] + 8]; fr = 0.1 * Math.sin(t * 20); fs = 1 - 0.7 * ss(T_BITE + 0.3, T_BEG - 0.2, t); }
+  else { fish = restF; fr = 0.1; fa = ss(T_BEG, T_BEG + 0.4, t); }
   const eyes = samEyesAt(t, S_, fish), g = samGeom(sam, t), mouthG = g.X(0.16, 0.74), L = lampVis(t);
   composeFrame([540, 960, 1], { noHalo: true,
     pre: (cx) => { bgRoom(cx, t); paperShadow(cx, SXC, FL + 8, 150, 0.5); paperShadow(cx, WX, FL + 6, 250, 0.4); paperShadow(cx, (TB.x0 + TB.x1) / 2, FL + 4, 100, 0.4); },
@@ -237,11 +245,12 @@ function renderFrame(T) {
       wheelStandBack(cx); wheelBack(cx, t); dynamo(cx, t);
       cx.strokeStyle = 'rgba(30,20,12,0.9)'; cx.lineWidth = 4; cx.beginPath(); cx.moveTo(DYN[0] - 10, DYN[1] - 52); cx.quadraticCurveTo((DYN[0] + LAMP[0]) / 2, Math.max(DYN[1], LAMP[1]) - 140 + 40, LAMP[0], LAMP[1] - 60); cx.stroke();
       wheelSpokes(cx, t); drawCat(cx, mst, t);
+      { const tr = wnd(T_TIRE + 0.6, T_SEE + 0.2, t, 0.8); if (tr > 0.05) { const Hc = G.HX(0, -6); cx.save(); for (let k = 0; k < 4; k++) { const u = ((t * 0.9 + k / 4) % 1), dir = k % 2 ? 1 : -0.6, x = Hc[0] + (24 + 46 * u) * dir + 8 * k, y = Hc[1] - 40 - 36 * u + 150 * u * u, r = 7 * (1 - 0.3 * u); cx.globalAlpha = tr * Math.min(1, (1 - u) * 2.5); cx.fillStyle = '#9ADBF5'; cx.strokeStyle = INKC; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(x, y - r * 2); cx.quadraticCurveTo(x + r * 1.3, y, x, y + r); cx.quadraticCurveTo(x - r * 1.3, y, x, y - r * 2); cx.fill(); cx.stroke(); } cx.restore(); } }
       wheelFront(cx, t); belt(cx, t); hubFront(cx, t);
       table(cx);
       if (!brushHeld(t)) brushDraw(cx, false); if (!rodHeld(t) || true) { }
       rodDraw(cx, R);
-      if (t < T_BITE || t >= 5.85) { cx.save(); cx.strokeStyle = 'rgba(40,28,18,0.9)'; cx.lineWidth = 2.5; cx.globalAlpha = fa; cx.beginPath(); cx.moveTo(R.tip[0], R.tip[1]); if (lure < 0.5) cx.quadraticCurveTo((R.tip[0] + fish[0]) / 2, Math.max(R.tip[1], fish[1]) + 6, fish[0] + 30, fish[1]); else cx.lineTo(fish[0], fish[1] - 12); cx.stroke(); cx.restore(); }
+      if (t < T_BITE || t >= T_BEG) { cx.save(); cx.strokeStyle = 'rgba(40,28,18,0.9)'; cx.lineWidth = 2.5; cx.globalAlpha = fa; cx.beginPath(); cx.moveTo(R.tip[0], R.tip[1]); if (lure < 0.5) cx.quadraticCurveTo((R.tip[0] + fish[0]) / 2, Math.max(R.tip[1], fish[1]) + 6, fish[0] + 30, fish[1]); else cx.lineTo(fish[0], fish[1] - 12); cx.stroke(); cx.restore(); }
       else if (t < T_BITE + 0.4) { cx.save(); cx.strokeStyle = 'rgba(40,28,18,0.9)'; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(R.tip[0], R.tip[1]); cx.lineTo(R.tip[0] + 6, R.tip[1] + 26 * Math.min(1, (t - T_BITE) / 0.1)); cx.stroke(); cx.restore(); }
       samLegs(cx, sam, t); samInk(cx, sam, t, 0.5); samOver(cx, Object.assign({}, sam, { band: { a: 0 }, e: { a: 0 }, sweat: 0, a: 0.28 }), t); samBand(cx, sam, t); samEyes(cx, sam, t, eyes[0], eyes[1]);
       const mw = sMouthAt(t); if (mw > 0.08) { const m = mouthG, o = 0.3 + 0.9 * mw; cx.save(); cx.translate(m[0], m[1]); cx.fillStyle = '#F1E9D8'; cx.beginPath(); cx.ellipse(0, 0, SAMS * 0.1 * (0.6 + 0.4 * mw), SAMS * 0.1 * o, 0, 0, 7); cx.fill(); cx.fillStyle = '#7A1B15'; cx.beginPath(); cx.ellipse(0, SAMS * 0.02, SAMS * 0.07 * (0.6 + 0.4 * mw), SAMS * 0.07 * o, 0, 0, 7); cx.fill(); cx.restore(); }
