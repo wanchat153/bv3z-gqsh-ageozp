@@ -295,3 +295,6 @@ function renderFrame(T) {
   m.globalCompositeOperation = 'source-over'; m.restore();
 }
 function initStory(canvas) { deepFreeze(P_SIT); initEngine(canvas); initCast(); }
+// ---- pacing: the whole story (cues.js time) is played KSLOW times slower (owner: "too fast") -> output length = DUR * KSLOW ----
+const KSLOW = 1.5, DUR_OUT = DUR * KSLOW;
+const _renderFrameStory = renderFrame; renderFrame = function (T) { return _renderFrameStory(T / KSLOW); };
