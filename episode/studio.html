@@ -1,9 +1,61 @@
-<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0">
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#000}</style></head><body>
 <canvas id="c" width="1080" height="1920"></canvas>
-<script src="src/core.js"></script><script src="src/engine.js"></script><script src="src/chars.js"></script><script src="src/cast.js"></script><script src="src/lib.js"></script><script src="src/mirror.js"></script>
+<script src="wave.js"></script>
 <script>
-initStory(document.getElementById('c')); renderFrame(0);
-window.grab = (t, q = 0.9) => { renderFrame(t); return document.getElementById('c').toDataURL('image/jpeg', q).split(',')[1]; };
-window.grabPNG = (t) => { renderFrame(t); return document.getElementById('c').toDataURL('image/png').split(',')[1]; };
-window.READY = true;
+const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const A=P.A,B=P.B,C=P.C,CX=540,CY=P.cy,DUR=P.dur,FIN=P.fin,WV=P.waves,H0=P.hue0;
+const cl=(x,a,b)=>Math.max(a,Math.min(b,x)),sm=(a,b,x)=>{const u=cl((x-a)/(b-a),0,1);return u*u*(3-2*u)};
+const rnd=k=>{const x=Math.sin(k*127.1+311.7)*43758.5453;return x-Math.floor(x)};
+const FOC=[[0,-C],[0,C]]; // local coords, y down; src 0 = top focus
+function hit(x,y,dx,dy){const a=dx*dx/(B*B)+dy*dy/(A*A),b=2*(x*dx/(B*B)+y*dy/(A*A)),c=x*x/(B*B)+y*y/(A*A)-1;const s=(-b+Math.sqrt(b*b-4*a*c))/(2*a);return[x+s*dx,y+s*dy,s]}
+// precompute balls: each has src focus, wall point, hue
+const balls=[];WV.forEach((w,wi)=>{const [sx,sy]=FOC[w.src],[tx,ty]=FOC[1-w.src];for(let k=0;k<w.n;k++){const th=w.rot+TAU*k/w.n,dx=Math.cos(th),dy=Math.sin(th),[px,py,d1]=hit(sx,sy,dx,dy);balls.push({wi,k,sx,sy,px,py,tx,ty,d1,hue:(H0+k/w.n*300+wi*17)%360})}});
+const waveOf=t=>{for(let i=WV.length-1;i>=0;i--)if(t>=WV[i].t0)return i;return 0};
+function ballPos(b,t){const w=WV[b.wi],e=(t-w.t0)*w.v;if(e<0)return null;if(e<b.d1){const u=e/b.d1;return[b.sx+(b.px-b.sx)*u,b.sy+(b.py-b.sy)*u,b.px-b.sx,b.py-b.sy]}
+  const d2=2*A-b.d1;if(e<=2*A){const u=(e-b.d1)/d2;return[b.px+(b.tx-b.px)*u,b.py+(b.ty-b.py)*u,b.tx-b.px,b.ty-b.py]}return null}
+function bg(c,t){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,`hsl(${250+(P.seed%4)*12},45%,12%)`);g.addColorStop(1,`hsl(${270+(P.seed%4)*12},50%,6%)`);c.fillStyle=g;c.fillRect(0,0,W,H)}
+function ellipse(c,glow){c.save();c.lineWidth=7;c.strokeStyle='rgba(235,240,255,.9)';c.beginPath();c.ellipse(0,0,B,A,0,0,TAU);c.stroke();c.restore()}
+function trails(c,t){
+  c.globalCompositeOperation='source-over';c.lineCap='round';c.lineJoin='round';
+  for(const b of balls){const w=WV[b.wi];if(t<w.t0)continue;const done=t>=w.t0+w.tau;
+    const fr=clampDraw(b,t);const base=.55*Math.min(1,Math.pow(9/w.n,.4));
+    const al=done?base*(.72+.28*Math.exp(-(t-(w.t0+w.tau))/.7)):base;
+    c.lineWidth=(w.n<=16?3.4:w.n<=64?2.6:2.0);
+    c.strokeStyle=`hsla(${b.hue},68%,66%,${al})`;c.beginPath();c.moveTo(b.sx,b.sy);
+    if(fr.wall){c.lineTo(b.px,b.py);if(fr.x!=null)c.lineTo(fr.x,fr.y)}else c.lineTo(fr.x,fr.y);c.stroke()}
+  c.globalCompositeOperation='source-over'}
+function clampDraw(b,t){const p=ballPos(b,t);if(!p)return{wall:true,x:b.tx,y:b.ty};const w=WV[b.wi],e=(t-w.t0)*w.v;if(e<b.d1)return{wall:false,x:p[0],y:p[1]};return{wall:true,x:p[0],y:p[1]}}
+function dots(c,t){
+  for(const b of balls){const p=ballPos(b,t);if(!p)continue;const L=Math.hypot(p[2],p[3])||1,dx=p[2]/L,dy=p[3]/L,nx=-dy,ny=dx,TL=120,R=22;
+    // comet tail: tapered, fading flame behind the ball
+    const ex=p[0]-dx*TL,ey=p[1]-dy*TL;const g=c.createLinearGradient(p[0],p[1],ex,ey);g.addColorStop(0,`hsla(${b.hue},75%,68%,.75)`);g.addColorStop(.5,`hsla(${b.hue},70%,60%,.28)`);g.addColorStop(1,`hsla(${b.hue},65%,55%,0)`);
+    c.fillStyle=g;c.beginPath();c.moveTo(p[0]+nx*R*.85,p[1]+ny*R*.85);c.lineTo(ex,ey);c.lineTo(p[0]-nx*R*.85,p[1]-ny*R*.85);c.closePath();c.fill();
+    c.fillStyle=`hsl(${b.hue},58%,66%)`;c.beginPath();c.arc(p[0],p[1],R,0,TAU);c.fill();
+    c.strokeStyle=`hsl(${b.hue},50%,26%)`;c.lineWidth=3.5;c.stroke();
+    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1.2;c.beginPath();c.arc(p[0],p[1],15.5,0,TAU);c.stroke()}}
+function wallMarks(c,t){
+  for(const b of balls){const w=WV[b.wi],tw=w.t0+b.d1/w.v,a=t-tw;if(a<0)continue;
+    const k=Math.exp(-a/.35);c.fillStyle=`hsla(${b.hue},60%,${78+14*k}%,${.8+.2*k})`;c.beginPath();c.arc(b.px,b.py,4.2+4*k,0,TAU);c.fill()}}
+function foci(c,t){
+  for(let q=0;q<2;q++){const f=FOC[q];let pu=0;for(const w2 of WV){const a=t-(w2.t0+w2.tau);if(w2.src===1-q&&a>=0&&a<.5)pu=Math.max(pu,Math.exp(-a/.18))}
+    c.strokeStyle=`rgba(255,255,255,${.7+.3*pu})`;c.lineWidth=4+2.5*pu;c.beginPath();c.arc(f[0],f[1],22,0,TAU);c.stroke()}}
+function bursts(c,t){}
+function counter(c,t){
+  const w=WV[waveOf(t)];c.save();c.textAlign='center';c.textBaseline='middle';
+  c.font='800 84px system-ui,sans-serif';c.fillStyle='rgba(255,255,255,.95)';c.fillText(w.n+(w.n===1?' ball':' balls'),540,95);
+  const T1=WV[1].t0+0.0,T2=FIN;let l1,l2,k;
+  if(t<WV[1].t0){l1='One ball leaves a focus, bounces once…';l2='…and always passes through the other focus.'}
+  else if(t<FIN){l1='Same speed, every direction.';l2='focus → wall → focus is always the same length.'}
+  else{l1='Reflection property of the ellipse';l2='Angle in = angle out, and the path length never changes.'}
+  const ph=t<WV[1].t0?0:t<FIN?1:2,st=[0,WV[1].t0,FIN][ph],al=Math.min(sm(st,st+.5,t)+(ph===0?1:0),1);
+  c.globalAlpha=Math.min(1,al);c.font='700 40px system-ui,sans-serif';c.fillStyle='#fff';c.fillText(l1,540,175);
+  c.globalAlpha=1;
+  
+  c.restore()}
+function renderMain(c,t){
+  bg(c,t);c.save();c.translate(CX,CY);ellipse(c,0);trails(c,t);wallMarks(c,t);foci(c,t);dots(c,t);bursts(c,t);c.restore();counter(c,t)}
+function renderFrame(c,t){renderMain(c,t);if(t>DUR-.5){c.fillStyle=`rgba(8,5,25,${sm(DUR-.5,DUR-.02,t)})`;c.fillRect(0,0,W,H)}}
+window.grab=(t,q=.92)=>{renderFrame(ctx,t);return cv.toDataURL('image/jpeg',q).split(',')[1]};
+window.grabPNG=(t)=>{renderFrame(ctx,t);return cv.toDataURL('image/png').split(',')[1]};
+window.READY=true;
 </script></body></html>
