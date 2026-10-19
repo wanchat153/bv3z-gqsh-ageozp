@@ -1,10 +1,10 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Twin double pendulums: identical, started 1e-7 rad apart. Frame = pure function of t. R=25.
+// Hex Kaleidoscope: one ball in a rotating hexagon; its path (in the hexagon's frame) is mirrored 6x2 into a flower. Frame = pure function of t. R=25.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const D=DATA,R=D.r,HZ=D.hz,L=D.L,PX=D.px,PY=D.py,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
-const TH={a:'#1a240c',b:'#070a03',g:'140,190,60',d:'205,235,150'};   // moss theme
+const D=DATA,R=D.r,CX=D.cx,CY=D.cy,RH=D.RH,OM=D.W,SAMP=D.samp,P=D.p,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
+const TH={a:'#0e1830',b:'#04060f',g:'90,140,255',d:'170,200,255'};   // midnight-blue theme
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
 function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 const framePath=()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],FR[4])};
@@ -29,30 +29,29 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
 
 
 
-function ang(t){const f=Math.max(0,Math.min(D.a.length-1.001,t*HZ)),k=Math.floor(f),u=f-k,p=D.a[k],q=D.a[k+1];return p.map((v,i)=>v+(q[i]-v)*u)}
-function joints(a1,a2){const x1=PX+L*Math.sin(a1),y1=PY+L*Math.cos(a1);return[[x1,y1],[x1+L*Math.sin(a2),y1+L*Math.cos(a2)]]}
-function gapAt(t){const f=Math.max(0,Math.min(D.gap.length-1.001,t*HZ)),k=Math.floor(f),u=f-k;return D.gap[k]+(D.gap[k+1]-D.gap[k])*u}
-const HA=190,HB=330;
-function rod(p,q,h,a){c.save();c.globalAlpha=a;c.lineCap='round';c.strokeStyle=`hsla(${h},40%,80%,.85)`;c.lineWidth=7;c.beginPath();c.moveTo(p[0],p[1]);c.lineTo(q[0],q[1]);c.stroke();c.restore()}
+
+function hexp(t){const f=Math.max(0,Math.min(P.length-1.001,t*SAMP)),k=Math.floor(f),u=f-k;return[P[k][0]+(P[k+1][0]-P[k][0])*u,P[k][1]+(P[k+1][1]-P[k][1])*u]}
 function render(t){
  bg();
  c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
- const A=ang(t),ja=joints(A[0],A[1]),jb=joints(A[2],A[3]),g=gapAt(t),split=Math.max(0,Math.min(1,(g-10)/60));
- const tr=(i)=>{const pts=[];for(let q=0;q<=40;q++){const a=ang(Math.max(0,t-q*.012));pts.push(joints(a[i],a[i+1])[1])}return pts};
- trail(tr(2),HB,.85);trail(tr(0),HA,.85);
- // B drawn under A while overlapped
- rod([PX,PY],jb[0],HB,1);rod(jb[0],jb[1],HB,1);rod([PX,PY],ja[0],HA,1);rod(ja[0],ja[1],HA,1);
- c.save();c.fillStyle='#eee';c.beginPath();c.arc(PX,PY,10,0,TAU);c.fill();c.restore();
- sphere(jb[0][0],jb[0][1],HB,1);sphere(jb[1][0],jb[1][1],HB,1);sphere(ja[0][0],ja[0][1],HA,1);sphere(ja[1][0],ja[1][1],HA,1);
- }
-function drawText(t){const g=gapAt(t);
- // text: one counter + one caption
- let top,cap;
- const gs=g<1?g.toFixed(4):g<100?g.toFixed(1):Math.round(g);
- top='Gap  '+gs+' px';
- if(t<2.2)cap='Two pendulums. Same start.';else if(g<2*R)cap='One is nudged 0.0000001 rad.';else cap='A tiny nudge. Two futures.';
+ const ph=OM*t,cur=Math.min(P.length-1,Math.floor(t*SAMP));
+ // mirrored pattern
+ c.save();c.translate(CX,CY);c.globalCompositeOperation='lighter';c.lineCap='round';c.lineJoin='round';
+ const CH=24;
+ for(let m=0;m<2;m++)for(let k=0;k<6;k++){c.save();c.rotate(ph+k*Math.PI/3);if(m)c.scale(1,-1);
+  for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.07,Math.min(.9,1.0-age*.085)),h=(s*.35+200)%360;
+   c.strokeStyle=`hsla(${h},85%,68%,${a*.55})`;c.lineWidth=2.4;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
+  c.restore()}
+ c.restore();
+ // rotating hexagon wall
+ c.save();c.translate(CX,CY);c.rotate(ph);c.strokeStyle='rgba(235,240,255,.9)';c.lineWidth=7;c.shadowColor='rgba(150,190,255,.9)';c.shadowBlur=18;c.lineJoin='round';c.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3+Math.PI/6;i?c.lineTo(RH*Math.cos(a),RH*Math.sin(a)):c.moveTo(RH*Math.cos(a),RH*Math.sin(a))}c.closePath();c.stroke();c.restore();
+ // the real ball + its comet tail (inertial frame)
+ const pos=tt=>{const q=hexp(tt),a=OM*tt;return[CX+q[0]*Math.cos(a)-q[1]*Math.sin(a),CY+q[0]*Math.sin(a)+q[1]*Math.cos(a)]};
+ const pts=[];for(let q=0;q<=40;q++)pts.push(pos(Math.max(0,t-q*.004)));const p=pos(t);
+ trail(pts,40,.9);sphere(p[0],p[1],40,1)}
+function drawText(t){const n=D.ev.filter(e=>e[0]<=t).length;
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
- c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
+ c.font='800 84px system-ui,sans-serif';c.fillText('Bounce '+n,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(t<3?'One ball in a spinning hexagon.':'It draws a flower.',540,178);c.restore()}
 window.render=render;
 const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
