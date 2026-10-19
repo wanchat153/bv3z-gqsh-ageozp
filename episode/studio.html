@@ -40,8 +40,8 @@ function render(t){
  c.save();c.translate(CX,CY);c.globalCompositeOperation='source-over';c.lineCap='round';c.lineJoin='round';
  const CH=24;
  for(let m=0;m<1;m++)for(let k=0;k<6;k++){c.save();c.rotate(ph+k*Math.PI/3);if(m)c.scale(1,-1);
-  for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.18,Math.min(1,1.05-age*.055)),h=(s*.35+200)%360;
-   c.strokeStyle=`hsla(${h},82%,68%,${a*.85})`;c.lineWidth=3.4;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
+  for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.10,Math.min(1,1.05-age*.075)),h=(s*.35+200)%360;
+   c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.strokeStyle=`hsla(${h},90%,60%,${a*.28})`;c.lineWidth=15;c.stroke();c.strokeStyle=`hsla(${h},88%,66%,${a*.95})`;c.lineWidth=7;c.stroke();c.strokeStyle=`hsla(${h},70%,90%,${a*.9})`;c.lineWidth=2.4;c.stroke()}
   c.restore()}
  c.restore();
  // rotating hexagon wall
@@ -52,7 +52,7 @@ function render(t){
  trail(pts,40,.9);sphere(p[0],p[1],40,1)}
 function drawText(t){const n=D.ev.filter(e=>e[0]<=t).length;
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
- c.font='800 84px system-ui,sans-serif';c.fillText('Bounce '+n,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(t<3?'One ball in a spinning hexagon.':'It keeps speeding up.',540,178);c.restore()}
+ c.font='800 84px system-ui,sans-serif';c.fillText('Bounce '+n,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(t<2.5?'One ball in a spinning hexagon.':'It keeps speeding up.',540,178);c.restore()}
 window.render=render;
 const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
