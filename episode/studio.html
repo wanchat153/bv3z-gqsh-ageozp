@@ -1,18 +1,19 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Ripple Grid: spring lattice of balls; radial taps launch circular waves. Frame = pure function of t. R=25 constant. 30 fps, 6-sample motion blur.
+// Twin double pendulums: identical, started 1e-7 rad apart. Frame = pure function of t. R=25.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const D=DATA,R=D.r,HZ=D.hz,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40],NC=D.nc,NR=D.nr,NN=NC*NR;
-const TH={a:'#0c1c3a',b:'#030812',g:'70,130,230',d:'170,205,255'};   // cobalt theme
+const D=DATA,R=D.r,HZ=D.hz,L=D.L,PX=D.px,PY=D.py,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];
+const TH={a:'#1a240c',b:'#070a03',g:'140,190,60',d:'205,235,150'};   // moss theme
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
 function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 const framePath=()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],FR[4])};
 function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.addColorStop(1,TH.b);c.fillStyle=g;c.fillRect(0,0,W,H);
  const r=c.createRadialGradient(540,960,60,540,960,900);r.addColorStop(0,`rgba(${TH.g},.20)`);r.addColorStop(1,`rgba(${TH.g},0)`);c.fillStyle=r;c.fillRect(0,0,W,H);
  c.save();c.beginPath();c.rect(0,0,W,H);c.roundRect(FR[0]-2,FR[1]-2,FR[2]+4,FR[3]+4,FR[4]);c.clip('evenodd');
- c.strokeStyle=`rgba(${TH.d},.12)`;c.lineWidth=2;for(let x=-1200;x<2400;x+=120){c.beginPath();c.moveTo(x,0);c.lineTo(x+1536,1536);c.stroke();c.beginPath();c.moveTo(x+1536,0);c.lineTo(x,1536);c.stroke()}
- const rr=sr(61);for(let k=0;k<70;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
+ c.strokeStyle=`rgba(${TH.d},.14)`;c.lineWidth=2.5;for(let k=0;k<8;k++){c.beginPath();c.arc(540,960,420+k*140,0,TAU);c.stroke()}
+ c.strokeStyle=`rgba(${TH.d},.09)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
+ const rr=sr(83);for(let k=0;k<80;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
  c.restore();c.save();framePath();c.fillStyle='rgba(2,2,8,.6)';c.fill();c.restore()}
 function sphere(x,y,h,a){c.save();c.globalAlpha=a;
  const sg=c.createRadialGradient(x-R*.36,y-R*.42,R*.05,x-R*.08,y-R*.1,R*1.1);sg.addColorStop(0,`hsl(${h},65%,90%)`);sg.addColorStop(.3,`hsl(${h},70%,66%)`);sg.addColorStop(.72,`hsl(${h},64%,40%)`);sg.addColorStop(1,`hsl(${h},60%,22%)`);
@@ -24,25 +25,38 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
  for(let layer=0;layer<2;layer++)for(let k=1;k<=n;k++){const u=k/n,f=Math.pow(1-u,1.1),hh=(h+u*50)%360;
   c.strokeStyle=layer?`hsla(${hh},90%,88%,${.5*f*a})`:`hsla(${hh},88%,62%,${.55*f*a})`;c.lineWidth=Math.max(1,2*R*(layer?.5:1.25)*f);c.beginPath();c.moveTo(pts[k-1][0],pts[k-1][1]);c.lineTo(pts[k][0],pts[k][1]);c.stroke()}
  c.restore()}
-function disp(i,t){const f=Math.max(0,Math.min(D.u.length/(2*NN)-1.001,t*HZ)),k=Math.floor(f),w=f-k,b0=k*2*NN+2*i,b1=b0+2*NN;return[(D.u[b0]+(D.u[b1]-D.u[b0])*w)/D.q,(D.u[b0+1]+(D.u[b1+1]-D.u[b0+1])*w)/D.q]}
+
+
+
+
+function ang(t){const f=Math.max(0,Math.min(D.a.length-1.001,t*HZ)),k=Math.floor(f),u=f-k,p=D.a[k],q=D.a[k+1];return p.map((v,i)=>v+(q[i]-v)*u)}
+function joints(a1,a2){const x1=PX+L*Math.sin(a1),y1=PY+L*Math.cos(a1);return[[x1,y1],[x1+L*Math.sin(a2),y1+L*Math.cos(a2)]]}
+function gapAt(t){const f=Math.max(0,Math.min(D.gap.length-1.001,t*HZ)),k=Math.floor(f),u=f-k;return D.gap[k]+(D.gap[k+1]-D.gap[k])*u}
+const HA=190,HB=330;
+function rod(p,q,h,a){c.save();c.globalAlpha=a;c.lineCap='round';c.strokeStyle=`hsla(${h},40%,80%,.85)`;c.lineWidth=7;c.beginPath();c.moveTo(p[0],p[1]);c.lineTo(q[0],q[1]);c.stroke();c.restore()}
 function render(t){
  bg();
  c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
- const tt=window.TT!==undefined?window.TT:t,P=[],M=[];
- for(let r=0;r<NR;r++)for(let q=0;q<NC;q++){const i=r*NC+q,d=disp(i,t);P.push([D.ox+q*D.a+d[0],D.oy+r*D.a+d[1]]);M.push(Math.hypot(d[0],d[1]))}
- // faint lattice lines
- c.save();c.strokeStyle='rgba(190,215,255,.16)';c.lineWidth=2;c.beginPath();for(let r=0;r<NR;r++)for(let q=0;q<NC;q++){const p=P[r*NC+q];if(q<NC-1){const n=P[r*NC+q+1];c.moveTo(p[0],p[1]);c.lineTo(n[0],n[1])}if(r<NR-1){const n=P[(r+1)*NC+q];c.moveTo(p[0],p[1]);c.lineTo(n[0],n[1])}}c.stroke();c.restore();
- // balls: hue shifts with displacement from rest (cyan -> pink)
- for(let i=0;i<NN;i++){const m=Math.min(1,M[i]/7),h=(205+m*150)%360;sphere(P[i][0],P[i][1],h,.62+.38*m)}
- let n=0;for(const k of D.kicks)if(tt>=k[0])n++;
- let top=n===0?'Ripple Grid':'Tap '+n+' of 3',cap='Tap the middle ball...';
- if(tt>=2.6&&tt<10)cap='Ripples travel and bounce back.';if(tt>=10.5&&tt<19)cap='Tap again: a new wave.';if(tt>=19)cap='Two taps, two waves cross.';
+ const A=ang(t),ja=joints(A[0],A[1]),jb=joints(A[2],A[3]),g=gapAt(t),split=Math.max(0,Math.min(1,(g-10)/60));
+ const tr=(i)=>{const pts=[];for(let q=0;q<=40;q++){const a=ang(Math.max(0,t-q*.012));pts.push(joints(a[i],a[i+1])[1])}return pts};
+ trail(tr(2),HB,.85);trail(tr(0),HA,.85);
+ // B drawn under A while overlapped
+ rod([PX,PY],jb[0],HB,1);rod(jb[0],jb[1],HB,1);rod([PX,PY],ja[0],HA,1);rod(ja[0],ja[1],HA,1);
+ c.save();c.fillStyle='#eee';c.beginPath();c.arc(PX,PY,10,0,TAU);c.fill();c.restore();
+ sphere(jb[0][0],jb[0][1],HB,1);sphere(jb[1][0],jb[1][1],HB,1);sphere(ja[0][0],ja[0][1],HA,1);sphere(ja[1][0],ja[1][1],HA,1);
+ }
+function drawText(t){const g=gapAt(t);
+ // text: one counter + one caption
+ let top,cap;
+ const gs=g<1?g.toFixed(4):g<100?g.toFixed(1):Math.round(g);
+ top='Gap  '+gs+' px';
+ if(t<2.2)cap='Two pendulums. Same start.';else if(g<2*R)cap='One is nudged 0.0000001 rad.';else cap='A tiny nudge. Two futures.';
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
  c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
 window.render=render;
 const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
-function blurFrame(t){window.TT=t;for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0)}
+function blurFrame(t){for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0);drawText(t)}
 window.grabPNG=t=>{blurFrame(t);return cv.toDataURL('image/png').split(',')[1]};
 window.grab=t=>{blurFrame(t);return cv.toDataURL('image/jpeg',.92).split(',')[1]};
 window.DUR=D.dur;window.READY=true;
