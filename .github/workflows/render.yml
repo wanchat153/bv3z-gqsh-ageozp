@@ -9,7 +9,12 @@ on:
       height: { description: 'frame height (1080 for landscape)', default: '1920' }
       wx: { description: 'watermark x, or none for no watermark', default: '380' }
       wy: { description: 'watermark y', default: '480' }
-      episode_dir: { description: 'episode folder with studio.html and audio.flac', default: 'episode' }
+      episode_dir: { description: 'episode folder with studio.html and the audio file', default: 'episode' }
+      audio: { description: 'audio file name inside the episode folder', default: 'audio.flac' }
+      fmt: { description: 'frame format png or jpg (jpg is much faster for big frames)', default: 'png' }
+      preset: { description: 'x264 preset for the parts', default: 'veryfast' }
+      crf: { description: 'x264 crf for the parts', default: '10' }
+      fast_finish: { description: 'true = stream-copy join of the parts (parts must already be final quality, no watermark)', default: 'false' }
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -41,7 +46,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg fonts-dejavu-core fonts-thai-tlwg fonts-noto-core
       - run: node tools/render_part.mjs ${{ inputs.episode_dir }} ${{ matrix.s }} ${{ matrix.e }} out/part_${{ matrix.i }}
-        env: { WORKERS: 4, FPS: '${{ inputs.fps }}', WIDTH: '${{ inputs.width }}', HEIGHT: '${{ inputs.height }}', CHROME: /usr/bin/google-chrome }
+        env: { WORKERS: 4, FPS: '${{ inputs.fps }}', WIDTH: '${{ inputs.width }}', HEIGHT: '${{ inputs.height }}', CHROME: /usr/bin/google-chrome, FMT: '${{ inputs.fmt }}', PRESET: '${{ inputs.preset }}', CRF: '${{ inputs.crf }}' }
       - run: mv out/part_${{ matrix.i }}/part.mp4 out/part.mp4
       - uses: actions/upload-artifact@v4
         with: { name: 'part-${{ matrix.i }}', path: out/part.mp4, retention-days: 1, compression-level: 0 }
@@ -56,6 +61,6 @@ jobs:
       - run: |
           # sort parts numerically: rename part-N -> part-000N
           for d in parts/part-*; do n=${d##*-}; mv "$d" "parts/p$(printf %04d $n)"; done
-          bash tools/finish.sh parts ${{ inputs.episode_dir }}/audio.flac out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}
+          if [ "${{ inputs.fast_finish }}" = "true" ]; then bash tools/finish_fast.sh parts ${{ inputs.episode_dir }}/${{ inputs.audio }} out.mp4 ${{ inputs.seconds }}; else bash tools/finish.sh parts ${{ inputs.episode_dir }}/${{ inputs.audio }} out.mp4 ${{ inputs.wx }} ${{ inputs.wy }} ${{ inputs.seconds }}; fi
       - uses: actions/upload-artifact@v4
         with: { name: video, path: out.mp4, retention-days: 14 }
