@@ -14,7 +14,7 @@ function bg(){const g=c.createLinearGradient(0,0,0,H);g.addColorStop(0,TH.a);g.a
  c.strokeStyle=`rgba(${TH.d},.14)`;c.lineWidth=2.5;for(let k=0;k<8;k++){c.beginPath();c.arc(540,960,420+k*140,0,TAU);c.stroke()}
  c.strokeStyle=`rgba(${TH.d},.09)`;c.lineWidth=1.5;for(let x=0;x<=W;x+=90){c.beginPath();c.moveTo(x,0);c.lineTo(x,1536);c.stroke()}for(let y=0;y<=1536;y+=90){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke()}
  const rr=sr(83);for(let k=0;k<80;k++){const x=rr()*W,y=rr()*1536,z=.9+rr()*2.2;c.fillStyle=`rgba(${TH.d},${.4+rr()*.5})`;c.beginPath();c.arc(x,y,z,0,TAU);c.fill()}
- c.restore();c.save();framePath();c.fillStyle='rgba(2,2,8,.6)';c.fill();c.restore()}
+ c.restore()}
 function sphere(x,y,h,a){c.save();c.globalAlpha=a;
  const sg=c.createRadialGradient(x-R*.36,y-R*.42,R*.05,x-R*.08,y-R*.1,R*1.1);sg.addColorStop(0,`hsl(${h},65%,90%)`);sg.addColorStop(.3,`hsl(${h},70%,66%)`);sg.addColorStop(.72,`hsl(${h},64%,40%)`);sg.addColorStop(1,`hsl(${h},60%,22%)`);
  c.fillStyle=sg;c.beginPath();c.arc(x,y,R,0,TAU);c.fill();
@@ -33,7 +33,7 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
 function hexp(t){const f=Math.max(0,Math.min(P.length-1.001,t*SAMP)),k=Math.floor(f),u=f-k;return[P[k][0]+(P[k+1][0]-P[k][0])*u,P[k][1]+(P[k+1][1]-P[k][1])*u]}
 function render(t){
  bg();
- c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
+
  const ph=OM*t,cur=Math.min(P.length-1,Math.floor(t*SAMP));
  // mirrored pattern
  c.save();c.translate(CX,CY);c.globalCompositeOperation='source-over';c.lineCap='round';c.lineJoin='round';
@@ -43,6 +43,8 @@ function render(t){
    c.strokeStyle=`hsla(${h},95%,66%,${a})`;c.lineWidth=4.2;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
   c.restore()}
  c.restore();
+ // rotating hexagon wall
+ c.save();c.translate(CX,CY);c.rotate(ph);c.strokeStyle='rgba(235,240,255,.9)';c.lineWidth=7;c.shadowColor='rgba(150,190,255,.9)';c.shadowBlur=18;c.lineJoin='round';c.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3+Math.PI/6;i?c.lineTo(RH*Math.cos(a),RH*Math.sin(a)):c.moveTo(RH*Math.cos(a),RH*Math.sin(a))}c.closePath();c.stroke();c.restore();
  // the real ball + its comet tail (inertial frame)
  const pos=tt=>{const q=hexp(tt),a=OM*tt;return[CX+q[0]*Math.cos(a)-q[1]*Math.sin(a),CY+q[0]*Math.sin(a)+q[1]*Math.cos(a)]};
  const pts=[];for(let q=0;q<=40;q++)pts.push(pos(Math.max(0,t-q*.004)));const p=pos(t);
