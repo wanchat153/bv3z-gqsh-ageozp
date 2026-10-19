@@ -41,7 +41,7 @@ function render(t){
  const CH=24;
  for(let m=0;m<1;m++)for(let k=0;k<6;k++){c.save();c.rotate(ph+k*Math.PI/3);if(m)c.scale(1,-1);
   for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.18,Math.min(1,1.05-age*.055)),h=(s*.35+200)%360;
-   c.strokeStyle=`hsla(${h},95%,66%,${a})`;c.lineWidth=4.2;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
+   c.strokeStyle=`hsla(${h},82%,68%,${a*.85})`;c.lineWidth=3.4;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
   c.restore()}
  c.restore();
  // rotating hexagon wall
