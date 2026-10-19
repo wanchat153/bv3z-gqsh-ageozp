@@ -40,7 +40,7 @@ function render(t){
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
  c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
 window.render=render;
-const FPSV=+(new URLSearchParams(location.search).get('fps')||30),K=6,SHUT=.75;
+const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
 function blurFrame(t){window.TT=t;for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0)}
 window.grabPNG=t=>{blurFrame(t);return cv.toDataURL('image/png').split(',')[1]};
