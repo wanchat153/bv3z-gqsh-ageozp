@@ -39,7 +39,7 @@ function render(t){
  c.save();c.translate(CX,CY);c.globalCompositeOperation='lighter';c.lineCap='round';c.lineJoin='round';
  const CH=24;
  for(let m=0;m<2;m++)for(let k=0;k<6;k++){c.save();c.rotate(ph+k*Math.PI/3);if(m)c.scale(1,-1);
-  for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.07,Math.min(.9,1.0-age*.085)),h=(s*.35+200)%360;
+  for(let s=0;s<cur;s+=CH){const e=Math.min(cur,s+CH),age=(t*SAMP-e)/SAMP,a=Math.max(.10,Math.min(.9,1.0-age*.045)),h=(s*.35+200)%360;
    c.strokeStyle=`hsla(${h},85%,68%,${a*.55})`;c.lineWidth=2.4;c.beginPath();c.moveTo(P[s][0],P[s][1]);for(let q=s+1;q<=e;q++)c.lineTo(P[q][0],P[q][1]);c.stroke()}
   c.restore()}
  c.restore();
