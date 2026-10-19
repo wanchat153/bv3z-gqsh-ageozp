@@ -1,10 +1,10 @@
 <!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas id="c" width="1080" height="1920"></canvas>
 <script src="data.js"></script>
 <script>
-// Resonance Sweep: 10 balls on springs, shaker frequency sweeps up; each ball peaks at its own natural frequency. Frame = pure function of t. R=25 constant. 30 fps, 6-sample motion blur.
+// Ripple Grid: spring lattice of balls; radial taps launch circular waves. Frame = pure function of t. R=25 constant. 30 fps, 6-sample motion blur.
 const W=1080,H=1920,TAU=Math.PI*2,cv=document.getElementById('c'),c=cv.getContext('2d');
-const D=DATA,R=D.r,HZ=D.hz,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40];const HUE=k=>(190+k*17)%360;
-const TH={a:'#2c1a12',b:'#0c0604',g:'200,120,70',d:'255,205,170'};   // mocha theme
+const D=DATA,R=D.r,HZ=D.hz,FR=[D.x0,D.y0,D.x1-D.x0,D.y1-D.y0,40],NC=D.nc,NR=D.nr,NN=NC*NR;
+const TH={a:'#0c1c3a',b:'#030812',g:'70,130,230',d:'170,205,255'};   // cobalt theme
 function sr(s){return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
 function sm(u){u=Math.max(0,Math.min(1,u));return u*u*(3-2*u)}
 const framePath=()=>{c.beginPath();c.roundRect(FR[0],FR[1],FR[2],FR[3],FR[4])};
@@ -24,25 +24,23 @@ function trail(pts,h,a){c.save();c.globalCompositeOperation='lighter';c.lineCap=
  for(let layer=0;layer<2;layer++)for(let k=1;k<=n;k++){const u=k/n,f=Math.pow(1-u,1.1),hh=(h+u*50)%360;
   c.strokeStyle=layer?`hsla(${hh},90%,88%,${.5*f*a})`:`hsla(${hh},88%,62%,${.55*f*a})`;c.lineWidth=Math.max(1,2*R*(layer?.5:1.25)*f);c.beginPath();c.moveTo(pts[k-1][0],pts[k-1][1]);c.lineTo(pts[k][0],pts[k][1]);c.stroke()}
  c.restore()}
-function S(a,t){const f=Math.max(0,Math.min(a.length-1.001,t*HZ)),k=Math.floor(f),u=f-k;return a[k]+(a[k+1]-a[k])*u}
-function spring(x,y0,y1,w){const n=14,amp=15;c.beginPath();c.moveTo(x,y0);for(let i=1;i<n;i++){const y=y0+(y1-y0)*i/n;c.lineTo(x+(i%2?amp:-amp),y)}c.lineTo(x,y1);c.stroke()}
+function disp(i,t){const f=Math.max(0,Math.min(D.u.length/(2*NN)-1.001,t*HZ)),k=Math.floor(f),w=f-k,b0=k*2*NN+2*i,b1=b0+2*NN;return[(D.u[b0]+(D.u[b1]-D.u[b0])*w)/D.q,(D.u[b0+1]+(D.u[b1+1]-D.u[b0+1])*w)/D.q]}
 function render(t){
  bg();
  c.save();c.shadowColor='rgba(255,255,255,.95)';c.shadowBlur=36;c.strokeStyle='rgba(255,255,255,.85)';c.lineWidth=11;framePath();c.stroke();c.shadowBlur=12;c.strokeStyle='#fff';c.lineWidth=4.5;framePath();c.stroke();c.restore();
- const tt=window.TT!==undefined?window.TT:t,u=S(D.pl,t),hz=S(D.hzs,tt),py=D.plate+u;
- // shaker plate
- c.save();const g=c.createLinearGradient(0,py-14,0,py+14);g.addColorStop(0,'#f3e9df');g.addColorStop(1,'#8a7566');c.fillStyle=g;c.strokeStyle='rgba(15,8,4,.85)';c.lineWidth=4;c.shadowColor='rgba(255,230,200,.5)';c.shadowBlur=16;c.beginPath();c.roundRect(D.x0+30,py-14,D.x1-D.x0-60,28,12);c.fill();c.stroke();c.restore();
- for(let k=0;k<D.nb;k++){const x=D.colx[k],by=D.rest+S(D.pos[k],t),h=HUE(k);
-  c.save();c.strokeStyle=`hsla(${h},35%,80%,.85)`;c.lineWidth=4;c.lineJoin='round';spring(x,py+14,by-R,0);c.restore();
-  const pts=[];for(let q=0;q<=14;q++)pts.push([x,D.rest+S(D.pos[k],Math.max(0,t-q*.0085))]);trail(pts,h,.85);sphere(x,by,h,1);
-  // natural-frequency label, brighter when the shaker is close
-  const close=Math.max(0,1-Math.abs(hz-D.f[k])/.35);c.save();c.font='800 30px system-ui,sans-serif';c.textAlign='center';c.fillStyle=`hsla(${h},80%,${68+20*close}%,${.55+.45*close})`;c.fillText(D.f[k].toFixed(1),x,1465);c.restore()}
- c.save();c.font='700 28px system-ui,sans-serif';c.textAlign='center';c.fillStyle='rgba(255,255,255,.6)';c.fillText('natural frequency (Hz)',540,1500);c.restore();
- let cap='Which ball will shake the most?';if(tt>=4&&tt<D.ts)cap='Each ball has its own favourite beat.';if(tt>=D.ts)cap='Match the beat = resonance.';
+ const tt=window.TT!==undefined?window.TT:t,P=[],M=[];
+ for(let r=0;r<NR;r++)for(let q=0;q<NC;q++){const i=r*NC+q,d=disp(i,t);P.push([D.ox+q*D.a+d[0],D.oy+r*D.a+d[1]]);M.push(Math.hypot(d[0],d[1]))}
+ // faint lattice lines
+ c.save();c.strokeStyle='rgba(190,215,255,.16)';c.lineWidth=2;c.beginPath();for(let r=0;r<NR;r++)for(let q=0;q<NC;q++){const p=P[r*NC+q];if(q<NC-1){const n=P[r*NC+q+1];c.moveTo(p[0],p[1]);c.lineTo(n[0],n[1])}if(r<NR-1){const n=P[(r+1)*NC+q];c.moveTo(p[0],p[1]);c.lineTo(n[0],n[1])}}c.stroke();c.restore();
+ // balls: hue shifts with displacement from rest (cyan -> pink)
+ for(let i=0;i<NN;i++){const m=Math.min(1,M[i]/7),h=(205+m*150)%360;sphere(P[i][0],P[i][1],h,.62+.38*m)}
+ let n=0;for(const k of D.kicks)if(tt>=k[0])n++;
+ let top=n===0?'Ripple Grid':'Tap '+n+' of 3',cap='Tap the middle ball...';
+ if(tt>=2.6&&tt<10)cap='Ripples travel and bounce back.';if(tt>=10.5&&tt<19)cap='Tap again: a new wave.';if(tt>=19)cap='Two taps, two waves cross.';
  c.save();c.textAlign='center';c.textBaseline='middle';c.fillStyle='rgba(255,255,255,.98)';c.shadowColor='rgba(0,0,0,.6)';c.shadowBlur=8;
- c.font='800 84px system-ui,sans-serif';c.fillText('Shaker: '+hz.toFixed(2)+' Hz',540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
+ c.font='800 84px system-ui,sans-serif';c.fillText(top,540,95);c.font='700 44px system-ui,sans-serif';c.fillText(cap,540,178);c.restore()}
 window.render=render;
-const FPSV=+(new URLSearchParams(location.search).get('fps')||60),K=6,SHUT=.75;
+const FPSV=+(new URLSearchParams(location.search).get('fps')||30),K=6,SHUT=.75;
 const acc=document.createElement('canvas');acc.width=W;acc.height=H;const ac=acc.getContext('2d');
 function blurFrame(t){window.TT=t;for(let j=0;j<K;j++){render(Math.max(0,t-SHUT/FPSV*(j/(K-1))));ac.globalAlpha=1/(j+1);ac.drawImage(cv,0,0)}ac.globalAlpha=1;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.drawImage(acc,0,0)}
 window.grabPNG=t=>{blurFrame(t);return cv.toDataURL('image/png').split(',')[1]};
