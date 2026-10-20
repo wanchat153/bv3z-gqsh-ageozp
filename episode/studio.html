@@ -11,17 +11,8 @@ const BM=new Map();
 async function loadBM(n){if(BM.has(n))return BM.get(n);const im=new Image();im.src='img/'+SH[n].img;await im.decode();const b=await createImageBitmap(im);BM.set(n,b);return b}
 function trim(keep){for(const [k,b] of BM)if(!keep.includes(k)){b.close();BM.delete(k)}}
 function shotAt(t){let lo=0,hi=SH.length-1;while(lo<hi){const m=(lo+hi+1)>>1;if(SH[m].t0<=t)lo=m;else hi=m-1}return lo}
-// camera: very slow push-in or pull-out with a tiny drift (never leaves the image)
-function cam(s,tl){
-  const d=Math.max(s.t1-s.t0,.5),e=sm(tl/d),k=s.n%4,z0=1.03,z1=1.075;
-  let z,fx,fy;
-  if(k===0){z=z0+(z1-z0)*e;fx=.5;fy=.47}
-  else if(k===1){z=z1-(z1-z0)*e;fx=.5;fy=.5}
-  else if(k===2){z=z0+(z1-z0)*e*.8;fx=.46+.08*e;fy=.48}
-  else {z=z0+(z1-z0)*e*.8;fx=.54-.08*e;fy=.48}
-  const half=.5/z;fx=clamp(fx,half,1-half);fy=clamp(fy,half,1-half);
-  return{z,cx:fx,cy:fy};
-}
+// no camera movement at all: the still stays perfectly steady
+function cam(s,tl){return{z:1,cx:.5,cy:.5}}
 function drawShot(s,tl,alpha){
   const bm=BM.get(s.n);if(!bm)return;const k=cam(s,tl);
   c.save();c.globalAlpha=alpha;c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
