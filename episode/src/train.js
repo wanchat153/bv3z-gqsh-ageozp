@@ -123,9 +123,9 @@ export function makeBoxcar(color, seed) {
 }
 
 // ---------------- the signalman ----------------
-export function makeSignalman() {
+export function makeSignalman(opt = {}) {
   const root = new THREE.Group();
-  const coatM = mat(0x2a2e36, 0.92, 0, CLOTH, 0.9); coatM.side = THREE.DoubleSide;
+  const coatM = mat(opt.coat ?? 0x2a2e36, 0.92, 0, CLOTH, 0.9); coatM.side = THREE.DoubleSide;
   const denim = mat(0x2a2a30, 0.95, 0, CLOTH, 0.7), shirt = mat(0x4a4038, 0.9, 0, CLOTH, 0.5), vest = mat(0x221c18, 0.85, 0, LEATHER, 0.5);
   const boot = mat(0x1e1610, 0.55, 0, LEATHER, 0.8), belt = mat(0x2a1c12, 0.6, 0, LEATHER, 0.8), skin = mat(0x4a3024, 0.75), glove = mat(0x4a3628, 0.72, 0, LEATHER, 0.6), capM = mat(0x1e2028, 0.8, 0, CLOTH, 0.4);
   const add = (o) => { root.add(o); return o; };
@@ -159,10 +159,17 @@ export function makeSignalman() {
   const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.068, 20, 14), skin); jaw.scale.set(1.0, 0.85, 0.9); jaw.position.set(0, 0.105, 0.012); head.add(jaw);
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.04, 10), skin); nose.position.set(0, 0.155, 0.095); nose.rotation.x = Math.PI / 2 + 0.5; head.add(nose);
   for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), skin); e.scale.set(0.5, 1.1, 0.8); e.position.set(s * 0.083, 0.165, -0.01); head.add(e); }
+  if (opt.hard) { // white hard hat with a brim ridge
+    const hm = new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.35 });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.125, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), hm); dome.scale.set(1, 0.85, 1.12); dome.position.set(0, 0.235, 0.0); head.add(dome);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.012, 40), hm); brim.scale.z = 1.18; brim.position.set(0, 0.235, 0.012); head.add(brim);
+    const ridge = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, 0.26), hm); ridge.position.set(0, 0.34, 0.0); head.add(ridge);
+  } else {
   // brakeman's cap with a visor; a short beard line
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.098, 0.1, 0.075, 32), capM); cap.position.set(0, 0.27, -0.005); head.add(cap);
   const top = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.098, 0.012, 32), capM); top.position.set(0, 0.31, -0.005); head.add(top);
   const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.008, 24, 1, false, -0.9, 1.8), mat(0x0c0c10, 0.4)); visor.position.set(0, 0.238, 0.03); visor.rotation.x = 0.18; visor.scale.z = 1.25; head.add(visor);
+  }
   root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return { root, head, arm, hand, coat, coatBase: Float32Array.from(coatGeo.attributes.position.array) };
 }

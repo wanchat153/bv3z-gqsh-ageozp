@@ -27,7 +27,7 @@ float snoise(vec3 v){
   return 105.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
 }`;
 // fireball size law, shared with film.js (light position)
-export const FBR = { R0: 10.5, k: 2.4, lin: 0.22, rise: 1.0, riseP: 1.1 };
+export const FBR = { R0: 22.0, k: 2.0, lin: 0.3, rise: 2.0, riseP: 1.1 };
 const RGLSL = `float R=${FBR.R0.toFixed(2)}*(1.0-exp(-te*${FBR.k.toFixed(2)}))+${FBR.lin.toFixed(2)}*te;`;
 const HGLSL = `float rise=max(te-1.6,0.0); float Hc=R*0.62+${FBR.rise.toFixed(2)}*pow(rise,${FBR.riseP.toFixed(2)});`;
 
@@ -57,7 +57,7 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       vec3 dir=vec3(sy*cos(az),cy,sy*sin(az));
       float rf=pow(aR.z,0.55);
       ${RGLSL}
-      float Rf=5.0*(1.0-exp(-te*10.0));
+      float Rf=10.0*(1.0-exp(-te*10.0));
       vec3 pF=dir*Rf*rf; pF.y=abs(pF.y)+Rf*0.25;
       vec3 pD=dir*R*rf; pD.y=abs(pD.y)*1.05;
       vec3 p=mix(pF,pD,smoothstep(0.05,0.7,te));
@@ -75,21 +75,21 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       vec3 q=p/Rn*2.2+vec3(0.0,-te*0.16,0.0);
       p+=(0.11+0.07*mt)*Rn*vec3(snoise(q),snoise(q+17.1),snoise(q+31.7));
       vec3 q2=q*2.7+vec3(4.0,te*0.3,1.0);
-      p+=0.035*Rn*vec3(snoise(q2),snoise(q2+7.7),snoise(q2+13.3));
+      p+=0.02*Rn*vec3(snoise(q2),snoise(q2+7.7),snoise(q2+13.3));
       p.y=max(p.y,0.05);
       float lob=snoise(q*1.9+5.0)*0.7+snoise(q2*1.3)*0.3;
       float tmp=(1.0-rf)*0.95+0.28*lob+0.15-te*0.035+0.6*exp(-te*3.0);
       tmp=clamp(tmp,0.0,1.4);
       vec3 cW=vec3(1.0,0.93,0.76), cG=vec3(1.0,0.604,0.314), cR=vec3(0.62,0.20,0.07), cD=vec3(0.10,0.04,0.025);
       vec3 col=tmp>0.62?mix(cG,cW,smoothstep(0.62,1.0,tmp)):(tmp>0.32?mix(cR,cG,smoothstep(0.32,0.62,tmp)):mix(cD,cR,smoothstep(0.05,0.32,tmp)));
-      float br=(0.35+1.0*smoothstep(-0.35,0.6,lob))*(0.6+0.8*tmp);
+      float br=(0.6+0.55*smoothstep(-0.5,0.7,lob))*(0.6+0.8*tmp);
       br*=1.0-0.35*isStem;
       float flash=exp(-te*8.0);
       col=mix(col,vec3(1.0,0.97,0.9),flash);
-      vC=vec4(col*br*uI, 0.09*(1.0+3.0*flash));
+      vC=vec4(col*br*uI, 0.045*(1.0+3.0*flash));
       vec4 mv=modelViewMatrix*vec4(uC+p,1.0);
-      float sz=mix(0.26,0.14+0.16*aS.z,smoothstep(0.0,1.0,te))*(Rn/10.5*0.6+0.4);
-      gl_PointSize=te<0.0?0.0:clamp(sz*uScale/-mv.z,1.0,40.0);
+      float sz=1.45*mix(0.26,0.14+0.16*aS.z,smoothstep(0.0,1.0,te))*(Rn/${FBR.R0.toFixed(1)}*0.6+0.4);
+      gl_PointSize=te<0.0?0.0:clamp(sz*uScale/-mv.z,1.5,64.0);
       gl_Position=projectionMatrix*mv;
     }`,
     fragmentShader: SPRITE_FS,
@@ -121,9 +121,9 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       float v=abs(snoise(q*2.4+3.0));
       float top=smoothstep(0.55,0.95,(p.y-Hc*0.6)/max(Rn,1.0));
       float keep=max((1.0-smoothstep(0.015,0.04,v))*step(0.45,p.y/max(Hc+rt,1.0)), top*step(aS.x,0.6));
-      vC=vec4(vec3(0.05,0.032,0.024)+vec3(0.30,0.14,0.05)*uI*0.12, 0.05*keep*smoothstep(0.8,2.5,te));
+      vC=vec4(vec3(0.05,0.032,0.024)+vec3(0.30,0.14,0.05)*uI*0.12, 0.025*keep*smoothstep(0.8,2.5,te));
       vec4 mv=modelViewMatrix*vec4(uC+p,1.0);
-      gl_PointSize=(keep<0.01||te<0.0)?0.0:clamp(0.45*(Rn/10.5*0.6+0.4)*uScale/-mv.z,1.0,40.0);
+      gl_PointSize=(keep<0.01||te<0.0)?0.0:clamp(0.45*(Rn/${FBR.R0.toFixed(1)}*0.6+0.4)*uScale/-mv.z,1.0,40.0);
       gl_Position=projectionMatrix*mv;
     }`,
     fragmentShader: SPRITE_FS,
@@ -153,10 +153,10 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
     vertexShader: NOISE + `attribute vec4 aR; attribute vec4 aS; uniform float uTe; uniform vec3 uC; uniform float uScale; uniform float uI; varying vec4 vC;
     void main(){ float te=uTe;
       float az=1.5708+(aR.x-0.5)*2.2;
-      float Rd=15.5*pow(max(te-0.3,0.0),0.8);
+      float Rd=20.2*pow(max(te-0.3,0.0),0.8);
       float back=pow(aR.y,1.6)*(2.0+0.15*Rd);
       float r=max(Rd-back,0.0);
-      float hmax=1.4+0.055*Rd;
+      float hmax=2.5+0.08*Rd;
       float h=hmax*pow(aR.z,1.7)*(0.6+0.4*(1.0-aR.y));
       vec3 rad=vec3(cos(az),0.0,sin(az));
       vec3 p=rad*r+vec3(0.0,h,0.0);
@@ -165,15 +165,15 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       p.y=max(p.y,0.05);
       float front=1.0-aR.y; float crest=smoothstep(0.35,1.0,h/hmax);
       vec3 col=vec3(0.075,0.06,0.05)*(0.7+0.6*front)+vec3(1.0,0.78,0.5)*uI*0.32*crest*(0.4+0.6*aR.w);
-      float a=0.13*smoothstep(0.3,1.2,te)*(0.4+0.6*front);
+      float a=0.06*smoothstep(0.3,1.2,te)*(0.4+0.6*front);
       vec4 mv=modelViewMatrix*vec4(uC+p,1.0);
       float dcam=-mv.z; a*=smoothstep(0.6,3.0,dcam);
       vC=vec4(col,a);
-      gl_PointSize=(te<0.3||a<0.002)?0.0:clamp((0.5+0.9*aS.x)*(1.0+0.05*Rd)*uScale/dcam,1.0,60.0);
+      gl_PointSize=(te<0.3||a<0.002)?0.0:clamp(3.6*(0.5+0.9*aS.x)*(1.0+0.05*Rd)*uScale/dcam,3.0,110.0);
       gl_Position=projectionMatrix*mv; }`,
     fragmentShader: SPRITE_FS,
   });
-  fx.dust = pts(scene, 90000, 404, fx.dustMat);
+  fx.dust = pts(scene, 26000, 404, fx.dustMat);
 
   // ---- bullet-time air: motes pushed out of the round's path, a Mach cone you can see
   fx.moteMat = new THREE.ShaderMaterial({

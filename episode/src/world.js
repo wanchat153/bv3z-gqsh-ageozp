@@ -1,7 +1,7 @@
 // The set: pre-dawn sky with stars, mesas, clouds, cracked desert floor cut by a gorge, rocks, sagebrush, a dead tree.
 import * as THREE from './three.module.js';
 import { mulberry, mix, clamp, limb } from './models.js';
-import { TRACK_X, GORGE0, GORGE1 } from './timeline.js';
+
 
 export const VNOISE = /* glsl */`
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
@@ -59,9 +59,6 @@ export function buildWorld(scene, renderer, FB) {
       const m = new THREE.Mesh(new THREE.ShapeGeometry(s), new THREE.MeshBasicMaterial({ color: col, fog: false }));
       m.position.z = z; m.rotation.y = ry; scene.add(m); return m;
     };
-    mk(-1250, -1600, 1600, 70, new THREE.Color(0.060, 0.070, 0.115));
-    mk(-950, -1300, 1300, 44, new THREE.Color(0.042, 0.048, 0.078));
-    mk(-650, -900, 900, 20, new THREE.Color(0.028, 0.030, 0.046));
     mk(1000, -1300, 1300, 46, new THREE.Color(0.050, 0.058, 0.095), Math.PI);
   }
   // clouds
@@ -96,11 +93,11 @@ export function buildWorld(scene, renderer, FB) {
   groundMat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying vec3 vWP;\nvoid main() {').replace('#include <project_vertex>', '#include <project_vertex>\n vWP=(modelMatrix*vec4(transformed,1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying vec3 vWP;\n' + VNOISE + `
-      float gh(vec2 p){ float c=crack(p*3.4+fbm(p*0.8)*0.8); float cw=smoothstep(0.4,0.7,fbm(p*0.25)); return fbm(p*2.2)*0.6+fbm(p*9.0)*0.15 - 0.6*cw*(1.0-smoothstep(0.0,0.025,c)); }
+      float gh(vec2 p){ float c=crack(p*3.4+fbm(p*0.8)*0.8); float cw=smoothstep(0.4,0.7,fbm(p*0.25)); return fbm(p*2.2)*0.6+fbm(p*9.0)*0.15; }
       vec3 gcol(vec2 p){ float n=fbm(p*0.12), n2=fbm(p*1.3), c=crack(p*3.4+fbm(p*0.8)*0.8), pe=vn(p*22.0); float cw=smoothstep(0.4,0.7,fbm(p*0.25));
         vec3 a=vec3(0.098,0.078,0.060), b=vec3(0.062,0.052,0.044), sand=vec3(0.13,0.108,0.084);
         vec3 col=mix(b,a,smoothstep(0.3,0.7,n)); col=mix(col,sand,smoothstep(0.55,0.8,n2)*0.6);
-        col*=0.8+0.35*pe; col*=mix(mix(1.0,0.6,cw),1.0,smoothstep(0.0,0.015,c)); col*=0.13;
+        col*=0.8+0.35*pe; col*=0.16;
         float rut=exp(-pow((abs(p.x-0.9-0.02*p.y)-0.78)/0.12,2.0))*0.35; col*=1.0-rut;
         return col; }
       void main() {`)
@@ -111,14 +108,10 @@ export function buildWorld(scene, renderer, FB) {
           vec3 nw=normalize(vec3(-hx/e*0.035*k,1.0,-hz/e*0.035*k));
           normal=normalize((viewMatrix*vec4(nw,0.0)).xyz); }`);
   };
-  // the plain, cut by a gorge across the line (z from GORGE1 to GORGE0)
-  for (const [z0, z1] of [[GORGE0, 1500], [-1500, GORGE1]]) {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, z1 - z0), groundMat);
-    ground.rotation.x = -Math.PI / 2; ground.position.z = (z0 + z1) / 2; ground.receiveShadow = true; scene.add(ground);
-  }
-
+  // the coastal flat, ending at the shoreline (the sea is drawn separately)
+  { const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000, 1820), groundMat); ground.rotation.x = -Math.PI / 2; ground.position.z = 1500 - 910; ground.receiveShadow = true; scene.add(ground); }
   // ---- props: keep the cowboy's mark and the camera lanes clear ----
-  const clear = (x, z) => Math.hypot(x - 2.6, z) < 1.6 || Math.abs(x - TRACK_X) < 3.2 || (x > -0.6 && x < 5.4 && z > -14 && z < 24) || (z > GORGE1 - 4 && z < GORGE0 + 4);
+  const clear = (x, z) => (Math.abs(x) < 3.0 && z > -3 && z < 14) || Math.hypot(x, z + 120) < 48 || z < -300 || (Math.abs(x) < 12 && z < 0 && z > -120);
   const r = mulberry(33);
   // rocks: one displaced boulder, instanced
   {
@@ -159,25 +152,6 @@ export function buildWorld(scene, renderer, FB) {
       m.compose(p, q, s); im.setMatrixAt(k, m); c.setRGB(0.035 + r() * 0.01, 0.038 + r() * 0.01, 0.026); im.setColorAt(k, c); k++;
     }
     im.castShadow = true; im.receiveShadow = true; scene.add(im);
-  }
-  // a dead tree, half-way to the wagon on the left
-  {
-    const bark = new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.95 });
-    const tree = new THREE.Group(); tree.position.set(-9.0, 0, -26); scene.add(tree);
-    const rr = mulberry(77);
-    const branch = (p0, dir, len, rad, depth) => {
-      const p1 = p0.clone().addScaledVector(dir, len * 0.5).add(new THREE.Vector3((rr() - 0.5) * 0.3 * len, 0, (rr() - 0.5) * 0.3 * len));
-      const p2 = p0.clone().addScaledVector(dir, len);
-      tree.add(limb([p0.toArray(), p1.toArray(), p2.toArray()], [rad, rad * 0.8, rad * 0.6], bark, 8, 8, false));
-      if (depth <= 0) return;
-      const nb = depth > 2 ? 2 : 3;
-      for (let k = 0; k < nb; k++) {
-        const d = dir.clone().add(new THREE.Vector3((rr() - 0.5) * 1.4, (rr() - 0.2) * 0.6, (rr() - 0.5) * 1.4)).normalize();
-        branch(p2, d, len * (0.55 + rr() * 0.25), rad * 0.6, depth - 1);
-      }
-    };
-    branch(new THREE.Vector3(0, -0.1, 0), new THREE.Vector3(0.1, 1, 0).normalize(), 2.6, 0.17, 4);
-    tree.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   }
   return out;
 }
