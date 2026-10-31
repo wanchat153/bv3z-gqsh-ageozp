@@ -18,7 +18,8 @@ const DUR = await pg.evaluate(() => window.DUR);
 const rows = []; const shots = {};
 const inter = (A, B) => Math.max(0, Math.min(A[2], B[2]) - Math.max(A[0], B[0])) * Math.max(0, Math.min(A[3], B[3]) - Math.max(A[1], B[1]));
 const area = (A) => Math.max(0, A[2] - A[0]) * Math.max(0, A[3] - A[1]);
-for (let t = 0.1; t < DUR - 0.05; t += step) {
+const T0 = +opt('--from', 0.1), T1 = +opt('--to', DUR - 0.05);
+for (let t = T0; t < T1; t += step) {
   const r = await pg.evaluate((t) => window.SUBJECTS(t), +t.toFixed(3)); const { W, H } = r; const F = [0, 0, W, H];
   const sh = shots[r.shot] ||= { shot: r.shot, wide: r.wide, t0: t, t1: t, heroMax: 0, heroMin: 1, flags: {} };
   sh.t1 = t; const flag = (k, msg) => { (sh.flags[k] ||= []).push(`${t.toFixed(2)}s ${msg}`); };
@@ -37,7 +38,7 @@ for (let t = 0.1; t < DUR - 0.05; t += step) {
   for (const c of chars) { const bb = c.box; const head = [bb[0], bb[1], bb[2], bb[1] + (bb[3] - bb[1]) * 0.42]; const hv = area(head) ? inter(head, F) / area(head) : 0;
     if (hv > 0.05 && hv < 0.6 && area(head) > W * H * 0.004) { flag('face-cut', `${c.id} face cut by the frame edge`); probs.push(c.id); } }
   for (let i = 0; i < chars.length; i++) for (let j = i + 1; j < chars.length; j++) { const A = chars[i].box, B = chars[j].box; const ha = [A[0], A[1], A[2], A[1] + (A[3] - A[1]) * 0.42], hb2 = [B[0], B[1], B[2], B[1] + (B[3] - B[1]) * 0.42];
-    const ov = inter(ha, hb2) / Math.max(1, Math.min(area(ha), area(hb2))); if (ov > 0.35 && Math.min(area(ha), area(hb2)) > W * H * 0.004) { flag('faces-overlap', `${chars[i].id} and ${chars[j].id} faces overlap ${Math.round(ov * 100)}%`); probs.push(chars[i].id, chars[j].id); } }
+    const ov = inter(ha, hb2) / Math.max(1, Math.min(area(ha), area(hb2))); const similar = Math.min(area(ha), area(hb2)) / Math.max(1, Math.max(area(ha), area(hb2))) > 0.45; if (ov > 0.35 && similar && Math.min(area(ha), area(hb2)) > W * H * 0.004) { flag('faces-overlap', `${chars[i].id} and ${chars[j].id} faces overlap ${Math.round(ov * 100)}%`); probs.push(chars[i].id, chars[j].id); } }
   // physical truth: working room, people vs people, pieces vs people, arm reach (from the page's clearance report)
   for (const c of r.clear || []) { flag('clearance', c); probs.push('clear'); }
   // captions never cover a face
@@ -58,7 +59,7 @@ for (const r of marks.filter((r, i, A) => i === 0 || r.t - A[i - 1].t >= 0.99 ||
   writeFileSync(join(out, `f_${String(n++).padStart(3, '0')}_${r.t.toFixed(2)}.jpg`), Buffer.from(data, 'base64'));
 }
 // report
-const L = ['# Frame check', '', `step ${step}s · ${VW}x${VH} · rules (benchmark: the reference videos): hero ≥ 1/3 frame height somewhere in each non-wide shot; hero's head (or a hero object) ≥ 90% inside the frame, bodies may crop like the references' medium shots; hero centre within the middle 70%; no face cut by the edge; no two faces overlapping > 35%; every character card faces the camera squarely (turns are drawing swaps, never a rotating card); the last 0.45 s of a shot that leaves on an in-camera transition is exempt.`, '', '| shot | time | hero height (min–max of frame) | problems |', '|---|---|---|---|'];
+const L = ['# Frame check', '', `step ${step}s · ${VW}x${VH} · rules (benchmark: the reference videos): hero ≥ 1/3 frame height somewhere in each non-wide shot; hero's head (or a hero object) ≥ 90% inside the frame, bodies may crop like the references' medium shots; hero centre within the middle 70%; no face cut by the edge; no two faces of similar size (same depth) overlapping > 35% (a much smaller face behind is depth staging); every character card faces the camera squarely (turns are drawing swaps, never a rotating card); the last 0.45 s of a shot that leaves on an in-camera transition is exempt.`, '', '| shot | time | hero height (min–max of frame) | problems |', '|---|---|---|---|'];
 let total = 0;
 for (const s of Object.values(shots)) { const p = []; if (!s.wide && s.heroMax < 0.33) p.push(`hero never reaches 1/3 of frame height (max ${Math.round(s.heroMax * 100)}%)`);
   for (const [k, v] of Object.entries(s.flags)) p.push(`${k} ×${v.length} (first ${v[0]})`); total += p.length;
