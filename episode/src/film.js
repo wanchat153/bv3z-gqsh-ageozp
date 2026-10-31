@@ -119,7 +119,7 @@ function manAt(t, toasts) {
   const w = tau(t);
   m.blink = (Math.sin(w * 1.3) > 0.985 || Math.sin(w * 0.77 + 2) > 0.99) ? 1 : 0;
   // which toast is in play
-  const seg = t < T.bPick ? 'A' : t < T.cPick ? 'B' : t < 22 ? 'C' : 'F';
+  const seg = t < T.bPick ? 'A' : t < T.cPick ? 'B' : t < T.think ? 'C' : 'F';
   const butterHands = (k, T0, T1) => {
     const s = toasts[k]; const P = FALL_PLAN[k];
     if (s.phase === 'butter') {
@@ -282,7 +282,7 @@ function camAt(t, toasts) {
   if (t < 22.6) {
     const k0 = keyCam(KEYS, 9.9); const o = orbitC(Math.min(t, FALLS.C.land), toasts);
     let c = blend(k0, o, sstep(9.9, 10.9, t));
-    if (t > 21.6) c = blend(c, keyCam(KEYS2, 22.6), sstep(21.6, 22.6, t));
+    if (t > 21.6) c = blend(c, keyCam(KEYS2.slice(1), 22.6), sstep(21.6, 22.6, t));
     return c;
   }
   if (t < 31.9) return keyCam(KEYS2.slice(1), t);
