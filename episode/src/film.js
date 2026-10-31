@@ -1,10 +1,9 @@
-// Cat Flip — wordless toon short. Every frame is a pure function of t.
+// Butter Side Down — wordless toon short. Every frame is a pure function of t.
 import * as THREE from './three.module.js';
-import { DUR, T, LEDGE_Y, CAT_Y0, tau, TAU_OFF, FALL_T, T_LAND, EV } from './timeline.js';
-import { clamp, mix, sstep } from './toon.js';
-import { buildSet, makeButterfly } from './set.js';
-import { makeCat, poseCat, LEG, STAND, makeDog } from './chars.js';
-import { buildInner, poseInner, INNER_O } from './inner.js';
+import { DUR, T, TOP0, LAYER, NLAYER, TH, OMEGA, FALLS, tau, layerT, EV } from './timeline.js';
+import { clamp, mix, sstep, mulberry } from './toon.js';
+import { buildSet, makeToast } from './set.js';
+import { makeFlat, drawMan, drawManArms, drawDog, drawBulb } from './flat.js';
 
 const W = innerWidth, HH = innerHeight;
 const canvas = document.createElement('canvas');
@@ -15,294 +14,395 @@ renderer.setPixelRatio(1); renderer.setSize(W, HH, false);
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, W / HH, 0.005, 1000);
+const camera = new THREE.PerspectiveCamera(40, W / HH, 0.01, 200);
+const QS = new URLSearchParams(location.search);
 
-const hemi = new THREE.HemisphereLight(0xd6ecff, 0x9a8a6a, 1.15); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
-Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 40 });
+const hemi = new THREE.HemisphereLight(0xfff8ee, 0xe9c9a6, 1.35); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.2); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, { left: -3.2, right: 3.2, top: 3.2, bottom: -3.2, near: 0.5, far: 30 });
 scene.add(sun); scene.add(sun.target);
 const SET = buildSet(scene);
-const CAT = makeCat(); scene.add(CAT.root);
-const DOG = makeDog(); scene.add(DOG.root);
-const BF = makeButterfly(); scene.add(BF.g);
-const IN = buildInner(scene);
-const DOG_HOME = new THREE.Vector3(2.55, SET.WALL_TOP + 0.13, 1.3);
+SET.stack[3].visible = false;
 
-// ---------- the cat through the film ----------
-const L = LEG;
-const QS = new URLSearchParams(location.search); const HEADP = +(QS.get('hp') ?? -0.45), HEADY = +(QS.get('hy') ?? -0.9);
-function catAt(t) {
-  const p = STAND(); const pos = new THREE.Vector3(); let rotY = -Math.PI / 2, rotX = 0, rotZ = 0;
-  const tr = tau(t) - TAU_OFF;             // world seconds since leaving the ledge
-  if (t < T.off) {
-    // asleep on its back along the rail; nose twitch, sneeze, slide toward the edge
-    const breathe = 0.04 * Math.sin(t * 2.4);
-    p.aF = p.aR = Math.PI; p.arch = breathe * 0.5;
-    p.legs = { FL: L(0.7, 1.1), FR: L(0.5, 1.3), HL: L(-0.3, -1.0), HR: L(-0.5, -0.8) };
-    p.eye = { open: 0 }; p.tail = { curl: -0.2, up: -0.5, sway: 0.9 };
-    p.head = { pitch: HEADP, yaw: HEADY, roll: 0 };
-    const tw = sstep(T.twitch, T.twitch + 0.15, t) * (1 - sstep(T.sneeze - 0.1, T.sneeze, t));
-    p.head.roll += 0.06 * tw * Math.sin(t * 45);
-    const sn = Math.exp(-Math.max(0, t - T.sneeze) * 9) * (t > T.sneeze ? 1 : 0);
-    p.head.pitch += -0.5 * sn; p.arch += 0.25 * sn;
-    p.eye = { open: t > T.sneeze ? 0.2 * (1 - sn) : 0 };
-    const sl = sstep(T.slide, T.off, t);
-    pos.set(0, CAT_Y0 + 0.02 * sn - 0.04 * sl * sl, -0.06 + 0.36 * sl * sl);
-    rotX = 0.35 * sl * sl;                  // tipping over the front edge
-  } else if (tr < FALL_T) {
-    const s = tr;
-    pos.set(0, CAT_Y0 - 0.04 - 4.9 * s * s, 0.30 + 0.5 * s);
-    rotX = 0.35 * (1 - sstep(0.0, 0.2, s));
-    const f = sstep(0.12, 0.24, s), r = sstep(0.22, 0.34, s), x = sstep(0.32, 0.42, s);
-    p.aF = Math.PI * (1 - f); p.aR = Math.PI * (1 - r);
-    const flail = 1 - sstep(0.08, 0.14, s), wob = Math.sin(t * 7.0);
-    const fl = (a, b) => mix(a, b, 1);
-    p.legs = {
-      FL: L(mix(mix(0.3 * wob, 0.95, sstep(0.1, 0.16, s)), mix(0.25, 0.15, x), r), mix(mix(0.4, 1.7, sstep(0.1, 0.16, s)), mix(0.35, 0.15, x), r), 0.55 * flail + 0.12 * x),
-      FR: L(mix(mix(-0.3 * wob, 0.95, sstep(0.1, 0.16, s)), mix(0.25, 0.15, x), r), mix(mix(0.4, 1.7, sstep(0.1, 0.16, s)), mix(0.35, 0.15, x), r), 0.55 * flail + 0.12 * x),
-      HL: L(mix(mix(-0.4, -0.35, f), mix(0.55, -0.15, x), r), mix(mix(-0.3, -0.15, f), mix(-1.5, -0.25, x), r), 0.5 * flail + 0.3 * (f - r) + 0.12 * x),
-      HR: L(mix(mix(0.4, -0.35, f), mix(0.55, -0.15, x), r), mix(mix(-0.3, -0.15, f), mix(-1.5, -0.25, x), r), 0.5 * flail + 0.3 * (f - r) + 0.12 * x),
-    };
-    p.arch = 0.22 * x;
-    p.head = { pitch: 0.25 * f, yaw: 0, roll: 0 };
-    p.eye = { open: 1, size: mix(0.5, 1.0, x), look: [0, -0.6 * f] };
-    p.tail = { curl: mix(-0.2, 0.7, x), up: mix(-0.3, 0.9, x), sway: 0.9 * (1 - f) - 1.4 * (f - r) + 0.2 * r };
+// ---------- toasts, ghosts, splats ----------
+const TOAST = {}; for (const k of ['A', 'B', 'C', 'F']) { TOAST[k] = makeToast(true); scene.add(TOAST[k].root); }
+const GH = {}; const NG = 9;
+for (const k of ['C', 'F']) { GH[k] = []; for (let i = 0; i < NG; i++) { const g = makeToast(true, true); scene.add(g.root); GH[k].push(g); } }
+const DOTM = new THREE.MeshBasicMaterial({ color: 0x3a2a4a, transparent: true, opacity: 0.6, depthWrite: false });
+const DOTS = {}; const ND = 22;
+for (const k of ['C', 'F']) { DOTS[k] = []; for (let i = 0; i < ND; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.006, 10, 8), DOTM.clone()); scene.add(d); DOTS[k].push(d); } }
+const SPLAT = {}; const butterM = new THREE.MeshToonMaterial({ color: 0xffe27a, gradientMap: TOAST.A.butter.material.gradientMap });
+for (const k of ['A', 'B', 'C']) {
+  const g = new THREE.Group(); scene.add(g);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 40), butterM); pool.rotation.x = -Math.PI / 2; pool.position.y = 0.002; g.add(pool);
+  const r = mulberry(k.charCodeAt(0) * 7); const blobs = [];
+  for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), butterM); b.castShadow = true; scene.add(b); const a = r() * Math.PI * 2; blobs.push({ m: b, a, v: 0.5 + r() * 0.6, vy: 0.6 + r() * 0.7, r: 0.007 + r() * 0.006 }); }
+  SPLAT[k] = { g, pool, blobs };
+}
+const CRUMBS = []; { const r = mulberry(31); for (let i = 0; i < 7; i++) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.009, 0.01), TOAST.A.body.children[0].material[1]); c.castShadow = true; scene.add(c); CRUMBS.push({ m: c, a: r() * 6.28, v: 0.25 + r() * 0.35, vy: 0.5 + r() * 0.6, spin: r() * 20 }); } }
+
+// ---------- flat characters ----------
+const MAN = makeFlat(2.1, 2048, drawMan); scene.add(MAN.mesh); scene.add(MAN.shadow);
+const ARMS = makeFlat(2.1, 1024, drawManArms); scene.add(ARMS.mesh); ARMS.mesh.renderOrder = 10;
+const DOG = makeFlat(0.7, 1024, drawDog); scene.add(DOG.mesh); scene.add(DOG.shadow);
+const BULB = makeFlat(0.34, 512, drawBulb); scene.add(BULB.mesh);
+MAN.shadow.material.color.set(0x5a3a2a); DOG.shadow.material.color.set(0x5a3a2a);
+
+// ---------- the table rising ----------
+const pop = (u) => { if (u <= 0) return 0; if (u >= 1) return 1; const c1 = 1.7, v = u - 1; return 1 + (c1 + 1) * v * v * v + c1 * v * v; };
+function layerF(L, t) { return clamp(pop((t - layerT(L)) / 0.28), 0, 1.12); }
+function tableY(t) { let y = 0; for (let L = 0; L < NLAYER; L++) y += Math.min(1, layerF(L, t)) * LAYER; return y; }
+const topAt = (t) => TOP0 + tableY(t);
+function jolt(t) { const s = t - T.bSneeze; return s > 0 ? 0.035 * Math.exp(-s * 7) * Math.sin(s * 30) : 0; }
+
+// ---------- toast choreography ----------
+const PLATE = (t) => new THREE.Vector3(0.1 + jolt(t), topAt(t) + 0.014 + TH / 2, 0.06);
+const STACKTOP = (t, n) => new THREE.Vector3(-0.28 + jolt(t), topAt(t) + 0.02 + TH / 2 + n * (TH + 0.001), 0.04);
+const arcMove = (a, b, u, h = 0.08) => a.clone().lerp(b, sstep(0, 1, u)).add(new THREE.Vector3(0, h * Math.sin(Math.PI * clamp(u, 0, 1)), 0));
+const FALL_PLAN = {
+  A: { pick: null, b0: T.aButter0, b1: T.aButter1, lift: T.aPlace - 0.4, place: T.aPlace, spot: [0.44, 0.06], push0: T.aPlace, kind: 'tip' },
+  B: { pick: T.bPick, b0: T.bButter0, b1: T.bButter1, lift: T.bButter1, place: T.bPlace, spot: [0.2, 0.2], push0: T.bSneeze + 0.05, kind: 'jolt' },
+  C: { pick: T.cPick, b0: T.cButter0, b1: T.cButter1, lift: T.cButter1, place: T.cPlace, spot: [0.42, -0.12], push0: T.cPush, kind: 'push' },
+  F: { pick: T.fPick, b0: T.fButter0, b1: T.fButter1, lift: T.fButter1, place: T.fPlace, spot: [0.42, 0.04], push0: T.fPush, kind: 'push' },
+};
+const STACK_N = { B: 2, C: 1, F: 0 };
+// eaten by the pup: [start, end]
+const EAT = { B: [22.0, 22.6], A: [23.3, 23.9], C: [24.4, 25.0], F: [T.gulp, T.gulp + 0.35] };
+function toastAt(k, t) {
+  const P = FALL_PLAN[k], F = FALLS[k]; const s = { pos: new THREE.Vector3(), rz: 0, yaw: 0, vis: true, butter: 1, sq: 1, held: false, phase: 'table', scale: 1 };
+  const w = tau(t), fs = w - F.w0;
+  if (P.pick !== null && t < P.pick) { s.vis = false; return s; }
+  s.butter = sstep(P.b0, P.b1, t);
+  if (fs < 0) {
+    if (P.pick !== null && t < P.b0) { s.pos.copy(arcMove(STACKTOP(t, STACK_N[k]), PLATE(t), (t - P.pick) / (P.b0 - P.pick), 0.08)); s.held = true; s.phase = 'carry'; }
+    else if (t < P.lift) { s.pos.copy(PLATE(t)); s.phase = 'butter'; }
+    else if (t < P.place) { const spot = new THREE.Vector3(P.spot[0] + jolt(t), topAt(t) + TH / 2 + 0.002, P.spot[1]); s.pos.copy(arcMove(PLATE(t), spot, (t - P.lift) / (P.place - P.lift), 0.07)); s.held = true; s.phase = 'carry'; }
+    else {
+      const spot = new THREE.Vector3(P.spot[0] + jolt(t), topAt(t) + TH / 2 + 0.002, P.spot[1]); s.pos.copy(spot);
+      const u = clamp((t - P.push0) / Math.max(0.01, F.rel - P.push0), 0, 1);
+      if (t > P.push0) {
+        const ease = P.kind === 'jolt' ? u * u : P.kind === 'tip' ? u * u : sstep(0, 1, u) * 0.6 + u * 0.4;
+        s.pos.x = mix(P.spot[0], F.x0, ease) + jolt(t); s.phase = P.kind === 'push' ? 'push' : 'slide';
+        s.rz = -0.12 * sstep(0.6, 1, u);
+      }
+    }
+    s.yaw = 0; return s;
+  }
+  // free flight (world time), then the landing
+  const top = F.top; const y0 = top + TH / 2 + 0.002; const rz0 = -0.12;
+  if (fs < F.sL) {
+    s.phase = 'fall';
+    s.pos.set(F.x0 + F.vx * fs, y0 - 0.5 * 9.8 * fs * fs, F.z); s.rz = rz0 - OMEGA * fs; s.yaw = F.yaw * fs / F.sL;
+    s.pos.y = Math.max(s.pos.y, TH / 2 + 0.003);
   } else {
-    // landed: absorb, stand, sit proud; later stroll over to the pup and sit beside him
-    const s = tr - FALL_T; const ld = new THREE.Vector3(0, 0.255, 0.30 + 0.5 * FALL_T);
-    const sq = Math.exp(-s * 10) * Math.sin(Math.min(Math.PI, s * 18));
-    pos.copy(ld); pos.y -= 0.07 * sq;
-    p.legs = { FL: L(0.15, 0.35 * sq), FR: L(0.15, 0.35 * sq), HL: L(-0.15, -0.5 * sq), HR: L(-0.15, -0.5 * sq) };
-    p.eye = { open: 1, size: 1 }; p.tail = { curl: 0.8, up: 1.0, sway: 0.1 * Math.sin(t * 2) };
-    const sit = sstep(T_LAND + 1.0, T_LAND + 1.6, t) * (1 - sstep(T.catWalk - 0.3, T.catWalk, t));
-    rotX = -0.45 * sit; pos.y -= 0.03 * sit;
-    p.legs.HL = L(mix(-0.15, -1.35, sit), mix(0, -2.2, sit)); p.legs.HR = L(mix(-0.15, -1.35, sit), mix(0, -2.2, sit));
-    p.legs.FL.sw += 0.45 * sit; p.legs.FR.sw += 0.45 * sit;
-    p.head = { pitch: 0.4 * sit, yaw: 0.6 * sit * sstep(T.pan, T.pan + 1, t) };
-    p.eye.open = mix(1, 0.55, sit * sstep(T_LAND + 1.4, T_LAND + 2.0, t));
-    // walk over to the pup
-    const wk = sstep(T.catWalk, T.catWalk + 2.8, t);
-    if (t > T.catWalk) {
-      const end = new THREE.Vector3(2.0, 0.255, 2.5);
-      pos.lerp(end, wk); pos.y = 0.255;
-      rotY = mix(-Math.PI / 2, Math.PI * 0.18, sstep(T.catWalk, T.catWalk + 0.6, t));
-      const ph = (t - T.catWalk) * 9.0, go = 1 - sstep(T.catWalk + 2.4, T.catWalk + 2.9, t);
-      p.legs = { FL: L(0.35 * Math.sin(ph) * go, 0.3 * Math.max(0, Math.cos(ph)) * go), FR: L(-0.35 * Math.sin(ph) * go, 0.3 * Math.max(0, -Math.cos(ph)) * go), HL: L(-0.35 * Math.sin(ph) * go, -0.3 * Math.max(0, -Math.cos(ph)) * go), HR: L(0.35 * Math.sin(ph) * go, -0.3 * Math.max(0, Math.cos(ph)) * go) };
-      const sit2 = sstep(T.catWalk + 2.9, T.catWalk + 3.5, t);
-      rotX = -0.45 * sit2; pos.y -= 0.03 * sit2;
-      p.legs.HL = L(mix(p.legs.HL.sw, -1.35, sit2), mix(p.legs.HL.bend, -2.2, sit2)); p.legs.HR = L(mix(p.legs.HR.sw, -1.35, sit2), mix(p.legs.HR.bend, -2.2, sit2));
-      p.legs.FL.sw += 0.45 * sit2; p.legs.FR.sw += 0.45 * sit2;
-      p.head = { pitch: 0.35 * sit2, yaw: -0.5 * sstep(T.catWalk + 3.2, T.catWalk + 3.8, t) };
-      const blink = sstep(42.6, 42.9, t) * (1 - sstep(43.1, 43.5, t));
-      p.eye = { open: mix(1, 0.55, sit2) * (1 - blink), size: 1 };
-      p.tail = { curl: 0.9, up: 1.2 - 0.6 * sit2, sway: 0.25 * Math.sin(t * 3) };
+    s.phase = 'down'; const after = fs - F.sL; const thL = rz0 - OMEGA * F.sL; const tgt = -Math.round(-thL / Math.PI) * Math.PI;
+    const u = sstep(0, 0.07, after); s.rz = mix(thL, tgt, u);
+    s.pos.set(F.x0 + F.vx * F.sL + 0.04 * sstep(0, 0.07, after), TH / 2 + 0.002 + 0.025 * Math.sin(Math.PI * clamp(after / 0.07, 0, 1)) * (1 - u * 0.5), F.z); s.yaw = F.yaw;
+    s.sq = 1 - 0.35 * Math.exp(-after * 40) * (after > 0 ? 1 : 0);
+    const e = EAT[k]; if (e && t > e[0]) { const b = clamp((t - e[0]) / (e[1] - e[0]), 0, 1); s.scale = 1 - Math.floor(b * 3.0 + (k === 'F' ? 2 : 0)) / 3; if (b >= 1) s.vis = false; s.pos.x -= 0.03 * b; }
+  }
+  return s;
+}
+function placeToast(obj, s) {
+  obj.root.visible = s.vis && s.scale > 0.01; obj.root.position.copy(s.pos);
+  obj.root.rotation.set(0, s.yaw, s.rz, 'YXZ'); obj.root.scale.set(s.scale, s.sq * Math.max(0.3, s.scale), s.scale);
+  obj.butter.scale.set(Math.max(0.001, s.butter), 1, Math.max(0.001, s.butter)); obj.butter.visible = s.butter > 0.01; if (obj.pat) { obj.pat.visible = s.butter > 0.6; }
+}
+
+// ---------- the man ----------
+const MAN_FLOOR = new THREE.Vector3(-0.06, 0.882, -0.62);
+const LADDER_POS = new THREE.Vector3(-0.1, 0, -0.85);
+const MAN_TOP = new THREE.Vector3(-0.1, 2.25 + 0.025 + 0.882, -0.85);
+const MAN_SIDE = new THREE.Vector3(-1.0, 0.882, 0.25);
+function manAt(t, toasts) {
+  const m = { anchor: MAN_FLOOR.clone(), mood: 'happy', look: null, lookW: null, hands: { L: { c: [-150, 30] }, R: { c: [150, 30] } }, shape: {}, knife: false, over: false, tilt: 0, sq: [1, 1], tuft: 0, sweat: false, blink: 0, ground: 0, carry: false };
+  const w = tau(t);
+  m.blink = (Math.sin(w * 1.3) > 0.985 || Math.sin(w * 0.77 + 2) > 0.99) ? 1 : 0;
+  // which toast is in play
+  const seg = t < T.bPick ? 'A' : t < T.cPick ? 'B' : t < 22 ? 'C' : 'F';
+  const butterHands = (k, T0, T1) => {
+    const s = toasts[k]; const P = FALL_PLAN[k];
+    if (s.phase === 'butter') {
+      m.over = true; m.knife = true; m.lookW = s.pos;
+      m.hands.L = { w: s.pos.clone().add(new THREE.Vector3(-0.085, 0.012, 0.02)) };
+      const st = clamp((t - P.b0) / (P.b1 - P.b0), 0, 1); const freq = (P.b1 - P.b0) < 1 ? 7 : 4.5;
+      const scoop = t < P.b0 ? 1 : 0;
+      const kp = s.pos.clone().add(new THREE.Vector3(0.03 + 0.04 * Math.sin((t - P.b0) * freq * Math.PI) * (st > 0 && st < 1 ? 1 : 0.2), 0.02, -0.01 + 0.02 * Math.cos((t - P.b0) * freq * 0.5 * Math.PI)));
+      m.hands.R = { w: kp };
+    } else if (s.phase === 'carry') {
+      m.over = true; m.lookW = s.pos;
+      m.hands.L = { w: s.pos.clone().add(new THREE.Vector3(-0.09, 0.01, 0)) }; m.hands.R = { w: s.pos.clone().add(new THREE.Vector3(0.09, 0.01, 0)) };
+    }
+  };
+  if (t < T.think) {
+    // ---- falls A, B, C at the table ----
+    const k = seg; const s = toasts[k]; const P = FALL_PLAN[k]; const F = FALLS[k];
+    if (k !== 'C' || t < F.rel) butterHands(k);
+    if (k === 'A') {
+      if (t > T.aPlace) { m.hands.L = { c: [-120, -60] }; m.hands.R = { c: [130, -40] }; m.lookW = s.pos; m.over = false; }
+      if (t > 2.95) { m.mood = 'nervous'; m.lookW = s.pos; }
+      if (t > F.land + 0.05) { m.mood = 'horror'; m.hands.L = { c: [-125, -285] }; m.hands.R = { c: [125, -285] }; m.lookW = new THREE.Vector3(0.62, 0, 0.06); m.tuft = Math.exp(-(t - F.land) * 5) * Math.sin((t - F.land) * 30); const e = Math.exp(-(t - F.land) * 9); m.sq = [1 - 0.06 * e, 1 + 0.08 * e]; }
+    } else if (k === 'B') {
+      m.mood = 'happy';
+      if (t < T.bButter0 && t > T.bPick) { m.mood = 'despair'; }
+      if (t > T.bPlace) { m.hands.L = { c: [-120, -60] }; m.hands.R = { c: [130, -40] }; m.over = false; m.lookW = s.pos; }
+      if (t > T.bPlace + 0.05 && t < T.bSneeze) { m.mood = 'sneeze0'; m.tilt = -0.12 * sstep(T.bPlace, T.bSneeze, t); m.lookW = null; m.look = [0, -0.5]; m.hands.R = { c: [40, -300] }; }
+      if (t >= T.bSneeze) { const e = Math.exp(-(t - T.bSneeze) * 6); m.mood = t < T.bSneeze + 0.35 ? 'sneeze' : 'horror'; m.tilt = 0.18 * e; m.sq = [1 + 0.05 * e, 1 - 0.07 * e]; m.lookW = s.pos; m.hands.R = { c: [130, -60] }; }
+      if (t > F.land + 0.05) { m.mood = 'despair'; m.hands.L = { c: [-95, -430] }; m.hands.R = { c: [95, -430] }; m.lookW = new THREE.Vector3(0.85, 0, 0.22); m.tilt = 0.06 * Math.sin(t * 5); }
+    } else {
+      m.mood = 'suspicious';
+      if (t > T.cPlace && t < F.rel) { m.hands.L = { c: [-120, -60] }; m.over = false; m.lookW = s.pos; m.tilt = 0.08; }
+      if (t > T.cPush - 0.1 && t < F.rel + 0.25) { m.over = true; m.shape.R = 'point'; const fp = s.pos.clone().add(new THREE.Vector3(-0.115, 0.012, 0.0)); m.hands.R = { w: fp }; }
+      if (t >= F.rel + 0.25) {
+        // the long slow fall: wary → worried → horrified, all in slow motion
+        const u = sstep(F.rel + 0.25, F.land, t);
+        m.mood = u < 0.3 ? 'suspicious' : u < 0.7 ? 'nervous' : 'horror'; m.lookW = s.pos; m.sweat = u > 0.45;
+        const hu = sstep(0.55, 0.95, u);
+        m.hands.L = { c: [mix(-120, -125, hu), mix(-60, -285, hu)] }; m.hands.R = { c: [mix(140, 125, hu), mix(-20, -285, hu)] }; m.over = false;
+        m.tilt = 0.08 * (1 - u);
+      }
+      if (t > F.land + 0.02) { m.mood = 'despair'; m.hands.L = { c: [-95, -430] }; m.hands.R = { c: [95, -430] }; m.lookW = new THREE.Vector3(0.7, 0, -0.12); m.sweat = false; }
+    }
+  } else if (t < T.crates - 0.5) {
+    // ---- thinking, then the idea ----
+    m.mood = 'think'; m.look = [-0.5, -0.75]; m.hands.R = { c: [30, -255], }; m.hands.L = { c: [-30, -110] }; m.tilt = -0.08;
+    if (t > T.eureka) { const e = Math.exp(-(t - T.eureka) * 7); m.mood = 'eureka'; m.look = [0, -0.2]; m.hands.R = { c: [175, -480] }; m.shape.R = 'point'; m.tilt = 0; m.sq = [1 - 0.07 * e, 1 + 0.1 * e]; m.tuft = e * Math.sin((t - T.eureka) * 25); }
+  } else if (t < T.climb) {
+    // ---- time-lapse: crates carried in, the table rises ----
+    m.anchor.copy(MAN_SIDE); m.mood = 'eureka';
+    const L = clamp(Math.floor((t - T.crates + 0.55) / 0.75), 0, NLAYER);
+    const tl = layerT(Math.min(NLAYER - 1, L));
+    const holding = L < NLAYER && t > tl - 0.55 && t < tl;
+    m.anchor.x += (L % 2 ? -0.12 : 0.0); m.anchor.z += (L % 2 ? 0.08 : 0);
+    if (holding) { m.carry = true; m.hands.L = { c: [-140, -470] }; m.hands.R = { c: [140, -470] }; m.mood = 'happy'; m.tilt = 0.05 * Math.sin(t * 20); }
+    else { m.hands.L = { c: [-150, 20] }; m.hands.R = { c: [150, 20] }; m.look = [0.55, -0.6]; m.mood = 'happy'; }
+    const since = t - tl; if (since > 0 && since < 0.2) m.sq = [1.06, 0.94];
+  } else if (t < T.onTop) {
+    // ---- hop onto the ladder top ----
+    const u = sstep(T.climb, T.onTop, t); m.anchor.copy(MAN_SIDE).lerp(MAN_TOP, u); m.anchor.y += 0.5 * Math.sin(Math.PI * u); m.mood = 'eureka';
+    m.hands.L = { c: [-170, -330] }; m.hands.R = { c: [170, -330] }; m.ground = 2.275 * u;
+  } else {
+    // ---- up top: one more toast ----
+    m.anchor.copy(MAN_TOP); m.ground = 2.275; const s = toasts.F; const F = FALLS.F;
+    const land = Math.exp(-Math.max(0, t - T.onTop) * 8); m.sq = [1 + 0.06 * land, 1 - 0.08 * land];
+    m.mood = 'happy'; butterHands('F');
+    if (t > T.fPlace) { m.hands.L = { c: [-120, -60] }; m.hands.R = { c: [130, -40] }; m.over = false; m.lookW = s.pos; }
+    if (t > T.fLook && t < T.fPush) { m.mood = 'nervous'; m.lookW = new THREE.Vector3(0.6, 0, 0.3); m.sweat = true; m.tilt = 0.1; }
+    if (t > T.fPush - 0.1 && t < F.rel + 0.25) { m.mood = 'suspicious'; m.over = true; m.shape.R = 'point'; m.hands.R = { w: s.pos.clone().add(new THREE.Vector3(-0.115, 0.012, 0.0)) }; m.lookW = s.pos; }
+    if (t >= F.rel + 0.25 && t < F.land + 0.05) { const u = sstep(F.rel, F.land, t); m.mood = u < 0.5 ? 'nervous' : 'horror'; m.lookW = s.pos; m.hands.L = { c: [-90, -150] }; m.hands.R = { c: [90, -150] }; m.sweat = true; m.tilt = 0.12; }
+    if (t >= F.land + 0.05) {
+      const e = Math.exp(-(t - F.land - 0.05) * 6); m.mood = 'cheer'; m.hands.L = { c: [-215, -470] }; m.hands.R = { c: [215, -470] }; m.sq = [1 - 0.08 * e, 1 + 0.1 * e]; m.tuft = Math.sin((t - F.land) * 14) * (0.5 + 0.5 * e);
+      m.dyBounce = -30 * Math.abs(Math.sin((t - F.land) * 7)) * (t < T.gulp ? 1 : 0);
+    }
+    if (t >= T.gulp) { m.mood = t < T.gulp + 0.6 ? 'horror' : 'deadpan'; m.hands.L = { c: [-150, 25] }; m.hands.R = { c: [150, 25] }; m.lookW = new THREE.Vector3(1.0, 0.05, 0.1); m.tuft = 0; m.sweat = false;
+      if (t > T.gulp + 0.6) { m.blink = (t > 44.6 && t < 45.0) ? 1 : 0; m.tilt = 0.06 * sstep(T.deadpan, T.deadpan + 1, t); }
     }
   }
-  return { pos, rotY, rotX, rotZ, pose: p };
+  return m;
 }
 
 // ---------- the pup ----------
+const L2 = (a, k = 0) => [a, k];
 function dogAt(t) {
-  const pos = DOG_HOME.clone(); let rotY = -Math.PI / 2, rotZ = 0;
-  const legs = { FL: L(-1.2, 0.0), FR: L(-1.2, 0.0), HL: L(1.1, -0.2), HR: L(1.1, -0.2) }; // lying sphinx-like
-  let eye = { open: 1, size: 1, look: [0, 0] }, tongue = 0, stars = false, headP = 0, headR = 0;
-  if (t > T_LAND - 0.3) eye.size = mix(1, 1.5, sstep(T_LAND - 0.3, T_LAND + 0.2, t)) * (1 - 0.3 * sstep(T.dogLie, T.dogLie + 0.5, t));
-  const roll = sstep(T.dogLie, T.dogLie + 1.0, t);
-  rotZ = Math.PI * roll;
-  if (t > T.dogLie) {
-    const wig = sstep(T.dogLie + 1.0, T.dogLie + 1.3, t) * Math.sin(t * 16) * (1 - sstep(T.dogRoll - 0.1, T.dogRoll, t));
-    rotZ += 0.15 * wig; legs.FL = L(mix(-1.2, 0.6, roll) + 0.3 * wig, 0.6); legs.FR = L(mix(-1.2, 0.6, roll) - 0.3 * wig, 0.6); legs.HL = L(mix(1.1, -0.4, roll), -0.6); legs.HR = L(mix(1.1, -0.4, roll), -0.6);
-    tongue = roll; eye = { open: 1, size: 0.8 };
+  const w = tau(t);
+  const d = { pos: new THREE.Vector3(3.6, 0.144, 0.4), dir: new THREE.Vector3(-1, 0, 0), legs: { FL: L2(0), FR: L2(0), HL: L2(0), HR: L2(0) }, headTilt: 0, tongue: 0, eye: { open: 1, size: 1, look: [0, 0] }, wag: Math.sin(w * 14), pitch: 0, sq: [1, 1], vis: true };
+  const walk = (a, b, t0, t1) => { const u = clamp((t - t0) / (t1 - t0), 0, 1); d.pos.copy(a).lerp(b, u); const ph = (w - tau(t0)) * 11; if (u > 0 && u < 1) { d.legs = { FL: L2(0.45 * Math.sin(ph), 0.4 * Math.max(0, Math.sin(ph + 1.5))), FR: L2(-0.45 * Math.sin(ph), 0.4 * Math.max(0, -Math.sin(ph + 1.5))), HL: L2(-0.45 * Math.sin(ph), -0.3 * Math.max(0, -Math.sin(ph))), HR: L2(0.45 * Math.sin(ph), -0.3 * Math.max(0, Math.sin(ph))) }; d.pos.y += 0.012 * Math.abs(Math.sin(ph)); } d.dir.set(Math.sign(b.x - a.x) || -1, 0, 0); return u; };
+  const at = (k, dz = 0.12) => { const F = FALLS[k]; return new THREE.Vector3(F.xL + 0.04 + 0.27, 0.144, F.z + dz); };
+  const eat = (t0, t1) => { const u = clamp((t - t0) / (t1 - t0), 0, 1); const b = Math.sin(u * Math.PI); d.pitch = 0.3 * b; d.headTilt = 0.8 * b + 0.15 * Math.sin(u * Math.PI * 6) * b; d.eye.open = 1 - 0.5 * b; };
+  if (t < 7.4) { d.vis = false; return d; }
+  if (t < 26.2) {
+    walk(new THREE.Vector3(2.5, 0.144, 0.36), at('B'), 7.4, 8.5);
+    if (t > 8.5 && t < 22.0) {
+      d.pitch = 0.18 * sstep(8.5, 8.9, t); d.headTilt = 0.45 * sstep(8.5, 8.9, t) + 0.05 * Math.sin(w * 18); d.wag = Math.sin(w * 18);
+      if (t > FALLS.C.land) { const e = sstep(FALLS.C.land, FALLS.C.land + 0.12, t); d.headTilt = mix(d.headTilt, -0.15, e); d.pitch = mix(d.pitch, 0, e); d.eye.size = 1.3; d.eye.look = [-0.6, 0.2]; }
+    }
+    if (t >= 22.0) eat(22.0, 22.6);
+    if (t > 22.65) { walk(at('B'), at('A'), 22.65, 23.25); if (t > 23.3) eat(23.3, 23.9); }
+    if (t > 23.95) { walk(at('A'), at('C', 0.14), 23.95, 24.4); if (t > 24.4) eat(24.4, 25.0); }
+    if (t > 25.05) { d.tongue = sstep(25.05, 25.3, t) * (1 - sstep(25.9, 26.1, t)); d.eye.open = 0.5; d.wag = Math.sin(w * 20); }
+    return d;
   }
-  if (t > T.dogRoll) {
-    // rolls off the wall toward the lawn, lands flat on his back
-    const s = t - T.dogRoll; const fallT = 0.45;
-    const u = clamp(s / fallT, 0, 1);
-    pos.z = mix(DOG_HOME.z, DOG_HOME.z + 0.62, u); pos.y = s < fallT ? DOG_HOME.y + 0.08 * Math.sin(Math.PI * u) - (DOG_HOME.y - 0.14) * u * u : 0.14;
-    rotZ = Math.PI + 0.4 * Math.sin(Math.PI * u);
-    const b = s > fallT ? Math.exp(-(s - fallT) * 7) * Math.abs(Math.sin((s - fallT) * 16)) : 0; pos.y += 0.06 * b;
-    legs.FL = L(0.9, 0.2 + 0.2 * Math.sin(s * 3)); legs.FR = L(0.7, 0.3); legs.HL = L(-0.8, -0.2); legs.HR = L(-0.6, -0.3);
-    stars = s > fallT + 0.1; eye = { open: 1, size: 0.45, look: [Math.sin(t * 6) * 0.6, Math.cos(t * 6) * 0.6] }; tongue = 1; headR = 0.2 * Math.sin(t * 4);
+  if (t < T.dogBack) { walk(at('C', 0.14), new THREE.Vector3(3.2, 0.144, 0.3), 26.2, 27.8); if (t > 27.8) d.vis = false; return d; }
+  walk(new THREE.Vector3(2.7, 0.144, 0.3), at('F'), T.dogBack, T.gulp - 0.1);
+  if (t > T.gulp - 0.1) {
+    const u = clamp((t - T.gulp) / 0.35, 0, 1); const b = Math.sin(u * Math.PI); d.pitch = 0.3 * b; d.headTilt = 0.8 * b;
+    if (t > T.gulp + 0.35) { const c = t - T.gulp - 0.35; d.sq = [1 + 0.04 * Math.sin(c * 30) * Math.exp(-c * 3), 1 - 0.04 * Math.sin(c * 30) * Math.exp(-c * 3)]; d.tongue = sstep(0.4, 0.6, c) * (1 - sstep(1.4, 1.6, c)); d.eye.open = c < 1.6 ? 0.45 : 1; d.headTilt = -0.25 * sstep(1.6, 2.0, c); d.eye.look = [0.2, -0.8 * sstep(1.6, 2.0, c)]; d.wag = Math.sin(w * 16); }
   }
-  return { pos, rotY, rotZ, legs, eye, tongue, stars, headP, headR };
-}
-
-// ---------- the butterfly ----------
-function butterflyAt(t, catNose) {
-  const fl = Math.sin(t * 40);
-  let p = new THREE.Vector3(), yaw = 0, flap = 0.9 * fl;
-  const start = new THREE.Vector3(1.4, 4.9, 1.6);
-  if (t < T.land) { const u = sstep(T.fly - 1.2, T.land, t); p.copy(start).lerp(catNose, u); p.y += 0.12 * Math.sin(u * 9) * (1 - u); p.x += 0.1 * Math.sin(u * 7) * (1 - u); yaw = 2.4; }
-  else if (t < T.sneeze) { p.copy(catNose); p.y += 0.02; flap = 0.5 + 0.4 * Math.sin(t * 3); yaw = 2.4; }
-  else if (t < 30) { const u = sstep(T.sneeze, T.sneeze + 2.5, t); p.copy(catNose).lerp(new THREE.Vector3(-1.5, 5.6, 1.2), u); p.y += 0.1 * Math.sin(u * 8); yaw = 3.8; if (t > 7) p.set(-50, -50, -50); }
-  else { // it comes back for the pup's nose at the end
-    const nose = DOG.head.localToWorld(new THREE.Vector3(0, -0.015, 0.17));
-    const u = sstep(40.6, 42.6, t); p.copy(new THREE.Vector3(-0.5, 1.6, 3.2)).lerp(nose, u); p.y += 0.1 * Math.sin(u * 8) * (1 - u) + 0.015; yaw = 0.6;
-    if (t > 42.6) flap = 0.5 + 0.4 * Math.sin(t * 3); if (t < 40.6) p.set(-50, -50, -50);
-  }
-  return { p, yaw, flap };
+  return d;
 }
 
 // ---------- camera ----------
-const headW = () => CAT.head.localToWorld(new THREE.Vector3(0, 0, 0));
-const earW = () => CAT.ears[1].localToWorld(new THREE.Vector3(0, -0.006, 0.02));
-function orbitAt(t, center) {
-  const u = sstep(T.off, T.dive, t);
-  const phi = mix(1.25, 2.6, u) + 0.15 * Math.sin(u * Math.PI * 2), R = mix(1.6, 1.9, Math.sin(u * Math.PI)), h = mix(0.35, -0.2, u) + 0.15 * Math.sin(u * Math.PI);
-  return center.clone().add(new THREE.Vector3(R * Math.cos(phi), h, R * Math.sin(phi)));
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const KEYS = [
+  [0.0, V(0.36, 1.42, 1.75), V(0.1, 1.02, -0.2), 40],
+  [2.5, V(0.32, 1.38, 1.6), V(0.12, 1.0, -0.2), 40],
+  [3.25, V(0.95, 1.1, 3.0), V(0.35, 0.8, -0.1), 40],
+  [3.75, V(0.95, 1.1, 3.0), V(0.35, 0.8, -0.1), 40],
+  [4.15, V(0.22, 1.5, 0.95), V(-0.06, 1.48, -0.62), 40],
+  [4.55, V(0.22, 1.5, 0.95), V(-0.06, 1.48, -0.62), 40],
+  [5.1, V(0.4, 1.4, 1.85), V(0.1, 1.0, -0.2), 40],
+  [6.3, V(0.5, 1.35, 2.2), V(0.15, 1.0, -0.2), 40],
+  [6.9, V(1.05, 1.1, 3.1), V(0.45, 0.78, -0.05), 40],
+  [8.2, V(1.1, 1.08, 3.15), V(0.5, 0.76, -0.05), 40],
+  [8.7, V(0.38, 1.38, 1.8), V(0.14, 1.0, -0.2), 40],
+  [9.9, V(0.64, 1.18, 1.7), V(0.36, 0.95, -0.12), 40],
+];
+const KEYS2 = [
+  [21.6, null], // handled by the orbit blend
+  [22.6, V(0.75, 1.05, 2.9), V(0.3, 0.75, -0.1), 40],
+  [23.6, V(0.75, 1.05, 2.9), V(0.3, 0.75, -0.1), 40],
+  [24.1, V(0.25, 1.55, 1.45), V(-0.04, 1.65, -0.62), 40],
+  [24.9, V(0.25, 1.55, 1.45), V(-0.04, 1.65, -0.62), 40],
+  [25.6, V(1.3, 1.5, 5.6), V(-0.2, 1.45, 0), 42],
+  [29.0, V(1.25, 2.4, 6.0), V(-0.2, 2.05, 0), 42],
+  [30.0, V(0.55, 3.55, 2.15), V(0.12, 3.3, -0.45), 40],
+  [31.9, V(0.7, 3.4, 1.6), V(0.35, 3.15, -0.15), 40],
+];
+function keyCam(K, t) {
+  let i = 0; while (i < K.length - 2 && t > K[i + 1][0]) i++;
+  const a = K[i], b = K[i + 1]; const u = sstep(a[0], b[0], t);
+  return { pos: a[1].clone().lerp(b[1], u), tgt: a[2].clone().lerp(b[2], u), fov: mix(a[3], b[3], u) };
 }
-function camAt(t) {
-  const c = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 40, inner: false };
-  CAT.root.updateMatrixWorld(true);
-  if (t < T.off) {
-    const H = headW(); const u = t / T.off;
-    const sl = sstep(T.slide, T.off, t);
-    c.pos.copy(H).add(new THREE.Vector3(-0.38 + 0.5 * sl, 0.5 + 0.15 * sl, 1.0 - 0.08 * u + 0.5 * sl));
-    c.tgt.copy(H).add(new THREE.Vector3(0.02 + 0.25 * sl, -0.03 - 0.3 * sl, 0.04 + 0.2 * sl)); c.fov = 38;
-    const sn = Math.exp(-Math.max(0, t - T.sneeze) * 8) * (t > T.sneeze ? 1 : 0); c.pos.y += 0.01 * sn * Math.sin(t * 70);
-  } else if (t < T.dive) {
-    const cen = CAT.root.position.clone(); c.pos.copy(orbitAt(t, cen)); c.tgt.copy(cen); c.fov = 40;
-  } else if (t < T.inner) {
-    const u = sstep(T.dive, T.inner, t) ** 1.6; const e = earW(); const cen = CAT.root.position.clone();
-    const from = orbitAt(T.dive, cen); const fwd = CAT.head.localToWorld(new THREE.Vector3(0, 0, 0.3)).sub(headW()).normalize();
-    const near = e.clone().addScaledVector(fwd, 0.02);
-    c.pos.copy(from).lerp(near, u); c.tgt.copy(cen).lerp(e, sstep(0, 0.5, u)); c.fov = mix(40, 30, u);
-  } else if (t < T.out) {
-    c.inner = true; const u = (t - T.inner) / (T.out - T.inner);
-    const back = sstep(0.9, 1.0, u);
-    const along = IN.path.getPointAt(Math.min(1, sstep(0, 0.28, u)) * (1 - back * 0.9));
-    const look = sstep(0.18, 0.32, u);
-    const lp = new THREE.Vector3(0.55, 0.75, 2.75);
-    const pl = along.clone().lerp(lp, look * (1 - back));
-    const ahead = IN.path.getPointAt(Math.min(1, sstep(0, 0.28, u) + 0.05)).lerp(new THREE.Vector3(0, -0.3, -0.2), look);
-    IN.chamber.updateMatrixWorld(true);
-    c.pos.copy(IN.chamber.localToWorld(pl)); c.tgt.copy(IN.chamber.localToWorld(ahead)); c.fov = 62;
-    c.up = new THREE.Vector3(0, 1, 0).applyQuaternion(IN.chamber.getWorldQuaternion(new THREE.Quaternion()));
-  } else if (t < T.swoop) {
-    const u = sstep(T.out, T.swoop, t); const e = earW(); const cen = CAT.root.position.clone();
-    const away = cen.clone().add(new THREE.Vector3(-0.35, 0.3, 1.7));
-    c.pos.copy(e).lerp(away, u); c.tgt.copy(e).lerp(cen, sstep(0, 0.6, u)); c.fov = mix(30, 42, u);
-  } else if (t < T.pan) {
-    const u = sstep(T.swoop, T_LAND - 0.25, t); const cen = CAT.root.position.clone();
-    const a = new THREE.Vector3(-0.35, 3.75, 2.2), b = new THREE.Vector3(-0.7, 0.2, 2.35);
-    c.pos.copy(a).lerp(b, u); c.tgt.copy(cen).add(new THREE.Vector3(0, mix(0, 0.05, u), 0)); c.fov = mix(42, 40, u);
-    const sh = Math.exp(-Math.max(0, t - T_LAND) * 6) * (t > T_LAND ? 1 : 0); c.pos.y += 0.006 * sh * Math.sin(t * 60);
-  } else if (t < T.catWalk) {
-    const u = sstep(T.pan, T.pan + 1.6, t);
-    const a = new THREE.Vector3(-0.7, 0.2, 2.35), b = new THREE.Vector3(1.25, 1.3, 3.5);
-    c.pos.copy(a).lerp(b, u); c.tgt.copy(new THREE.Vector3(0, 0.3, 0.75)).lerp(new THREE.Vector3(2.4, 1.05, 1.3), u); c.fov = 40;
-    const v = sstep(T.dogRoll - 0.2, T.dogRoll + 0.9, t);
-    c.pos.lerp(new THREE.Vector3(2.05, 0.6, 3.55), v); c.tgt.lerp(new THREE.Vector3(2.35, 0.3, 1.95), v);
-  } else {
-    const u = sstep(T.catWalk, DUR, t);
-    c.pos.set(mix(2.05, 2.15, u), mix(0.6, 0.66, u), mix(3.55, 4.05, u)); c.tgt.set(mix(2.35, 2.3, u), 0.28, mix(1.95, 2.15, u)); c.fov = 40;
+const blend = (A, B, u) => ({ pos: A.pos.clone().lerp(B.pos, u), tgt: A.tgt.clone().lerp(B.tgt, u), fov: mix(A.fov, B.fov, u) });
+function orbitC(t, toasts) {
+  const F = FALLS.C; const u = sstep(F.rel, F.land, t); const p = toasts.C.pos.clone();
+  if (toasts.C.phase === 'down') p.copy(toasts.C.pos);
+  const phi = mix(1.3, 1.9, u), R = mix(1.05, 0.9, u), h = mix(0.22, 0.12, u);
+  const cen = p.clone().add(V(0.02, 0, 0));
+  return { pos: cen.clone().add(V(R * Math.cos(phi), h, R * Math.sin(phi))), tgt: cen.clone().add(V(0, 0.02, 0)), fov: 40 };
+}
+function trackF(t, toasts) {
+  const F = FALLS.F; const u = sstep(F.rel, F.land, t); const p = toasts.F.pos.clone();
+  const phi = mix(1.2, 1.75, u), R = mix(0.75, 0.95, u), h = mix(0.18, 0.12, u);
+  const pos = p.clone().add(V(R * Math.cos(phi), h, R * Math.sin(phi))); pos.y = Math.max(0.14, pos.y);
+  return { pos, tgt: p.clone().add(V(0, mix(0.02, 0.06, u), 0)), fov: 40 };
+}
+function camAt(t, toasts) {
+  if (t < 9.9) return keyCam(KEYS, t);
+  if (t < 22.6) {
+    const k0 = keyCam(KEYS, 9.9); const o = orbitC(Math.min(t, FALLS.C.land), toasts);
+    let c = blend(k0, o, sstep(9.9, 10.9, t));
+    if (t > 21.6) c = blend(c, keyCam(KEYS2, 22.6), sstep(21.6, 22.6, t));
+    return c;
   }
-  return c;
+  if (t < 31.9) return keyCam(KEYS2.slice(1), t);
+  if (t < 39.4) { const k0 = keyCam(KEYS2.slice(1), 31.9); return blend(k0, trackF(Math.min(t, FALLS.F.land), toasts), sstep(31.9, 32.8, t)); }
+  const end = trackF(FALLS.F.land, toasts);
+  const K3 = [[39.4, end.pos, end.tgt, 40], [40.2, V(1.6, 1.6, 6.6), V(0.2, 2.1, -0.2), 42], [40.8, V(1.6, 1.6, 6.6), V(0.2, 2.1, -0.2), 42], [41.4, V(1.3, 0.42, 1.75), V(1.0, 0.24, 0.1), 40], [42.9, V(1.3, 0.42, 1.75), V(1.0, 0.24, 0.1), 40], [43.6, V(0.62, 3.45, 1.75), V(-0.05, 3.55, -0.85), 40], [DUR, V(0.6, 3.45, 1.6), V(-0.06, 3.55, -0.85), 40]];
+  return keyCam(K3, t);
+}
+
+// ---------- helpers: world point → flat canvas units ----------
+const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _u = new THREE.Vector3();
+function toCanvas(flat, P) {
+  _f.set(0, 0, -1).applyQuaternion(camera.quaternion); _r.set(1, 0, 0).applyQuaternion(camera.quaternion); _u.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const C = camera.position, A = flat.mesh.position; const d = P.clone().sub(C); const n = _f.clone().negate();
+  const k = A.clone().sub(C).dot(n) / d.dot(n); const X = C.clone().addScaledVector(d, k).sub(A);
+  return [X.dot(_r) / flat.sizeM * 1024, -X.dot(_u) / flat.sizeM * 1024];
 }
 
 let POST = {};
 function setup(t) {
-  // cat
-  const ca = catAt(t);
-  CAT.root.position.copy(ca.pos); CAT.root.rotation.set(ca.rotX, ca.rotY, ca.rotZ, 'YXZ'); poseCat(CAT, ca.pose);
-  CAT.root.updateMatrixWorld(true);
-  // pup
-  const d = dogAt(t);
-  DOG.root.position.copy(d.pos); DOG.root.rotation.set(0, d.rotY, 0); DOG.root.rotateZ(d.rotZ);
-  for (const k of ['FL', 'FR', 'HL', 'HR']) { DOG.legs[k].sh.rotation.set(d.legs[k].sw, 0, 0); DOG.legs[k].knee.rotation.x = d.legs[k].bend; }
-  DOG.eyes.forEach((e) => { e.pupil.scale.set(0.75 * d.eye.size, d.eye.size, 0.4); e.pupil.position.x = (d.eye.look ? d.eye.look[0] : 0) * 0.008; e.pupil.position.y = (d.eye.look ? d.eye.look[1] : 0) * 0.008; });
-  DOG.tongue.scale.set(0.9, 0.4, 1.4 * (0.6 + 0.8 * d.tongue)); DOG.tongue.visible = d.tongue > 0.05;
-  DOG.head.rotation.set(d.headP, 0, d.headR);
-  DOG.stars.visible = d.stars; if (d.stars) { DOG.root.remove(DOG.stars); DOG.head.remove(DOG.stars); scene.add(DOG.stars); DOG.head.updateMatrixWorld(true); DOG.stars.position.copy(DOG.head.localToWorld(new THREE.Vector3(0, 0, 0))).add(new THREE.Vector3(0, 0.2, 0)); DOG.stars.rotation.set(0, t * 3.0, 0); }
-  DOG.tail.rotation.x = 0.4 * Math.sin(t * (t > T_LAND && t < T.dogLie ? 14 : 3));
-  DOG.root.updateMatrixWorld(true);
-  // butterfly
-  const nose = CAT.head.localToWorld(new THREE.Vector3(0, 0.005, 0.1));
-  const b = butterflyAt(t, nose); BF.g.position.copy(b.p); BF.g.rotation.set(0, b.yaw, 0);
-  BF.wings.forEach((w) => { w.piv.rotation.z = w.s * b.flap; });
-  // inner world
-  if (t >= T.inner - 0.05 && t < T.out + 0.05) poseInner(IN, clamp((t - T.inner) / (T.out - T.inner), 0, 1), t);
+  // table + crates
+  const ty = tableY(t); SET.table.position.set(jolt(t), ty, 0); SET.table.rotation.z = -jolt(t) * 0.6;
+  for (let L = 0; L < NLAYER; L++) { const f = layerF(L, t); const g = SET.crates[L]; g.visible = f > 0.001; g.position.set(0, L * LAYER, 0); g.scale.set(1, Math.max(0.001, Math.min(1, f)), 1); }
+  const lad = sstep(T.ladder, T.ladder + 0.25, t); SET.ladder.visible = lad > 0; SET.ladder.position.copy(LADDER_POS); SET.ladder.scale.set(1, Math.max(0.001, lad * (1 + 0.1 * Math.sin(Math.PI * lad))), 1);
+  const picks = (t > T.bPick ? 1 : 0) + (t > T.cPick ? 1 : 0) + (t > T.fPick ? 1 : 0);
+  for (let k = 0; k < 3; k++) SET.stack[k].visible = k < 3 - picks;
+  // clock hands follow film time a little
+  SET.hands[0].rotation.z = -t * 0.12; SET.hands[1].rotation.z = -1.2 - t * 0.01;
+  // toasts
+  const TS = {}; for (const k of ['A', 'B', 'C', 'F']) { TS[k] = toastAt(k, t); placeToast(TOAST[k], TS[k]); }
+  // ghost trails + dotted arcs
+  for (const k of ['C', 'F']) {
+    const F = FALLS[k]; const fs = tau(t) - F.w0; const fade = k === 'C' ? 1 - sstep(24.2, 25.0, t) : 1 - sstep(40.2, 40.8, t);
+    GH[k].forEach((g, i) => { const si = (i / (NG - 1)) * F.sL; const on = fs > si + F.sL * 0.06 && fade > 0.01 && (i < NG - 1);
+      g.root.visible = on; if (!on) return; const y0 = F.top + TH / 2 + 0.002;
+      g.root.position.set(F.x0 + F.vx * si, Math.max(TH / 2 + 0.003, y0 - 4.9 * si * si), F.z); g.root.rotation.set(0, F.yaw * si / F.sL, -0.12 - OMEGA * si, 'YXZ');
+      const op = 0.3 * fade * (0.5 + 0.5 * i / NG); g.root.traverse((o) => { if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mm) => (mm.opacity = op)); }); });
+    DOTS[k].forEach((d, i) => { const si = (i / (ND - 1)) * F.sL; const on = fs > si && fade > 0.01; d.visible = on; if (!on) return; const y0 = F.top + TH / 2 + 0.002; d.position.set(F.x0 + F.vx * si, Math.max(0.006, y0 - 4.9 * si * si), F.z + 0.0); d.material.opacity = 0.65 * fade; });
+  }
+  // splats (butter-down falls)
+  for (const k of ['A', 'B', 'C']) {
+    const F = FALLS[k]; const after = tau(t) - F.w0 - F.sL; const S = SPLAT[k]; const e = EAT[k];
+    const gone = e ? sstep(e[0], e[1], t) : 0; const lx = F.x0 + F.vx * F.sL + 0.04;
+    S.g.visible = after > 0 && gone < 1; S.g.position.set(lx, 0, F.z); S.g.rotation.y = F.yaw;
+    const g = sstep(0, 0.05, after); S.pool.scale.set(0.105 * g * (1 - gone), 0.09 * g * (1 - gone), 1);
+    S.blobs.forEach((b) => { const on = after > 0 && gone < 1; b.m.visible = on; if (!on) return; const s = Math.min(after, 2 * b.vy / 9.8); const fly = after < 2 * b.vy / 9.8;
+      const R = 0.08 + b.v * s; b.m.position.set(lx + Math.cos(b.a) * R, Math.max(0.004, b.vy * s - 4.9 * s * s), F.z + Math.sin(b.a) * R);
+      const sc = b.r * (1 - gone); b.m.scale.set(sc * (fly ? 1 : 1.6), sc * (fly ? 1 : 0.35), sc * (fly ? 1 : 1.6)); });
+  }
+  { const F = FALLS.F; const after = tau(t) - F.w0 - F.sL; const lx = F.x0 + F.vx * F.sL + 0.04; const gone = t > T.gulp + 0.3;
+    CRUMBS.forEach((c) => { const on = after > 0 && !gone; c.m.visible = on; if (!on) return; const tf = 2 * c.vy / 9.8; const s = Math.min(after, tf); const R = 0.07 + c.v * s; c.m.position.set(lx + Math.cos(c.a) * R, Math.max(0.005, c.vy * s - 4.9 * s * s) * 0.5, F.z + Math.sin(c.a) * R); c.m.rotation.set(c.spin * s, c.spin * s * 0.7, 0); }); }
   // camera
-  const c = camAt(t);
-  camera.position.copy(c.pos); camera.up.copy(c.up || new THREE.Vector3(0, 1, 0)); camera.lookAt(c.tgt);
-  camera.fov = c.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+  const c = camAt(t, TS);
+  camera.position.copy(c.pos); camera.up.set(0, 1, 0); camera.lookAt(c.tgt); camera.fov = c.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  // man
+  const m = manAt(t, TS);
+  MAN.mesh.position.copy(m.anchor); ARMS.mesh.position.copy(m.anchor);
+  const pose = { mood: m.mood, look: m.look || [0, 0], tilt: m.tilt, sq: m.sq, tuft: m.tuft, sweat: m.sweat, blink: m.blink, dy: m.dyBounce || 0, hands: {}, shape: m.shape, knife: m.knife };
+  if (m.lookW) { const q = toCanvas(MAN, m.lookW); const fx = q[0], fy = q[1] + 330; const L = Math.hypot(fx, fy) || 1; pose.look = [fx / L * Math.min(1, L / 160), fy / L * Math.min(1, L / 160)]; }
+  for (const s of ['L', 'R']) { const h = m.hands[s]; pose.hands[s] = h.w ? toCanvas(MAN, h.w) : h.c; }
+  MAN.update(camera, m.anchor, right, pose, m.ground, 0.0);
+  ARMS.update(camera, m.anchor, right, pose, m.ground, 0.0);
+  ARMS.mesh.material.depthTest = !m.over; ARMS.mesh.position.addScaledVector(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), -0.01);
+  MAN.shadow.position.set(m.anchor.x, m.ground + 0.006, m.anchor.z); MAN.shadow.scale.set(0.42, 0.26, 1); MAN.shadow.material.opacity = 0.22; MAN.shadow.visible = !(m.anchor.y - m.ground > 0.95);
+  ARMS.shadow.visible = false;
+  // the crate he carries in the time-lapse
+  SET.carry.visible = m.carry; if (m.carry) { SET.carry.position.copy(m.anchor).add(V(0, 0.88 + 0.22 - 0.882 + 0.882 * 0 + 0.05, 0.02)); SET.carry.position.y = m.anchor.y + 0.98; SET.carry.rotation.set(0, 0, 0.05 * Math.sin(t * 20)); }
+  // idea bulb
+  const bu = t - T.eureka; const bon = bu > 0 && t < T.crates - 0.5; BULB.mesh.visible = bon; BULB.shadow.visible = false;
+  if (bon) { const s = clamp(bu / 0.15, 0, 1) * (1 + 0.25 * Math.exp(-bu * 8) * Math.sin(bu * 30)) * (1 - sstep(T.crates - 0.8, T.crates - 0.5, t)); BULB.update(camera, m.anchor.clone().add(V(0.0, 1.36, 0.02)), right, { s: Math.max(0.01, s), rays: 0.5 + 0.5 * Math.sin(bu * 10) }, 0, 0); }
+  // pup
+  const d = dogAt(t); DOG.mesh.visible = DOG.shadow.visible = d.vis;
+  if (d.vis) DOG.update(camera, d.pos, d.dir, { legs: d.legs, headTilt: d.headTilt, tongue: d.tongue, eye: d.eye, wag: d.wag, pitch: d.pitch, sq: d.sq }, 0, 0.2);
   // sun follows the action so shadows stay crisp
-  const focus = c.inner ? CAT.root.position : c.tgt;
-  sun.target.position.copy(focus); sun.position.copy(focus).add(new THREE.Vector3(3.5, 7, 4.5));
-  POST = { bs: 0, bp: new THREE.Vector2(-9, -9), bd: new THREE.Vector2(1, 0), focus: 3, ap: 0, flash: 0, exp: 1.0, haze: 0,
-    fade: sstep(0, 0.4, t) * (1 - sstep(T.fade, DUR, t)) };
+  const focus = c.tgt.clone(); focus.y = Math.min(focus.y, 2.0);
+  sun.target.position.copy(focus); sun.position.copy(focus).add(V(-2.6, 6.5, 4.2));
+  const big = t > 25.3 && t < 30.1 || (t > 39.6 && t < 41.1);
+  const ext = big ? 4.6 : 2.6; Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext }); sun.shadow.camera.updateProjectionMatrix();
+  POST = { fade: sstep(0, 0.5, t) * (1 - sstep(T.fade, DUR - 0.05, t)), flash: 0 };
 }
-const HIDDEN = () => [];
-function subframes(t) { return ((t > T.sneeze - 0.1 && t < T.off + 0.3) || (t > 31.0 && t < 32.6) || (t > T.dogRoll - 0.1 && t < T.dogRoll + 0.9)) ? 2 : 1; }
-const SHOTS = [0, T.inner, T.out, DUR];
-const shotOf = (t) => (t < T.inner ? 0 : t < T.out ? 1 : 2);
+function subframes(t) {
+  const near = (x, a, b) => t > x - a && t < x + b;
+  return (near(FALLS.A.land, 0.42, 0.3) || near(FALLS.B.land, 0.42, 0.3) || near(T.bSneeze, 0.05, 0.3)) ? 3 : 1;
+}
 
-// ---------- post: motion-blur accumulation, depth of field, halation, IMAX grade ----------
+// ---------- post: clean — MSAA, gentle halation from the brightest parts, filmic curve, soft vignette. No grain. ----------
 const rtScene = new THREE.WebGLRenderTarget(W, HH, { type: THREE.HalfFloatType, depthBuffer: true, samples: 4 });
 const rtAcc = new THREE.WebGLRenderTarget(W, HH, { type: THREE.HalfFloatType, depthBuffer: false });
 const mk = (w, h) => new THREE.WebGLRenderTarget(Math.max(2, w), Math.max(2, h), { type: THREE.HalfFloatType, depthBuffer: false });
 const lw = Math.round(W / 4), lh = Math.round(HH / 4);
-const rtDepth = new THREE.WebGLRenderTarget(lw * 2, lh * 2, { type: THREE.HalfFloatType, depthBuffer: true });
 const rA = [mk(lw, lh), mk(lw >> 1, lh >> 1), mk(lw >> 2, lh >> 2)], rB = [mk(lw, lh), mk(lw >> 1, lh >> 1), mk(lw >> 2, lh >> 2)];
-const dA = [mk(W >> 1, HH >> 1), mk(W >> 2, HH >> 2), mk(W >> 3, HH >> 3)], dB = [mk(W >> 1, HH >> 1), mk(W >> 2, HH >> 2), mk(W >> 3, HH >> 3)];
 const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); const quadScene = new THREE.Scene(); quadScene.add(quad);
 const VQ = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0);} `;
 const accMat = new THREE.ShaderMaterial({ uniforms: { tSrc: { value: null }, uW: { value: 1 } }, vertexShader: VQ, transparent: true, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
   fragmentShader: `uniform sampler2D tSrc; uniform float uW; varying vec2 vUv; void main(){ gl_FragColor=vec4(texture2D(tSrc,vUv).rgb*uW,1.0);} ` });
-const brightMat = new THREE.ShaderMaterial({ uniforms: { tSrc: { value: null }, uTh: { value: 1.0 } }, vertexShader: VQ,
-  fragmentShader: `uniform sampler2D tSrc; uniform float uTh; varying vec2 vUv; void main(){ vec3 c=texture2D(tSrc,vUv).rgb; float l=dot(c,vec3(0.3,0.55,0.15)); gl_FragColor=vec4(c*smoothstep(uTh,uTh+0.8,l),1.0);} ` });
+const brightMat = new THREE.ShaderMaterial({ uniforms: { tSrc: { value: null } }, vertexShader: VQ,
+  fragmentShader: `uniform sampler2D tSrc; varying vec2 vUv; void main(){ vec3 c=texture2D(tSrc,vUv).rgb; float l=dot(c,vec3(0.3,0.55,0.15)); gl_FragColor=vec4(c*smoothstep(1.1,1.9,l),1.0);} ` });
 const blurMat = new THREE.ShaderMaterial({ uniforms: { tSrc: { value: null }, uDir: { value: new THREE.Vector2() } }, vertexShader: VQ,
   fragmentShader: `uniform sampler2D tSrc; uniform vec2 uDir; varying vec2 vUv; void main(){ vec3 s=texture2D(tSrc,vUv).rgb*0.2270;
     s+=(texture2D(tSrc,vUv+uDir*1.3846).rgb+texture2D(tSrc,vUv-uDir*1.3846).rgb)*0.3162; s+=(texture2D(tSrc,vUv+uDir*3.2308).rgb+texture2D(tSrc,vUv-uDir*3.2308).rgb)*0.0703; gl_FragColor=vec4(s,1.0);} ` });
 const copyMat = new THREE.ShaderMaterial({ uniforms: { tSrc: { value: null } }, vertexShader: VQ, fragmentShader: `uniform sampler2D tSrc; varying vec2 vUv; void main(){ gl_FragColor=texture2D(tSrc,vUv);} ` });
-const distMat = new THREE.ShaderMaterial({
-  vertexShader: `varying float vD; void main(){ vec4 p=vec4(position,1.0);
-    #ifdef USE_INSTANCING
-      p=instanceMatrix*p;
-    #endif
-    vec4 mv=modelViewMatrix*p; vD=-mv.z; gl_Position=projectionMatrix*mv; }`,
-  fragmentShader: `varying float vD; void main(){ gl_FragColor=vec4(vD,0.0,0.0,1.0); }`, side: THREE.DoubleSide,
-});
 const finalMat = new THREE.ShaderMaterial({
-  uniforms: {
-    tScene: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, tD0: { value: null }, tD1: { value: null }, tD2: { value: null }, tDepth: { value: null },
-    uFrame: { value: 0 }, uExp: { value: 1 }, uFlash: { value: 0 }, uFade: { value: 1 }, uHaze: { value: 0 }, uFocus: { value: 8 }, uAp: { value: 0.3 },
-    uBP: { value: new THREE.Vector2(-9, -9) }, uBD: { value: new THREE.Vector2(1, 0) }, uBS: { value: 0 }, uWeave: { value: new THREE.Vector2() }, uAsp: { value: W / HH },
-  },
+  uniforms: { tScene: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, uFade: { value: 1 }, uFlash: { value: 0 } },
   vertexShader: VQ,
-  fragmentShader: `uniform sampler2D tScene,tB0,tB1,tB2,tD0,tD1,tD2,tDepth; uniform float uFrame,uExp,uFlash,uFade,uHaze,uBS,uAsp,uFocus,uAp; uniform vec2 uBP,uBD,uWeave; varying vec2 vUv;
-  float h12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
-  float coc(vec2 uv){ float z=texture2D(tDepth,uv).r; z=z<=0.0?3000.0:z; return clamp((abs(z-uFocus)/z*uAp-0.04)/0.96,0.0,1.0); }
+  fragmentShader: `uniform sampler2D tScene,tB0,tB1,tB2; uniform float uFade,uFlash; varying vec2 vUv;
   void main(){
-    vec2 uv=vUv+uWeave;
-    // shock cone around the round (screen-space refraction)
-    if(uBS>0.0){
-      vec2 q=(uv-uBP)*vec2(uAsp,1.0); vec2 d=normalize(uBD*vec2(uAsp,1.0)); vec2 nn=vec2(-d.y,d.x);
-      float a=dot(q,d), b=dot(q,nn);
-      float cone=abs(abs(b)-(-a)*0.55); float behind=smoothstep(0.0,-0.02,a)*exp(a*4.0);
-      float ring=exp(-cone*cone/(0.0004*uBS))*behind;
-      float tip=exp(-dot(q,q)/(0.0005*uBS));
-      uv+=(nn*sign(b)*ring*0.006+q*tip*0.18)*uBS/vec2(uAsp,1.0);
-    }
-    // depth of field: sharp frame blended into a blur pyramid by circle of confusion
-    float k=coc(uv); vec2 px=vec2(2.0/${(W / 4).toFixed(1)},2.0/${(HH / 4).toFixed(1)});
-    k=max(k,0.6*max(max(coc(uv+vec2(px.x,0.0)),coc(uv-vec2(px.x,0.0))),max(coc(uv+vec2(0.0,px.y)),coc(uv-vec2(0.0,px.y)))));
-    vec3 c0=texture2D(tScene,uv).rgb, c1=texture2D(tD0,uv).rgb, c2=texture2D(tD1,uv).rgb, c3=texture2D(tD2,uv).rgb;
-    vec3 c=k<0.33?mix(c0,c1,k/0.33):(k<0.66?mix(c1,c2,(k-0.33)/0.33):mix(c2,c3,(k-0.66)/0.34));
-    // warm halation around bright sources
-    vec3 hal=texture2D(tB0,uv).rgb*0.55+texture2D(tB1,uv).rgb*0.8+texture2D(tB2,uv).rgb*1.1;
-    c+=hal*vec3(1.0,0.6,0.35)*0.22;
-    c+=vec3(0.55,0.42,0.30)*uHaze*(0.6+0.4*vUv.y);
-    c=c*uExp+vec3(1.0,0.96,0.9)*uFlash;
-    // filmic curve: soft toe, linear mids, the brightest core clips
+    vec3 c=texture2D(tScene,vUv).rgb;
+    vec3 hal=texture2D(tB0,vUv).rgb*0.5+texture2D(tB1,vUv).rgb*0.7+texture2D(tB2,vUv).rgb*0.9;
+    c+=hal*vec3(1.0,0.75,0.5)*0.18;
+    c+=vec3(1.0)*uFlash;
     c=1.22*c/(1.0+0.32*c);
     c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2));
     float l=dot(c,vec3(0.3,0.55,0.15));
-    c=mix(c*vec3(0.92,0.98,1.10),c*vec3(1.05,1.0,0.92),smoothstep(0.25,0.75,l));
-    vec2 v=(vUv-0.5)*vec2(1.0,1.15); c*=1.0-0.25*smoothstep(0.35,0.9,length(v)*1.25);
+    c=mix(c*vec3(0.97,0.99,1.04),c*vec3(1.03,1.0,0.96),smoothstep(0.3,0.8,l));
+    c=mix(vec3(l),c,1.08);
+    vec2 v=(vUv-0.5)*vec2(1.0,1.1); c*=1.0-0.18*smoothstep(0.45,0.95,length(v)*1.25);
     c*=uFade;
-    gl_FragColor=vec4(c,1.0);
+    gl_FragColor=vec4(clamp(c,0.0,1.0),1.0);
   }`,
 });
 function pass(mat, target) { quad.material = mat; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); }
@@ -315,42 +415,26 @@ function pyramid(src, A, B, firstMat) {
     blurMat.uniforms.tSrc.value = B[i].texture; blurMat.uniforms.uDir.value.set(0, 1 / h); pass(blurMat, A[i]);
   }
 }
-const SUB = new URLSearchParams(location.search).get('sub');
-
+const SUB = QS.get('sub');
 function render(t) {
   t = clamp(t, 0, DUR - 1e-4);
-  const s = shotOf(t), a = SHOTS[s], b = SHOTS[s + 1] - 1e-4;
   const N = SUB ? +SUB : subframes(t);
   let src;
-  if (N <= 1) { setup(t); renderer.setRenderTarget(rtScene); renderer.setClearColor(0, 1); renderer.render(scene, camera); src = rtScene.texture; }
+  if (N <= 1) { setup(t); renderer.setRenderTarget(rtScene); renderer.setClearColor(0xbfe3ff, 1); renderer.render(scene, camera); src = rtScene.texture; }
   else {
     renderer.setRenderTarget(rtAcc); renderer.setClearColor(0, 1); renderer.clear();
     for (let k = 0; k < N; k++) {
-      const ts = clamp(t - 1 / 96 + (k + 0.5) / N / 48, a, b);
-      setup(ts); renderer.setRenderTarget(rtScene); renderer.setClearColor(0, 1); renderer.render(scene, camera);
+      const ts = clamp(t - 1 / 96 + (k + 0.5) / N / 48, 0, DUR - 1e-4);
+      setup(ts); renderer.setRenderTarget(rtScene); renderer.setClearColor(0xbfe3ff, 1); renderer.render(scene, camera);
       accMat.uniforms.tSrc.value = rtScene.texture; accMat.uniforms.uW.value = 1 / N; quad.material = accMat;
       renderer.setRenderTarget(rtAcc); renderer.autoClear = false; renderer.render(quadScene, quadCam); renderer.autoClear = true;
     }
-    src = rtAcc.texture;
-    setup(t); // centre of the shutter for depth and post values
+    src = rtAcc.texture; setup(t);
   }
-  // depth of meshes only, for the DOF
-  const hidden = HIDDEN();
-  const vis = hidden.map((o) => o.visible); hidden.forEach((o) => (o.visible = false));
-  const fog = scene.fog, bg = scene.environment; scene.fog = null; scene.overrideMaterial = distMat; renderer.shadowMap.enabled = false;
-  renderer.setRenderTarget(rtDepth); renderer.setClearColor(0, 1); renderer.render(scene, camera);
-  scene.overrideMaterial = null; scene.fog = fog; renderer.shadowMap.enabled = true; hidden.forEach((o, i) => (o.visible = vis[i]));
-  // pyramids for halation and DOF
-  brightMat.uniforms.uTh.value = 1.0; pyramid(src, rA, rB, brightMat);
-  pyramid(src, dA, dB, null);
+  pyramid(src, rA, rB, brightMat);
   const fu = finalMat.uniforms;
   fu.tScene.value = src; fu.tB0.value = rA[0].texture; fu.tB1.value = rA[1].texture; fu.tB2.value = rA[2].texture;
-  fu.tD0.value = dA[0].texture; fu.tD1.value = dA[1].texture; fu.tD2.value = dA[2].texture; fu.tDepth.value = rtDepth.texture;
-  fu.uBS.value = POST.bs; fu.uBP.value.copy(POST.bp); fu.uBD.value.copy(POST.bd);
-  fu.uFocus.value = POST.focus; fu.uAp.value = POST.ap;
-  const frame = Math.round(t * 24); fu.uFrame.value = 0;
-  fu.uWeave.value.set(0, 0);
-  fu.uExp.value = POST.exp; fu.uFlash.value = POST.flash; fu.uHaze.value = POST.haze; fu.uFade.value = POST.fade;
+  fu.uFade.value = POST.fade; fu.uFlash.value = POST.flash;
   pass(finalMat, null);
 }
 
