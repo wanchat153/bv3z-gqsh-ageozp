@@ -165,5 +165,5 @@ export function makeShip() {
       goldM.metalness = 0.95 - 0.8 * w; sails.forEach((sl) => { sl.mesh.visible = false; sl.furl.visible = w < 0.5; }); flags.forEach((f) => (f.m.visible = w < 0.5)); rig.forEach((o) => (o.visible = w < 0.5)); lantM.emissiveIntensity = 0.6 * (1 - w); masts.forEach((m) => { m.mesh.scale.y = 1 - 0.45 * w; m.mesh.position.y = m.base + m.H * (1 - 0.45 * w) / 2; }); }
   }
   set({});
-  return { root, heel, set, ports, lids, mats, masts, widthAt, deckY };
+  return { root, heel, hull, set, ports, lids, mats, masts, widthAt, deckY };
 }

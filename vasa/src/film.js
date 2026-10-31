@@ -66,9 +66,17 @@ function pool(scene, n, size, px) { const a = []; for (let i = 0; i < n; i++) { 
 const HB = pool(HS, 8, 2.3, 1024), HC = pool(HS, 46, 2.3, 384);   // harbour: hero boards + crowd boards
 const GB = pool(GD.scene, 6, 2.3, 768); const RB = pool(RM.scene, 4, 2.3, 1024); const MB = pool(MU.scene, 14, 2.3, 512);
 const WORM = makeBoard(2.4, 512, drawWorm); SB.scene.add(WORM.mesh); WORM.shadow.visible = false;
-const used = new Set();
-function put(board, feet, pose, tint, ground) { board.mesh.visible = true; board.update(cam, feet, pose, tint, ground); used.add(board); }
-function hideAll() { for (const a of [HB, HC, GB, RB, MB]) for (const b of a) { b.mesh.visible = false; b.shadow.visible = false; } used.clear(); }
+const used = [];   // boards placed this frame, in order: the first is the hero unless the stage names one
+function put(board, feet, pose, tint, ground) { board.mesh.visible = true; board.update(cam, feet, pose, tint, ground); used.push({ board, feet: feet.clone(), back: !!pose.back }); }
+function hideAll() { for (const a of [HB, HC, GB, RB, MB]) for (const b of a) { b.mesh.visible = false; b.shadow.visible = false; } used.length = 0; }
+// ---- one world -> screen function: every framing check, focus pull and caption placement goes through it ----
+const _v = new THREE.Vector3();
+function toScreen(p) { _v.copy(p).project(cam); return [(_v.x * 0.5 + 0.5) * W, (1 - (_v.y * 0.5 + 0.5)) * H, _v.z < 1]; }
+function boxOfPoints(pts) { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, front = true; for (const p of pts) { const [x, y, f] = toScreen(p); front = front && f; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return front ? [x0, y0, x1, y1] : null; }
+function charBox(u) { const k = u.board.sizeM / 2.3; const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion); right.y = 0; right.normalize().multiplyScalar(0.34 * k);
+  const top = u.feet.clone().add(new THREE.Vector3(0, 1.68 * k, 0)); return boxOfPoints([u.feet.clone().add(right), u.feet.clone().sub(right), top.clone().add(right), top.clone().sub(right)]); }
+function objBox(obj) { obj.updateMatrixWorld(true); const b = new THREE.Box3().setFromObject(obj); if (b.isEmpty()) return null; const c = []; for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) c.push(new THREE.Vector3(x, y, z)); return { box: boxOfPoints(c), centre: b.getCenter(new THREE.Vector3()) }; }
+let LAST = { subjects: [], shot: '' };
 
 // crowd layout on the quay (stable random looks)
 const CROWD = []; { const r = rnd(123); for (let i = 0; i < HC.length; i++) { const row = i < 26 ? 0 : 1; const x = -26 + (row ? (i - 26) * 2.3 : i * 1.9) + r() * 0.6, z = QUAY.z + 1.4 + row * 1.6 + r() * 0.4;
@@ -129,7 +137,7 @@ const STAGE = {
     const u = l / d; camSet(V(mix(70, 30, ease(u)), mix(55, 9, ease(u)), mix(-95, -48, ease(u))), V(mix(-5, -2, u), mix(5, 10, u), mix(15, 4, u)), 38);
     // workers on the quay: barrel rollers, a waver
     const r = rnd(3); for (let i = 0; i < 6; i++) { const x = -18 + i * 6 + (i % 2 ? l * 0.8 : -l * 0.6); put(HB[i], V(x, QUAY.top, QUAY.z + 2.2 + (i % 3) * 1.5), { t, ...(i % 2 ? LOOK.worker : sailor(i)), walk: t * 7 + i, face: { eyes: 'dot', mouth: i % 2 ? 'smile' : 'line' } }); }
-    return { exp: 1.0, bloom: 0.3, dof: 0 };
+    return { exp: 1.0, bloom: 0.3, dof: 0, wide: true, heroObj: SHIP.hull, hero: 0 };
   },
   // 2. the stern and the king who wants it grander
   stern(t, l, d) {
@@ -168,8 +176,9 @@ const STAGE = {
     const p0 = onDeck(-9.2, 0.0, t); camSet(p0.clone().add(V(0.4, 1.35, 4.6)), p0.clone().add(V(0, 1.1, -0.2)), 42);
     const stop = l < 1.3, read = l >= 1.3 && l < 2.4, go = l >= 2.4;
     put(HB[0], onDeck(-8.6, 0.2, t), { t, ...LOOK.admiral, face: { eyes: read ? 'wide' : go ? 'lid' : 'dot', mouth: stop ? 'open' : read ? 'o' : 'smirk', open: 0.8, look: read ? [0.5, 0.3] : [-0.3, 0], browAng: stop ? 0.5 : 0, sweat: read ? 1 : 0 },
-      armR: stop ? [90, -230, -30] : go ? [170, -60, -20] : [60, 40, -20], armL: go ? [-90, -90, 40] : [-30, 140, 12] });
-    put(HB[1], onDeck(-10.6, 0.1, t), { t, ...LOOK.captain, face: { eyes: go ? 'shut' : 'dot', mouth: go ? 'frown' : 'line', look: [0.6, 0] }, armL: go ? [40, -190, -10] : [-30, 150, 12] });
+      armR: kf([[0, [40, 150, -12]], [0.18, [90, -230, -30]], [1.15, [90, -230, -30]], [1.45, [60, 40, -20]], [2.3, [60, 40, -20]], [2.6, [170, -60, -20]]], l),
+      armL: kf([[0, [-30, 140, 12]], [2.3, [-30, 140, 12]], [2.6, [-90, -90, 40]]], l) });
+    put(HB[1], onDeck(-10.6, 0.1, t), { t, ...LOOK.captain, face: { eyes: go ? 'shut' : 'dot', mouth: go ? 'frown' : 'line', look: [0.6, 0] }, armL: kf([[0, [-30, 150, 12]], [2.45, [-30, 150, 12]], [2.8, [40, -190, -10]]], l) });
     if (l > 0.9) put(HB[2], onDeck(mix(-4, -7.0, clamp((l - 0.9) / 0.4, 0, 1)), 0.4, t), { t, ...LOOK.messenger, face: { eyes: 'dot', mouth: 'smile', look: [-0.6, 0] }, prop: { hand: 'R', kind: 'scroll' }, armR: [-90, -40, -20], walk: l < 1.3 ? t * 8 : null });
     // frozen sailors in the background
     for (let i = 0; i < 4; i++) put(HC[i], onDeck(-12 + i * 1.6, -3.0, t), { t, ...sailor(i), face: { eyes: 'wide', mouth: 'o' }, armL: [-90, -40, 20], armR: [90, -40, -20], legs: [[-30, 0], [40, 0]] });
@@ -180,7 +189,7 @@ const STAGE = {
     harbourBase(t, { sails: clamp(l / 2.2, 0, 1), wind: 0.5, sunAt: V(10, 0, 0), shadowExt: 40 });
     const u = l / d; camSet(V(mix(-14, -10, u), 3.6, QUAY.z + 6.5), V(mix(4, 10, u), 6, -6), 42);
     crowd(t, (c) => ({ eyes: 'happy', mouth: 'grin' }), { back: true, wave: true });
-    return { exp: 1.02, bloom: 0.3, dof: 1.0, focus: 30 };
+    return { exp: 1.02, bloom: 0.3, dof: 1.0, wide: true, heroObj: SHIP.hull, hero: 0 };
   },
   // 7. first gust: she leans... and comes back; cheers
   gust1(t, l, d) {
@@ -216,7 +225,7 @@ const STAGE = {
     const sp = shipPath(t).pos; camSet(V(sp.x - 50, 4.2, QUAY.z + 6.2), sp.clone().add(V(0, mix(10, 3, ease(l / d)), 0)), 34);
     crowd(t, () => ({}), { back: true, noProps: true, n: 30, dx: sp.x - 42 });
     shotFoam(t, sp, sstep(0.3, 2.5, l) * (1 - sstep(4.0, 5.0, l) * 0.6), 18);
-    return { exp: 0.98, bloom: 0.28, dof: 0.8, focus: 70 };
+    return { exp: 0.98, bloom: 0.28, dof: 0.8, wide: true, heroObj: SHIP.hull, hero: 0 };
   },
   // 10b. the crowd, frozen in shock
   shock(t, l, d) {
@@ -231,9 +240,9 @@ const STAGE = {
   inquiry(t, l, d) {
     const u = l / d; camSet(V(0.2, 1.8, mix(7.8, 7.0, u)), V(0.2, 1.4, -1.5), 50);
     const ph = l < 1.0 ? 0 : l < 2.0 ? 1 : 2;
-    put(RB[0], V(0.4, 1.0, -2.8), { t, ...LOOK.judge, face: { eyes: ph === 2 ? 'shut' : 'lid', mouth: ph === 2 ? 'line' : 'frown', look: [ph === 0 ? -0.5 : 0.5, 0] }, armR: ph === 2 ? [140, -160, -20] : [40, 120, -10], armL: ph === 2 ? [-140, -160, 20] : [-40, 120, 10], prop: ph === 2 ? null : { hand: 'R', kind: 'gavel' }, shadow: false }, null, 1.0);
-    put(RB[1], V(-1.35, 0, 0.6), { t, ...LOOK.captain, face: { eyes: 'dot', mouth: ph === 1 ? 'open' : 'frown', open: 0.5, browAng: 0.5, look: [0.6, 0] }, armR: ph === 1 ? [10, -270, -10] : [190, -60, -10] });
-    put(RB[2], V(1.8, 0, 0.6), { t, ...LOOK.wright, face: { eyes: 'dot', mouth: ph === 1 ? 'open' : 'frown', open: 0.5, browAng: 0.5, look: [-0.6, 0] }, armL: ph === 1 ? [-10, -270, 10] : [-190, -60, 10] });
+    put(RB[0], V(0.4, 1.0, -2.8), { t, ...LOOK.judge, face: { eyes: ph === 2 ? 'shut' : 'lid', mouth: ph === 2 ? 'line' : 'frown', look: [ph === 0 ? -0.5 : 0.5, 0] }, armR: kf([[0, [40, 120, -10]], [1.9, [40, 120, -10]], [2.15, [140, -160, -20]]], l), armL: kf([[0, [-40, 120, 10]], [1.9, [-40, 120, 10]], [2.15, [-140, -160, 20]]], l), prop: ph === 2 ? null : { hand: 'R', kind: 'gavel' }, shadow: false }, null, 1.0);
+    put(RB[1], V(-1.35, 0, 0.6), { t, ...LOOK.captain, face: { eyes: 'dot', mouth: ph === 1 ? 'open' : 'frown', open: 0.5, browAng: 0.5, look: [0.6, 0] }, armR: kf([[0, [40, 150, -12]], [0.15, [190, -60, -10]], [0.95, [190, -60, -10]], [1.15, [10, -270, -10]], [1.9, [10, -270, -10]], [2.1, [190, -60, -10]]], l) });
+    put(RB[2], V(1.8, 0, 0.6), { t, ...LOOK.wright, face: { eyes: 'dot', mouth: ph === 1 ? 'open' : 'frown', open: 0.5, browAng: 0.5, look: [-0.6, 0] }, armL: kf([[0, [-40, 150, 12]], [0.35, [-190, -60, 10]], [0.95, [-190, -60, 10]], [1.15, [-10, -270, 10]], [1.9, [-10, -270, 10]], [2.1, [-190, -60, 10]]], l) });
     return { scene: RM.scene, exp: 1.05, bloom: 0.4, bloomT: 1.0, dof: 1.6, focus: 5.5, tint: [1.05, 1.0, 0.92] };
   },
   // 12. down on the seabed: cold, dark water; the shipworm shivers and gives up
@@ -242,7 +251,7 @@ const STAGE = {
     camSet(V(mix(30, 13, ease(u)), mix(-15, -25.5, ease(u)), mix(-36, -19, ease(u))), V(mix(2, 5, u), mix(-22, -26.2, u), mix(0, -6.5, u)), 44);
     const wx = 7.5 - 1.2 * Math.min(1, l / 1.6) + 2.2 * sstep(2.4, 3.8, l); const cold = l > 1.5;
     WORM.mesh.visible = true; WORM.update(cam, V(wx, -27.6, -7.6), { t, shiver: cold ? 1 : 0, cold, turn: l > 2.4 ? 1 : 0, wiggle: 1, shadow: false }, new THREE.Color(0.75, 0.95, 1.0));
-    return { scene: SB.scene, exp: 1.5, bloom: 0.5, bloomT: 0.7, dof: 1.0, focus: 14, tint: [0.85, 1.0, 1.05], vig: 0.4 };
+    return { scene: SB.scene, heroObj: WORM.mesh, hero: 0, exp: 1.5, bloom: 0.5, bloomT: 0.7, dof: 1.0, focus: 14, tint: [0.85, 1.0, 1.05], vig: 0.4 };
   },
   // 13. 1961: pontoons, cables, and up she comes, streaming water; flashbulbs
   salvage(t, l, d) {
@@ -251,14 +260,14 @@ const STAGE = {
     const u = l / d; camSet(V(mix(-20, -15, u), 9.5, -40 + 26), V(-2, mix(2, 5, u), -40), 46);
     shotFoam(t, V(0, 0, -40), 0.9, 14);
     for (let i = 0; i < 5; i++) { const fl = Math.max(0, 1 - Math.abs(((t * 1.3 + i * 0.37) % 1.6) - 0.1) * 8); put(HB[i], V(-15.5 + i * 2.0, 3.6, -40 + 11.8), { t, ...RETRO_LOOK(rnd(31 + i)), face: { eyes: 'dot', mouth: i % 2 ? 'o' : 'smile', look: [0.4, -0.2] }, prop: { hand: 'R', kind: 'flashcam' }, flash: fl, armR: [10, -60, -20], armL: [80, -40, 20] }, null, 3.55); }
-    return { exp: 0.95, bloom: 0.45, bloomT: 0.9, dof: 1.0, focus: 9, sat: 0.85, tint: [0.98, 0.98, 1.02], flash: 0 };
+    return { heroObj: WRECK2.hull, hero: 0, exp: 0.95, bloom: 0.45, bloomT: 0.9, dof: 1.0, focus: 9, sat: 0.85, tint: [0.98, 0.98, 1.02], flash: 0 };
   },
   // 14. today: the museum hall, the ship lit in the dark, visitors looking up
   museum(t, l, d) {
     const u = l / d; camSet(V(mix(2.4, 1.2, ease(u)), mix(-3.1, -2.4, ease(u)), mix(22.5, 21.6, u)), V(mix(-4, -2, u), mix(-1.5, 2.5, ease(u)), 0), 50);
     const r = rnd(51); for (let i = 0; i < 8; i++) { const x = -3.2 + i * 0.95 + r() * 0.3; const lk = MOD_LOOK(r); const ph = r() < 0.35;
       put(MB[i], V(x, -5.2, 15.4 + (i % 2) * 0.9 + r() * 0.3), { t, ...lk, back: !ph && r() < 0.5, face: { eyes: i % 3 ? 'dot' : 'wide', mouth: i % 3 ? 'smile' : 'o', look: [-0.4, -0.5] }, prop: ph ? { hand: 'R', kind: 'phone' } : null, armR: ph ? [20, -200, -20] : [40, 150, -12] }, new THREE.Color(0.9, 0.85, 0.8), -5.2); }
-    return { scene: MU.scene, exp: 1.5, bloom: 0.45, bloomT: 0.9, dof: 0.9, focus: 8, vig: 0.35, tint: [1.05, 1.0, 0.95] };
+    return { scene: MU.scene, heroObj: MUSHIP.hull, hero: 0, wide: true, exp: 1.5, bloom: 0.45, bloomT: 0.9, dof: 0.9, focus: 8, vig: 0.35, tint: [1.05, 1.0, 0.95] };
   },
 };
 function windStreaks(t, sp, k) { WIND.forEach((w, i) => { const ph = (t * 0.9 + w.ph) % 1; w.m.position.set(sp.x - 40 + ph * 80, w.y, sp.z + w.z); w.m.material.opacity = 0.55 * k * Math.sin(Math.PI * ph); w.m.lookAt(cam.position); }); }
@@ -269,11 +278,19 @@ function render(t) {
   t = clamp(t, 0, DUR - 1e-4); hideAll(); WORM.mesh.visible = false;
   const s = shotAt(t); const l = t - s.t0, d = s.t1 - s.t0;
   const o = STAGE[s.stage](t, l, d) || {};
+  cam.updateMatrixWorld(true);
+  const subjects = used.map((u, i) => ({ id: `char${i}`, kind: 'char', back: u.back, box: charBox(u), at: u.feet.clone().add(new THREE.Vector3(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
+  const heroObj = o.heroObj || ((o.scene || HS) === HS && !used.length ? SHIP.hull : null);
+  if (heroObj) { const ob = objBox(heroObj); if (ob) subjects.unshift({ id: 'object', kind: 'object', box: ob.box, at: ob.centre }); }
+  const hi = o.hero ?? 0; if (subjects[hi]) subjects[hi].hero = true;
+  // focus follows the hero every frame (from the camera to the subject), unless the stage pins it
+  if (o.dof > 0 && subjects[hi] && !o.pinFocus) o.focus = cam.position.distanceTo(subjects[hi].at);
+  LAST = { shot: s.stage, wide: !!o.wide, subjects: subjects.map(({ at, ...r }) => r) };
   // shot boundary fades: quick dip at the very start and end of the film
   const fade = sstep(0, 0.4, t) * (1 - sstep(DUR - 1.0, DUR - 0.05, t));
   POST.render(o.scene || HS, cam, { ...o, fade });
 }
-window.DUR = DUR; window.FPS = FPS; window.render = render;
+window.DUR = DUR; window.FPS = FPS; window.render = render; window.SUBJECTS = (t) => { render(t); return { W, H, ...LAST }; };
 window.grabPNG = (t) => { render(t); return canvas.toDataURL('image/png').split(',')[1]; };
 window.grab = (t) => { render(t); return canvas.toDataURL('image/jpeg', 0.95).split(',')[1]; };
 render(0); window.READY = true;
