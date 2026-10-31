@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style></head><body>
+<script type="module">
+import * as THREE from '../src/three.module.js';
+import { makePost } from '../src/post.js';
+import { makeSky, makeEnv, makeWater, makeHarbour, QUAY } from '../src/world.js';
+import { makeShip } from '../src/ship.js';
+import { makeBoard, drawPerson } from '../src/stick.js';
+const W = innerWidth, H = innerHeight; const cv = document.createElement('canvas'); document.body.appendChild(cv);
+const P = makePost(cv, W, H); const scene = new THREE.Scene();
+const SKY = makeSky(scene); scene.environment = makeEnv(P.renderer, SKY.u); scene.environmentIntensity = 0.7;
+scene.fog = new THREE.Fog(0xd8d0c0, 120, 700);
+const sun = new THREE.DirectionalLight(0xffe2b8, 3.0); sun.position.set(-60, 50, -80); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 300 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.05; scene.add(sun, sun.target);
+scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x6a5a40, 0.6));
+const water = makeWater(scene); const H0 = makeHarbour(scene); const ship = makeShip(); scene.add(ship.root); ship.set({ t: 1, sails: 0, wind: 0.2 });
+const cam = new THREE.PerspectiveCamera(40, W / H, 0.2, 2000);
+const people = []; const looks = [{ body: '#2c3f73', hat: 'tricorn', moustache: '#5a3a24', face: { eyes: 'lid', mouth: 'smirk' } }, { body: '#f2f2f2', stripes: '#2f5fb0', hat: 'sailor', hatCol: '#1d2d4a', face: { eyes: 'dot', mouth: 'smile' } }, { body: '#4a7a3a', hair: 'bun', face: { eyes: 'dot', mouth: 'open', open: 0.4 }, armR: [70, -140, -30], prop: { hand: 'R', kind: 'hankie' } }];
+for (let i = 0; i < 3; i++) { const b = makeBoard(2.4, 512, drawPerson); scene.add(b.mesh, b.shadow); people.push(b); }
+const views = { a: [[26, 7, -58], [-2, 13, 0], 40], b: [[-14, 3.2, 7.4], [-8, 2.9, 11.5], 40], c: [[4, 9.6, 2.5], [-16, 12.5, -1], 46], d: [[-48, 7, -22], [-22, 8.5, 0], 36] };
+window.READY = true;
+window.grab = (v) => { const [p, tg, f] = views[v]; cam.position.set(...p); cam.lookAt(...tg); cam.fov = f; cam.updateProjectionMatrix(); water.update(3);
+  people.forEach((b, i) => b.update(cam, new THREE.Vector3(-9.5 + i * 1.7, QUAY.top, QUAY.z + 1.6 + i * 0.4), { t: 1, ...looks[i] }));
+  sun.target.position.set(0, 0, 0); P.render(scene, cam, { dof: v === 'b' ? 3 : 0, focus: 8.5, bloom: 0.3, exp: 1.0 }); return cv.toDataURL('image/jpeg', 0.9).split(',')[1]; };
+</script></body></html>

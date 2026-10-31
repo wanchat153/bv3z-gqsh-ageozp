@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+import { drawPerson } from '../src/stick.js';
+const c = document.createElement('canvas'); c.width = 1080; c.height = 1920; document.body.appendChild(c); const x = c.getContext('2d');
+const g = x.createLinearGradient(0, 0, 0, 1920); g.addColorStop(0, '#c9a77a'); g.addColorStop(1, '#6b4a33'); x.fillStyle = g; x.fillRect(0, 0, 1080, 1920);
+const P = [
+  { body: '#2c3f73', hat: 'tricorn', hatCol: '#22222e', moustache: '#5a3a24', face: { eyes: 'lid', mouth: 'frown', browAng: 0.5 }, armR: [60, 120, -10], buttons: '#e3b341', belt: '#5a3a24' },
+  { body: '#f2f2f2', stripes: '#2f5fb0', hair: 'cap', hairCol: '#8a5a32', face: { eyes: 'wide', mouth: 'o', open: 0.8, sweat: 1 }, armL: [-120, -40, 20], armR: [120, -40, -20], walk: 1, run: 1 },
+  { body: '#7a2a3a', hat: 'crown', moustache: '#6b4427', sash: '#2f6fd6', face: { eyes: 'happy', mouth: 'teeth', open: 1, tears: 1 }, armR: [50, 60, -20] },
+  { body: '#4a7a3a', hair: 'bun', hairCol: '#4a2a1a', face: { eyes: 'dot', mouth: 'smile', blush: 1, look: [0.6, 0] }, prop: { hand: 'R', kind: 'hankie' }, armR: [70, -120, -30] },
+  { body: '#e2782f', hair: 'cap', hairCol: '#6a4024', face: { eyes: 'lid', mouth: 'smirk', browAng: -0.2, look: [-0.5, 0] }, prop: { hand: 'R', kind: 'camera', rot: 0.1 }, armR: [-10, 80, -30] },
+  { body: '#5b3fa8', hat: 'beanie', hatCol: '#3a2a6a', face: { eyes: 'glasses', mouth: 'open', open: 0.5, brow: 1 } },
+];
+P.forEach((p, i) => { x.save(); x.translate(200 + (i % 3) * 340, 520 + Math.floor(i / 3) * 900); x.scale(0.62, 0.62); x.lineJoin = x.lineCap = 'round'; drawPerson(x, { t: 0.3, ...p }); x.restore(); });
+window.READY = true; window.grab = () => c.toDataURL('image/jpeg', 0.92).split(',')[1];
+</script></body></html>

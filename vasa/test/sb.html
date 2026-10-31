@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style></head><body>
+<script type="module">
+import * as THREE from '../src/three.module.js';
+import { makePost } from '../src/post.js';
+import { makeSeabed } from '../src/sets.js';
+import { makeShip } from '../src/ship.js';
+const W = innerWidth, H = innerHeight; const cv = document.createElement('canvas'); document.body.appendChild(cv);
+const P = makePost(cv, W, H); const SB = makeSeabed(); const S = makeShip(); S.set({ wreck: 1 }); SB.scene.add(S.root); S.root.position.set(0, SB.mudY + 3.6, 0);
+const cam = new THREE.PerspectiveCamera(44, W / H, 0.1, 2500);
+window.READY = true;
+window.grab = (v) => { if (v === 'a') { cam.position.set(34, -14, -34); cam.lookAt(0, -22, 0); } else { SB.scene.fog = null; cam.position.set(34, -14, -34); cam.lookAt(0, -22, 0); }
+  SB.update(1); P.render(SB.scene, cam, { exp: 1.25 }); const info = []; SB.scene.traverse(o => { if (o.isMesh && o.geometry.attributes.position.count > 2000) info.push(o.geometry.type); }); console.error('meshes', info.join(',')); return cv.toDataURL('image/jpeg', 0.9).split(',')[1]; };
+</script></body></html>
