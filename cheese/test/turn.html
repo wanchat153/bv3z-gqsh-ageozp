@@ -1,0 +1,8 @@
+<!doctype html><html><body style="margin:0;background:#c9a77a"><script type="module">
+import { drawPerson } from '../src/stick.js';
+const c = document.createElement('canvas'); c.width = 1400; c.height = 560; document.body.appendChild(c); const x = c.getContext('2d'); x.fillStyle = '#c9a77a'; x.fillRect(0, 0, 1400, 560);
+const looks = [{ body: '#3f6fb5', apron: '#fbfaf5', hat: 'chef', moustache: '#5a3a24' }, { body: '#c8312d', hair: 'cap', hairCol: '#4a2a14' }];
+looks.forEach((lk, row) => [-2, -1, 0, 1, 2, 3].forEach((tn, i) => { x.save(); x.translate(110 + i * 230, 150 + row * 0); x.scale(0.3, 0.3); x.translate(0, row ? 0 : 0); x.lineJoin = x.lineCap = 'round';
+  if (row) x.translate(0, 900); drawPerson(x, { t: 0.4, ...lk, turn: tn, back: tn === 3, face: { eyes: 'dot', mouth: 'smile' } }); x.restore(); }));
+window.READY = true; window.grab = () => c.toDataURL('image/jpeg', 0.9).split(',')[1];
+</script></body></html>

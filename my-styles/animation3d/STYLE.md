@@ -18,8 +18,12 @@ Not HD-2D (no pixel sprites, no tilt-shift toy band, no RPG UI), not a 3D animat
 ## 2. Materials & rendering
 
 - **Characters**: drawn every frame with Canvas2D on camera-facing, upright planes (yaw toward the camera, never pitched), 384–1024 px canvases in a 1024-unit space, feet at a fixed canvas point so they stand on the set. A soft blob shadow on the ground under each one. Characters take the scene's light as a tint (cooler at night, warmer by fire), never 3D shading.
+- **Angles are drawings, not rotations**: every character has front, three-quarter (left/right), profile (left/right) and back drawings, plus sitting, lying (seen from above) and carrying poses as a film needs. A character walking across the frame is drawn in profile or three-quarter facing its direction of travel.
+- **Turning**: a turn is a snap through those drawings (back → three-quarter → profile → … → front), each held at least 2 frames at 30 fps. The card itself always faces the camera squarely; it is never rotated, scaled thin or seen edge-on (the frame checker flags any card more than ~14° off the camera).
+- Animals and creatures are drawn in the same 2D style (same ink, flat fills, minimal faces).
 - **Outline**: one ink colour, a warm near-black brown (e.g. `#2a1d1d`), ~3% of head width; limbs are the same ink at about the outline width; round caps and joins.
 - **Fills**: flat, with one soft inner gradient (lighter upper-left, darker lower-right) on head and body; the head is off-white, never pure white.
+- **Sets** range from painterly lit 3D to ink-outlined toon sets (flat bright colours with dark contour lines, as in the references' interiors); pick one per film and keep it.
 - **Sets**: three.js `MeshStandardMaterial` (roughness/metal), canvas-painted textures for planks, stone, plaster, carvings; procedural geometry at real scale (metres). An environment map from the sky for reflections; one shadow-casting key, a hemisphere fill, practical point lights where the story has lamps.
 - **Post chain**: MSAA scene → depth-of-field from a depth pass (two blur levels mixed by circle of confusion) → bloom from bright areas → filmic tone map → grade (exposure, tint, saturation per shot) → vignette. No film grain, no chromatic aberration.
 
@@ -65,16 +69,16 @@ Not HD-2D (no pixel sprites, no tilt-shift toy band, no RPG UI), not a 3D animat
 - Pace varies: fast cuts against at least one held breath (a 3–5 s take); a gag or failure stays on screen long enough to read.
 - Hard cuts between shots are the default grammar; a dip to black only at the very start and end.
 
-**Benchmark = the reference videos, never our own earlier films.** Compare every film with `demo/tools/refcompare.py ours.mp4 <reference videos>` (the references stay on the user's machine; never commit them) and match these measured targets (from the two references):
+**Benchmark = the reference videos, never our own earlier films.** Compare every film with `demo/tools/refcompare.py ours.mp4 <reference videos>` (the references stay on the user's machine; never commit them) and match these measured targets (from the four references: The Ancient Jar, The Window, The Town Built Around a Button, The Burglar Who Only Moved Furniture):
 
 | Measure | Target |
 |---|---|
 | a new shot or framing every | 2.2–4.5 s |
-| hard cuts | 11–16 per minute |
+| hard cuts | 11–20 per minute |
 | in-camera transitions (push-in into a detail then cut on the motion, an object sweeping across the lens, a pull-back revealing a new framing) | 3–11 per minute; never zero |
-| motion (mean frame difference at 90×160) | 10.8–14: the camera is almost never still |
-| average luma | 86–112 / 255 |
-| average saturation | 22–24 %: rich colour, warm vs cool practicals |
+| motion (mean frame difference at 90×160) | 10.8–16.7: the camera is almost never still |
+| average luma | 86–140 / 255 |
+| average saturation | 22–30 %: rich colour, warm vs cool practicals, purple-blue nights |
 | hero head width in medium shots | 30–45 % of frame width; characters stand beside the props they use, at the same scale |
 | set density | every frame has foreground, midground and background props; no empty floors or blank sky above a character |
 

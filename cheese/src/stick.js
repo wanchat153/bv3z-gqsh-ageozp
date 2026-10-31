@@ -107,11 +107,13 @@ function hat(c, kind, col, hx, hy, rx, ry, t) {
 // ---------------- the face ----------------
 // p.face: {eyes: 'dot'|'lid'|'shut'|'wide'|'happy'|'glasses'|'shades', look:[x,y], brow: -1..1 (raised), browAng: + angry, mouth: 'line'|'smile'|'grin'|'open'|'o'|'frown'|'teeth'|'smirk', open: 0..1, tears, sweat, blush}
 function face(c, f, hx, hy, rx, ry, t) {
-  const lx = (f.look ? f.look[0] : 0) * rx * 0.22, ly = (f.look ? f.look[1] : 0) * ry * 0.14;
+  const tn = f.turn || 0, ts = Math.sign(tn), ta = Math.abs(tn);
+  const lx = (f.look ? f.look[0] : 0) * rx * 0.22 * (ta ? 0.3 : 1) + ts * rx * (ta === 1 ? 0.36 : ta === 2 ? 0.58 : 0), ly = (f.look ? f.look[1] : 0) * ry * 0.14;
   const ex = rx * 0.34, ey = hy - ry * 0.05 + ly, ebR = rx * 0.085;
   const blink = f.blink ? 1 : 0; let eyes = blink ? 'shut' : (f.eyes || 'dot');
   for (const s of [-1, 1]) {
-    const x = hx + lx + s * ex, y = ey;
+    if (ta === 2 && s !== ts) continue;                       // profile: only the near eye
+    const x = hx + lx + s * ex * (ta === 1 ? 0.78 : ta === 2 ? 0.55 : 1), y = ey;
     if (eyes === 'dot') { ell(c, x, y, ebR, ebR * 1.25); c.fillStyle = INK; c.fill(); ell(c, x + ebR * 0.3, y - ebR * 0.45, ebR * 0.28, ebR * 0.28); c.fillStyle = '#fff'; c.fill(); }
     if (eyes === 'lid') { c.save(); ell(c, x, y + ebR * 0.25, ebR * 1.05, ebR * 1.0); c.clip(); ell(c, x + s * 0, y + ebR * 0.55, ebR, ebR * 1.2); c.fillStyle = INK; c.fill(); c.restore(); c.beginPath(); c.moveTo(x - ebR * 1.6, y - ebR * 0.05); c.lineTo(x + ebR * 1.6, y - ebR * 0.05 + s * 0); stroke(c, 8); }
     if (eyes === 'shut') { c.beginPath(); c.moveTo(x - ebR * 1.4, y); c.quadraticCurveTo(x, y + ebR * 0.9, x + ebR * 1.4, y); stroke(c, 8); }
@@ -122,7 +124,7 @@ function face(c, f, hx, hy, rx, ry, t) {
   if (eyes === 'glasses') { c.beginPath(); c.moveTo(hx + lx - ex + ebR * 2.3, ey); c.lineTo(hx + lx + ex - ebR * 2.3, ey); stroke(c, 6); }
   // brows: thick short strokes
   const br = f.brow || 0, ba = f.browAng || 0;
-  for (const s of [-1, 1]) { const x = hx + lx + s * ex, y = ey - ry * 0.27 - br * ry * 0.08 + (eyes === 'wide' ? -ry * 0.07 : 0); const L = rx * 0.17; const dy = ba * L * 0.6;
+  for (const s of [-1, 1]) { if (ta === 2 && s !== ts) continue; const x = hx + lx + s * ex * (ta === 1 ? 0.78 : ta === 2 ? 0.55 : 1), y = ey - ry * 0.27 - br * ry * 0.08 + (eyes === 'wide' ? -ry * 0.07 : 0); const L = rx * 0.17; const dy = ba * L * 0.6;
     c.beginPath(); c.moveTo(x - L, y + (s < 0 ? -dy : dy) * -1 * -1 * (s > 0 ? 1 : -1) * 0 + (s < 0 ? -dy : dy)); c.lineTo(x + L, y + (s < 0 ? dy : -dy)); stroke(c, 13); }
   // mouth
   const mx = hx + lx * 1.15, my = hy + ry * 0.42 + ly, mw = rx * 0.17, o = clamp(f.open ?? 0.6, 0, 1); const m = f.mouth || 'line';
@@ -149,6 +151,7 @@ function face(c, f, hx, hy, rx, ry, t) {
 //        armL/armR: [dx, dy] hand offset from shoulder (canvas units) + bend, prop: {hand:'R', kind}, walk (phase or null), run, lean, bob, sq,
 //        face:{...}, sit}
 export function drawPerson(c, p) {
+  const turn = p.back ? 3 : (p.turn || 0), tsg = Math.sign(turn) || 1, tab = Math.abs(turn), front = turn !== 3;
   const t = p.t || 0, sq = p.sq || 1; c.save(); c.translate(0, 430); c.rotate(p.lean || 0); c.scale(1 / Math.sqrt(sq), sq); c.translate(0, -430);
   const bob = p.bob || 0; const bw = p.bodyW || 98, bh = p.bodyH || 345, body = p.body || '#e2782f';
   const hipY = 250, topY = hipY - bh + 30 + bob; const [hrx, hry] = p.head || [160, 148];
@@ -166,26 +169,29 @@ export function drawPerson(c, p) {
   const bean = () => { const y0 = topY, y1 = hipY + bob + 25, wt = bw * 0.86; c.beginPath(); c.moveTo(-wt, y0 + wt); c.quadraticCurveTo(-wt, y0, 0, y0); c.quadraticCurveTo(wt, y0, wt, y0 + wt);
     c.lineTo(bw, y1 - bw); c.quadraticCurveTo(bw, y1, 0, y1); c.quadraticCurveTo(-bw, y1, -bw, y1 - bw); c.closePath(); };
   bean(); fillStroke(c, body, 10); bean(); softShade(c, 0, (topY + hipY) / 2, bh * 0.6, 0.22);
-  if (p.collar) { c.beginPath(); c.moveTo(-bw * 0.35, topY + 8); c.lineTo(0, topY + 70); c.lineTo(bw * 0.35, topY + 8); stroke(c, 8); }
+  if (p.collar && front) { c.beginPath(); c.moveTo(-bw * 0.35, topY + 8); c.lineTo(0, topY + 70); c.lineTo(bw * 0.35, topY + 8); stroke(c, 8); }
   if (p.belt) { c.beginPath(); c.moveTo(-bw * 0.97, hipY - 40 + bob); c.lineTo(bw * 0.97, hipY - 40 + bob); stroke(c, 22, p.belt); c.beginPath(); c.moveTo(-bw * 0.97, hipY - 51 + bob); c.lineTo(bw * 0.97, hipY - 51 + bob); c.moveTo(-bw * 0.97, hipY - 29 + bob); c.lineTo(bw * 0.97, hipY - 29 + bob); stroke(c, 5); }
   if (p.stripes) { c.save(); bean(); c.clip(); for (let y = topY + 40; y < hipY + 20; y += 42) { c.beginPath(); c.moveTo(-bw, y); c.lineTo(bw, y); stroke(c, 14, p.stripes); } c.restore(); bean(); stroke(c, 10); }
-  if (p.apron) { c.save(); bean(); c.clip(); rrect(c, -bw * 0.62, topY + 70 + bob, bw * 0.62, hipY + bob + 40, 26); fillStroke(c, p.apron, 8); c.beginPath(); c.moveTo(-bw * 0.62, topY + 70 + bob); c.lineTo(-bw * 0.35, topY + 8 + bob); c.moveTo(bw * 0.62, topY + 70 + bob); c.lineTo(bw * 0.35, topY + 8 + bob); stroke(c, 8); c.restore(); bean(); stroke(c, 10); }
-  if (p.tie) { c.beginPath(); c.moveTo(0, topY + 10); c.lineTo(-16, topY + 40); c.lineTo(0, topY + 150); c.lineTo(16, topY + 40); c.closePath(); fillStroke(c, p.tie, 6); }
-  if (p.buttons) for (let i = 0; i < 3; i++) { ell(c, 0, topY + 70 + i * 45, 8, 8); fillStroke(c, p.buttons, 4); }
-  if (p.sash) { c.beginPath(); c.moveTo(-bw * 0.8, topY + 30); c.lineTo(bw * 0.85, hipY - 30); stroke(c, 30, p.sash); }
+  if (p.apron && front) { c.save(); bean(); c.clip(); rrect(c, -bw * 0.62, topY + 70 + bob, bw * 0.62, hipY + bob + 40, 26); fillStroke(c, p.apron, 8); c.beginPath(); c.moveTo(-bw * 0.62, topY + 70 + bob); c.lineTo(-bw * 0.35, topY + 8 + bob); c.moveTo(bw * 0.62, topY + 70 + bob); c.lineTo(bw * 0.35, topY + 8 + bob); stroke(c, 8); c.restore(); bean(); stroke(c, 10); }
+  if (p.tie && front) { c.beginPath(); c.moveTo(0, topY + 10); c.lineTo(-16, topY + 40); c.lineTo(0, topY + 150); c.lineTo(16, topY + 40); c.closePath(); fillStroke(c, p.tie, 6); }
+  if (p.buttons && front) for (let i = 0; i < 3; i++) { ell(c, 0, topY + 70 + i * 45, 8, 8); fillStroke(c, p.buttons, 4); }
+  if (p.sash && front) { c.beginPath(); c.moveTo(-bw * 0.8, topY + 30); c.lineTo(bw * 0.85, hipY - 30); stroke(c, 30, p.sash); }
   // arms over the body
   limb(c, sh[0], sh[1], handL[0], handL[1], aL[2] ?? 12, 11, 10); limb(c, shR[0], shR[1], handR[0], handR[1], aR[2] ?? -12, 11, 10);
   if (p.prop) { const h = p.prop.hand === 'L' ? handL : handR; c.save(); c.translate(h[0], h[1]); c.rotate(p.prop.rot || 0); PROPS[p.prop.kind](c, p); c.restore(); }
   // head
   ell(c, hx, hy, hrx, hry); fillStroke(c, p.skin || '#f6f2ea', 10.5); ell(c, hx, hy, hrx, hry); softShade(c, hx, hy, hrx, 0.12);
-  hair(c, p.hair, p.hairCol || '#7a4a2a', hx, hy, hrx, hry);
+  if (tab === 1 || tab === 2) { c.save(); ell(c, hx, hy, hrx, hry); c.clip(); c.translate(-tsg * hrx * (tab === 1 ? 0.14 : 0.3), 0); hair(c, p.hair, p.hairCol || '#7a4a2a', hx, hy, hrx, hry); c.restore();
+    if (p.hair && tab === 2) { c.save(); ell(c, hx, hy, hrx, hry); c.clip(); c.beginPath(); c.ellipse(hx - tsg * hrx * 0.55, hy - hry * 0.1, hrx * 0.7, hry * 1.05, 0, 0, Math.PI * 2); c.fillStyle = p.hairCol || '#7a4a2a'; c.fill(); c.restore(); }
+    ell(c, hx, hy, hrx, hry); stroke(c, 10.5); }
+  else hair(c, p.hair, p.hairCol || '#7a4a2a', hx, hy, hrx, hry);
   if (p.beard && !p.back) { c.beginPath(); c.ellipse(hx, hy + hry * 0.35, hrx * 0.72, hry * 0.58, 0, 0.05 * Math.PI, 0.95 * Math.PI); c.quadraticCurveTo(hx, hy + hry * 0.5, hx + hrx * 0.71, hy + hry * 0.38); fillStroke(c, p.beard, 10); }
-  if (p.moustache && !p.back) { for (const s of [-1, 1]) { c.beginPath(); c.moveTo(hx, hy + hry * 0.3); c.quadraticCurveTo(hx + s * hrx * 0.25, hy + hry * 0.2, hx + s * hrx * 0.4, hy + hry * 0.38); stroke(c, 13, p.moustache); } }
-  if (p.back) { if (p.hair) { ell(c, hx, hy - hry * 0.05, hrx * 0.98, hry * 0.95); fillStroke(c, p.hairCol || '#7a4a2a', 10); } }
-  else face(c, p.face || {}, hx, hy, hrx, hry, t);
-  if (p.mask && !p.back) { const lx = (p.face && p.face.look ? p.face.look[0] : 0) * hrx * 0.22; c.beginPath(); c.moveTo(hx - hrx * 0.98, hy - hry * 0.2); c.quadraticCurveTo(hx + lx, hy - hry * 0.38, hx + hrx * 0.98, hy - hry * 0.2); c.lineTo(hx + hrx * 0.9, hy + hry * 0.12); c.quadraticCurveTo(hx + lx, hy - hry * 0.02, hx - hrx * 0.9, hy + hry * 0.12); c.closePath(); fillStroke(c, '#16161c', 8);
+  if (p.moustache && turn !== 3) { if (tab) { c.save(); c.translate(tsg * hrx * (tab === 1 ? 0.36 : 0.58), 0); c.scale(tab === 2 ? 0.55 : 0.8, 1); } for (const s of [-1, 1]) { c.beginPath(); c.moveTo(hx, hy + hry * 0.3); c.quadraticCurveTo(hx + s * hrx * 0.25, hy + hry * 0.2, hx + s * hrx * 0.4, hy + hry * 0.38); stroke(c, 13, p.moustache); } if (tab) c.restore(); }
+  if (turn === 3) { if (p.hair) { ell(c, hx, hy - hry * 0.05, hrx * 0.98, hry * 0.95); fillStroke(c, p.hairCol || '#7a4a2a', 10); } }
+  else face(c, { ...(p.face || {}), turn }, hx, hy, hrx, hry, t);
+  if (p.mask && turn !== 3) { const lx = (p.face && p.face.look ? p.face.look[0] : 0) * hrx * 0.22; c.beginPath(); c.moveTo(hx - hrx * 0.98, hy - hry * 0.2); c.quadraticCurveTo(hx + lx, hy - hry * 0.38, hx + hrx * 0.98, hy - hry * 0.2); c.lineTo(hx + hrx * 0.9, hy + hry * 0.12); c.quadraticCurveTo(hx + lx, hy - hry * 0.02, hx - hrx * 0.9, hy + hry * 0.12); c.closePath(); fillStroke(c, '#16161c', 8);
     for (const s of [-1, 1]) { ell(c, hx + lx + s * hrx * 0.34, hy - hry * 0.05, hrx * 0.13, hry * 0.1); c.fillStyle = '#ffffff'; c.fill(); ell(c, hx + lx * 1.3 + s * hrx * 0.34, hy - hry * 0.05, hrx * 0.05, hry * 0.06); c.fillStyle = INK; c.fill(); } }
-  hat(c, p.hat, p.hatCol || '#2a2a3a', hx, hy, hrx, hry, t);
+  { if (tab === 1 || tab === 2) { c.save(); c.translate(-tsg * hrx * 0.06 * tab, 0); } hat(c, p.hat, p.hatCol || '#2a2a3a', hx, hy, hrx, hry, t); if (tab === 1 || tab === 2) c.restore(); }
   c.restore();
 }
 
@@ -216,4 +222,14 @@ export function drawCow(c, p) {
   c.beginPath(); c.moveTo(220, -95 + 40 * dn); c.quadraticCurveTo(205, -140 + 40 * dn, 225, -150 + 40 * dn); stroke(c, 12, '#e8dcc0'); c.beginPath(); c.moveTo(220, -95 + 40 * dn); c.quadraticCurveTo(205, -140 + 40 * dn, 225, -150 + 40 * dn); stroke(c, 3);
   if (p.chew) { c.beginPath(); c.moveTo(285, 75 + 40 * dn); c.quadraticCurveTo(305, 80 + 40 * dn + 6 * Math.sin(t * 14), 325, 72 + 40 * dn); stroke(c, 6); }
   c.restore();
+}
+
+// A turn is a snap through separate drawings (back -> 3/4 -> profile -> 3/4 -> front), each held >= 2 frames at 30 fps,
+// never a rotating card. turnAt(l, t0, from, to, hold) returns the drawing index at local time l.
+export function turnAt(l, t0, from, to, hold = 2 / 30) {
+  if (l < t0) return from; const path = []; const step = from === 3 ? (to <= 0 ? -1 : 1) : Math.sign(to - from);
+  let k = from; if (from === 3) { path.push(to < 0 ? -2 : to > 0 ? 2 : (to === 0 ? 2 : 2)); k = path[0]; }
+  else if (to === 3) { while (Math.abs(k) < 2) { k += Math.sign(k || 1); path.push(k); } path.push(3); return path[Math.min(path.length - 1, Math.floor((l - t0) / hold))] ?? to; }
+  while (k !== to) { k += Math.sign(to - k); path.push(k); }
+  return path[Math.min(path.length - 1, Math.floor((l - t0) / hold))] ?? to;
 }

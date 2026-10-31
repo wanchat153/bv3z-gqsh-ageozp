@@ -3,7 +3,7 @@ import * as THREE from './three.module.js';
 import { makePost } from './post.js';
 import { makeSky, makeEnv } from './world.js';
 import { makeDairy, makeStreet, makeLobby, makeVault, makeDock, makeWheel, PALE, GOLD, WHEEL } from './sets.js';
-import { makeBoard, drawPerson, drawCow } from './stick.js';
+import { makeBoard, drawPerson, drawCow, turnAt } from './stick.js';
 import { SHOTS, DUR, FPS, T } from './shots.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -55,6 +55,10 @@ function armTo(feet, side, target, size = 2.3) {
   const d = target.clone().sub(sh); return [d.dot(right) * k, -d.y * k, -side * 14];
 }
 
+// facing for a moving character: the drawing that points along its screen motion (never a rotated card)
+function facingFrom(feet, vel) { const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion); right.y = 0; right.normalize(); const fwd = cam.position.clone().sub(feet); fwd.y = 0; fwd.normalize();
+  const sx = vel.dot(right), sz = vel.dot(fwd); const a = Math.atan2(sx, sz);   // 0 = toward camera, ±π/2 = sideways, π = away
+  const k = Math.abs(a); const sgn = Math.sign(sx) || 1; return k < 0.45 ? 0 : k < 1.15 ? sgn : k < 2.2 ? 2 * sgn : 3; }
 // ================= camera, world -> screen =================
 function camSet(p, tg, fov = 40, roll = 0) { cam.position.copy(p); cam.up.set(Math.sin(roll), Math.cos(roll), 0); cam.lookAt(tg); cam.fov = fov; cam.updateProjectionMatrix(); cam.updateMatrixWorld(true); }
 const _v = new THREE.Vector3();
@@ -101,9 +105,9 @@ const STAGE = {
   street(t, l, d) {
     const z0 = -4, z1 = -15.5; const zw = mix(z0, z1, l / d); rollG.position.set(-1.2, WHEEL.r * 1.04, zw); rollG.rotation.set((zw - z0) / (WHEEL.r * 1.04), 0, 0); WH.out.visible = true;
     const feet = V(-1.2, 0, zw + 0.75); const wp = V(-1.2, WHEEL.r * 1.04 + 0.12, zw + 0.25);
-    put(B.out[0], feet, { ...LOOK.maker, face: { eyes: 'dot', mouth: 'grin', look: [0.4, 0] }, walk: t * 9, armL: armTo(feet, -1, wp.clone().add(V(-0.18, 0.05, 0))), armR: armTo(feet, 1, wp.clone().add(V(0.18, 0.05, 0))), lean: 0.12 }, null, 0);
+    put(B.out[0], feet, { ...LOOK.maker, turn: facingFrom(feet, V(0, 0, -1)), face: { eyes: 'dot', mouth: 'grin' }, walk: t * 9, armL: armTo(feet, -1, wp.clone().add(V(-0.18, 0.05, 0))), armR: armTo(feet, 1, wp.clone().add(V(0.18, 0.05, 0))), lean: 0.12 }, null, 0);
     const pr = [[-3.2, -12, '#c8312d', 'bun'], [3.0, -14, '#2f6a8a', 'cap'], [-3.4, -18, '#5a7a3a', 'curly'], [2.6, -20, '#a07a3a', 'bun'], [-2.9, -24, '#6a4a8a', 'cap'], [3.3, -27, '#3a3a5a', 'side']];
-    pr.forEach(([x, z, body, hair], i) => put(B.walkers[i], V(x, 0, z + (i % 2 ? 1 : -1) * l * 1.2), { body, hair, hairCol: ['#4a2a14', '#8a5a32', '#2a1a10'][i % 3], walk: t * 6 + i, flip: i % 2 === 1, face: { eyes: 'dot', mouth: 'smile', look: [i % 2 ? -0.5 : 0.5, 0] } }, null, 0));
+    pr.forEach(([x, z, body, hair], i) => put(B.walkers[i], V(x, 0, z + (i % 2 ? 1 : -1) * l * 1.2), { turn: facingFrom(V(x, 0, z), V(0, 0, i % 2 ? 1 : -1)), body, hair, hairCol: ['#4a2a14', '#8a5a32', '#2a1a10'][i % 3], walk: t * 6 + i, flip: i % 2 === 1, face: { eyes: 'dot', mouth: 'smile', look: [i % 2 ? -0.5 : 0.5, 0] } }, null, 0));
     const wipe = sstep(d - 0.55, d - 0.05, l); const colZ = 2 - Math.round((2 - (zw - 1.4)) / 3.6) * 3.6;
     camSet(V(mix(2.2, -4.85, wipe), mix(1.25, 0.9, wipe), mix(zw - 3.4, colZ + 0.9 - 1.0 * wipe, wipe)), V(-1.0, 1.0, zw + 0.1), 46);
     osun.target.position.set(-1, 0, zw); osun.position.set(13, 22, zw - 30); Object.assign(osun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 }); osun.shadow.camera.updateProjectionMatrix();
@@ -131,7 +135,7 @@ const STAGE = {
   // 6. the cathedral of cheese: crane up and back
   cathedral(t, l, d) {
     vaultDay(t, 0.4); const ax = VT.aisleX(2); const feet = V(ax, 0, -4.0);
-    put(B.vault[0], feet, { ...LOOK.maker, back: true }); put(B.vault[1], V(ax + 0.9, 0, -3.6), { ...LOOK.banker, back: true });
+    const tm = turnAt(l, 2.6, 3, 0); put(B.vault[0], feet, { ...LOOK.maker, turn: tm, face: { eyes: 'wide', mouth: 'o', open: 0.9, look: [0, -0.4] } }); put(B.vault[1], V(ax + 0.9, 0, -3.6), { ...LOOK.banker, turn: turnAt(l, 3.0, 3, -1), face: { eyes: 'glasses', mouth: 'smirk' } });
     const u = ease(l / d); camSet(V(ax + mix(0.2, 0.6, u), mix(1.1, 9.0, u), mix(-1.6, 6.5, u)), V(ax, mix(1.9, 2.5, u), mix(-8, -24, u)), mix(46, 52, u));
     return { scene: VT.scene, exp: 1.15, sat: 1.3, bloom: 0.55, bloomT: 0.85, dof: 0.6, flash: 0.8 * (1 - sstep(0, 0.35, l)), tint: [1.06, 1.0, 0.88], wide: true, heroObj: VT.inst };
   },
@@ -141,7 +145,8 @@ const STAGE = {
     const hand = clamp((l - 0.5) / 0.5, 0, 1); const bagP = V(ax + mix(-0.25, 0.25, ease(hand)), 1.05, -2.6);
     const hugs = l > 1.2;
     put(B.vault[0], fb, { ...LOOK.banker, face: { eyes: 'happy', mouth: 'smile', look: [0.5, 0] }, armR: hand < 1 ? armTo(fb, 1, bagP) : [40, 150, -12], prop: hand < 0.55 ? { hand: 'R', kind: 'bag' } : null });
-    put(B.vault[1], fm, { ...LOOK.maker, face: { eyes: hugs ? 'happy' : 'wide', mouth: hugs ? 'grin' : 'o', blush: hugs ? 1 : 0, look: [-0.5, 0] }, armL: hand > 0.4 ? armTo(fm, -1, hugs ? fm.clone().add(V(0.05, 0.95, 0.1)) : bagP) : [-40, 150, 12], prop: hand >= 0.55 ? { hand: 'L', kind: 'bag' } : null, bob: hugs ? -10 * Math.abs(Math.sin(l * 9)) : 0 });
+    const dash = clamp((l - 1.75) / 0.6, 0, 1); fm.x += 1.6 * dash * dash; const tmm = turnAt(l, 1.6, 0, 2);
+    put(B.vault[1], fm, { ...LOOK.maker, turn: tmm, walk: dash > 0 ? t * 14 : null, run: dash > 0 ? 1 : 0, face: { eyes: hugs ? 'happy' : 'wide', mouth: hugs ? 'grin' : 'o', blush: hugs ? 1 : 0, look: [-0.5, 0] }, armL: hand > 0.4 ? armTo(fm, -1, hugs ? fm.clone().add(V(0.05, 0.95, 0.1)) : bagP) : [-40, 150, 12], prop: hand >= 0.55 ? { hand: 'L', kind: 'bag' } : null, bob: hugs ? -10 * Math.abs(Math.sin(l * 9)) : 0 });
     camSet(V(ax + mix(0.1, -0.1, l / d), 1.55, mix(1.6, 1.0, l / d)), V(ax, 1.3, -2.9), 42);
     return { scene: VT.scene, exp: 1.15, sat: 1.3, bloom: 0.5, dof: 1.0, tint: [1.06, 1.0, 0.9], hero: 1 };
   },
@@ -167,8 +172,8 @@ const STAGE = {
     vaultNight(t); const ax = VT.aisleX(2); const z = mix(2.6, -1.4, l / d);
     VT.cart.position.set(ax + 0.6, 0, z - 0.8); VT.cart.scale.set(1, 1, 1); VT.cartLoad.forEach((w) => (w.visible = false));
     const fa = V(ax - 0.3, 0, z), fb2 = V(ax + 1.3, 0, z + 0.4);
-    put(B.vault[0], fa, { ...LOOK.thiefA, walk: t * 5, face: { eyes: 'dot', mouth: 'smirk', look: [0.5, 0] }, armR: [60, -60, -20], prop: { hand: 'R', kind: 'torch' }, lean: -0.08 }, new THREE.Color(0.6, 0.7, 1.0));
-    put(B.vault[1], fb2, { ...LOOK.thiefB, walk: t * 5 + 1, face: { eyes: 'dot', mouth: 'line', look: [-0.4, 0] }, armL: armTo(fb2, -1, V(ax + 1.0, 0.95, z - 0.4)) }, new THREE.Color(0.6, 0.7, 1.0));
+    put(B.vault[0], fa, { ...LOOK.thiefA, turn: facingFrom(fa, V(0, 0, -1)), walk: t * 5, face: { eyes: 'dot', mouth: 'smirk', look: [0.5, 0] }, armR: [60, -60, -20], prop: { hand: 'R', kind: 'torch' }, lean: -0.08 }, new THREE.Color(0.6, 0.7, 1.0));
+    put(B.vault[1], fb2, { ...LOOK.thiefB, turn: facingFrom(fb2, V(0, 0, -1)), walk: t * 5 + 1, face: { eyes: 'dot', mouth: 'line', look: [-0.4, 0] }, armL: armTo(fb2, -1, V(ax + 1.0, 0.95, z - 0.4)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax + Math.sin(l * 1.7) * 2, 1.5, z - 8)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 1.5 + Math.sin(l * 2.1 + 1) * 2, 3, z - 10));
     camSet(V(ax + 1.7, 3.4, z + 3.4), V(ax + 0.5, 1.1, z - 0.4), 46);
     return { scene: VT.scene, exp: 1.25, sat: 1.15, bloom: 0.5, bloomT: 0.85, dof: 0.6, tint: [0.75, 0.85, 1.15], hero: 0 };
@@ -181,7 +186,7 @@ const STAGE = {
     const slip = clamp((l - 2.0) / (d - 2.0), 0, 1); const runaway = WH.vault2; runaway.visible = l > 2.0; const rz = mix(z - 0.6, z + 6.8, Math.pow(slip, 1.3));
     runaway.position.set(ax + 0.3, WHEEL.r * 1.04, rz); runaway.rotation.set((rz - z) / (WHEEL.r * 1.04), 0, Math.PI / 2);
     const fa = V(ax - 0.3, 0, mix(z, z + 3.0, slip)), fb2 = V(ax + 1.3, 0, z + 0.4);
-    put(B.vault[0], fa, { ...LOOK.thiefA, walk: slip > 0 ? t * 12 : null, run: slip > 0 ? 1 : 0, face: { eyes: slip > 0 ? 'wide' : 'dot', mouth: slip > 0 ? 'open' : 'smirk', open: 0.8, sweat: slip > 0 ? 1 : 0 }, armL: [-110, -40, 20], armR: [110, -40, -20] }, new THREE.Color(0.6, 0.7, 1.0));
+    put(B.vault[0], fa, { ...LOOK.thiefA, turn: slip > 0 ? facingFrom(fa, V(0, 0, 1)) : 0, walk: slip > 0 ? t * 12 : null, run: slip > 0 ? 1 : 0, face: { eyes: slip > 0 ? 'wide' : 'dot', mouth: slip > 0 ? 'open' : 'smirk', open: 0.8, sweat: slip > 0 ? 1 : 0 }, armL: [-110, -40, 20], armR: [110, -40, -20] }, new THREE.Color(0.6, 0.7, 1.0));
     put(B.vault[1], fb2, { ...LOOK.thiefB, face: { eyes: 'wide', mouth: 'o', look: [0.4, 0.3] }, armL: armTo(fb2, -1, V(ax + 0.7, 1.2, z - 0.8)), armR: armTo(fb2, 1, V(ax + 0.9, 1.2, z - 0.8)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax, 0.3, rz)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 0.6, 0.6, z - 0.8));
     const p = l < 2.0 ? V(ax + 1.2, 1.7, z + 3.8) : V(ax + 0.35, 0.35, z + 7.4); camSet(p, l < 2.0 ? V(ax + 0.6, 1.1, z - 0.3) : V(ax + 0.3, 0.4, rz - 1.0), l < 2.0 ? 44 : 50);
@@ -239,7 +244,8 @@ function render(t) {
   STAGE[s.stage](t, l, d); hideAll();            // pass 1 settles the camera for this frame
   const o = STAGE[s.stage](t, l, d) || {};       // pass 2 places boards and solves arms against that camera
   cam.updateMatrixWorld(true);
-  const subjects = used.map((u, i) => ({ id: `${u.kind}${i}`, kind: u.kind, back: u.back, box: charBox(u), at: u.feet.clone().add(V(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
+  const facing = (u) => { const n = new THREE.Vector3(0, 0, 1).applyQuaternion(u.board.mesh.quaternion); const dir = cam.position.clone().sub(u.board.mesh.position); dir.y = 0; n.y = 0; return n.normalize().dot(dir.normalize()); };
+  const subjects = used.map((u, i) => ({ id: `${u.kind}${i}`, kind: u.kind, back: u.back, facing: facing(u), box: charBox(u), at: u.feet.clone().add(V(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
   if (o.heroObj) { const ob = objBox(o.heroObj); if (ob) subjects.unshift({ id: 'object', kind: 'object', box: ob.box, at: ob.centre }); }
   const hi = o.heroObj ? 0 : (o.hero ?? 0); if (subjects[hi]) subjects[hi].hero = true;
   if (o.dof > 0 && subjects[hi] && !o.pinFocus) o.focus = cam.position.distanceTo(subjects[hi].at);
