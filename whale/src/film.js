@@ -150,16 +150,16 @@ const WALK = {};
 const TRK = { t0: SHOTS.at('truck').t0, v0: 8, a: 3.5, brake: 0.4 };
 TRK.stopL = TRK.brake + TRK.v0 / TRK.a; TRK.dist = TRK.v0 * TRK.brake + TRK.v0 * TRK.v0 / (2 * TRK.a);
 function truckX(l) { const d = l < TRK.brake ? TRK.v0 * l : l < TRK.stopL ? TRK.v0 * TRK.brake + TRK.v0 * (l - TRK.brake) - 0.5 * TRK.a * (l - TRK.brake) ** 2 : TRK.dist; return TRUCK.x - TRK.dist + d; }
-{ const b0 = SHOTS.at('boulder').t0; WALK.eng4 = makeWalker([[b0, 7.8, 6.6], [b0 + 1.6, 6.0, 3.6, { face: [5.5, 0] }], [b0 + 1.9, 6.0, 3.6], [b0 + 2.0, 6.0, 3.6, { face: [6.4, 9.5] }], [99, 6.0, 3.6]]); }
-{ const t0 = SHOTS.at('crates').t0; WALK.w1 = makeWalker([[t0, 4.7, 4.0], [t0 + 2.5, 1.22, 2.5, { face: [1.22, 0] }], [99, 1.22, 2.5]]); WALK.w2 = makeWalker([[t0, 2.0, 2.65, { face: [2, 0] }], [t0 + 0.2, 2.0, 2.65], [t0 + 0.4, 2.0, 2.65, { face: [2.6, 6] }], [t0 + 0.5, 2.0, 2.65], [t0 + 1.9, 2.6, 5.4, { via: true }], [t0 + 4.0, 6.6, 6.4], [99, 6.6, 6.4]]); }
+{ const b0 = SHOTS.at('boulder').t0; WALK.eng4 = makeWalker([[b0, 6.9, 5.5], [b0 + 1.6, 6.0, 3.6, { face: [5.5, 0] }], [b0 + 1.9, 6.0, 3.6], [b0 + 2.0, 6.0, 3.6, { face: [6.4, 9.5] }], [99, 6.0, 3.6]]); }
+{ const t0 = SHOTS.at('crates').t0; WALK.w1 = makeWalker([[t0, 4.7, 4.0], [t0 + 2.5, 1.22, 2.5, { face: [1.22, 0] }], [99, 1.22, 2.5]]); WALK.w2 = makeWalker([[t0, 3.0, 5.2], [t0 + 3.0, 7.4, 6.8], [99, 7.4, 6.8]]); }
 { const t0 = SHOTS.at('retreat').t0; WALK.ownerC = makeWalker([[t0, 393.0, 10.6], [t0 + 3.2, 403.6, 10.9, { face: Math.PI * 1.5 }], [99, 403.6, 10.9]]); WALK.owner = makeWalker([[t0, 432.96, 23.25, { face: [433.4, 22.6] }], [t0 + 0.9, 432.96, 23.25], [t0 + 1.2, 432.96, 23.25, { face: Math.PI * 1.5 }], [t0 + 1.3, 432.96, 23.25], [t0 + 2.4, 429.6, 23.15, { via: true }], [t0 + 3.6, 425.3, 20.4], [99, 425.3, 20.4]]);
   WALK.crowd = SP.map((p, i) => makeWalker([[t0, p.x - 7 - (i % 3), p.z + (i % 2 ? 0.6 : -0.4)], [t0 + 3.0 + (i % 4) * 0.15, p.x, p.z, { face: Math.PI * 1.5 }], [99, p.x, p.z]])); }
 // 11: when the rain starts, people run outward, each away from the nearest landing
 { const t0 = SHOTS.at('rain').t0; const c = V(CROWD.x + 0.6, 0, CROWD.z + 1.0); const dirs = [[-1, -0.6], [-0.2, -1], [0.3, 1], [1, -0.5], [-0.9, 0.7], [0.4, 1], [1, 0.4], [-1, 0.6]];
   WALK.run = SP.map((p, i) => { const d = V(dirs[i][0], 0, dirs[i][1]).normalize(); const go = t0 + 0.35 + (i % 4) * 0.12; const e1 = p.clone().addScaledVector(d, 3.0), e2 = p.clone().addScaledVector(d, 9.5);
     return makeWalker([[t0, p.x, p.z, { face: Math.PI * 1.5 }], [go, p.x, p.z], [go + 0.15, p.x, p.z, { face: Math.atan2(d.x, d.z) }], [go + 0.25, p.x, p.z], [go + 1.1, e1.x, e1.z, { run: true, via: true }], [go + 2.9, e2.x, e2.z, { run: true }], [99, e2.x, e2.z]], { run: true }); }); }
-{ const t0 = SHOTS.at('owner').t0; WALK.owner2 = makeWalker([[t0, 426.4, 18.9], [t0 + 1.0, 429.5, 19.3, { face: [428, 16] }], [99, 429.5, 19.3]]); }
-{ const t0 = SHOTS.at('after').t0; WALK.eng14 = makeWalker([[t0, 10.2, 7.2], [t0 + 2.3, 4.2, 4.3, { face: [2, 0] }], [99, 4.2, 4.3]]); WALK.w14a = makeWalker([[t0 + 0.3, 11.6, 6.9], [t0 + 2.8, 6.6, 5.3, { face: [2, 0] }], [99, 6.6, 5.3]]); WALK.w14b = makeWalker([[t0 + 0.5, 12.0, 8.0], [t0 + 3.0, 7.3, 6.6, { face: [2, 0] }], [99, 7.3, 6.6]]); }
+{ const t0 = SHOTS.at('owner').t0; WALK.owner2 = makeWalker([[t0, 428.0, 18.7], [t0 + 1.0, 429.5, 19.3, { face: [428, 16] }], [99, 429.5, 19.3]]); }
+{ const t0 = SHOTS.at('after').t0; WALK.eng14 = makeWalker([[t0, 6.9, 6.4], [t0 + 1.8, 4.2, 4.3, { face: [2, 0] }], [99, 4.2, 4.3]]); WALK.w14a = makeWalker([[t0 + 0.3, 8.6, 7.0], [t0 + 2.4, 6.6, 5.3, { face: [2, 0] }], [99, 6.6, 5.3]]); WALK.w14b = makeWalker([[t0 + 0.5, 9.4, 8.2], [t0 + 2.6, 7.3, 6.6, { face: [2, 0] }], [99, 7.3, 6.6]]); }
 
 const thought = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(512, 512, (x, w, h) => { x.fillStyle = '#ffffff'; x.strokeStyle = '#2a1d1d'; x.lineWidth = 12; for (const [cx, cy, r] of [[150, 450, 22], [200, 400, 34]]) { x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill(); x.stroke(); }
   x.beginPath(); for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283; x.ellipse(290 + Math.cos(a) * 140, 220 + Math.sin(a) * 105, 70, 60, 0, 0, 7); } x.fill(); x.beginPath(); for (let i = 0; i < 9; i++) { const a = i / 9 * 6.283; x.moveTo(290 + Math.cos(a) * 140 + 70, 220 + Math.sin(a) * 105); x.ellipse(290 + Math.cos(a) * 140, 220 + Math.sin(a) * 105, 70, 60, 0, 0, 7); } x.stroke();
@@ -180,7 +180,7 @@ const STAGE = {
     const lw = makeWalker([[0, 9.6, 7.4], [3.2, 6.6, 4.2, { face: [4, 0] }], [99, 6.6, 4.2]]); walk('local0', lw, l, LOOK.sp[0], { face: { eyes: 'wide', mouth: 'o', look: [0, -0.4] } });
     const lw2 = makeWalker([[0, 11.2, 6.8], [3.2, 8.4, 3.7, { face: [6, 0] }], [99, 8.4, 3.7]]); walk('local1', lw2, l, LOOK.sp[1], { face: { eyes: 'dot', mouth: 'line', look: [-0.3, -0.3] } });
     camSet(V(mix(15.5, 13.8, u), mix(2.6, 2.3, ease(u)), mix(10.5, 9.4, u)), V(mix(2.5, 3.0, u), 1.25, 0.6), 46); sunAt(V(2, 0, 3));
-    return { exp: 1.0, sat: 1.38, bloom: 0.3, dof: 0.4, tint: [1.04, 1.0, 0.95], wide: true, heroObj: WH.root, cap: { y: 0.72 } };
+    return { exp: 1.0, sat: 1.38, bloom: 0.3, dof: 0.4, tint: [1.04, 1.0, 0.95], wide: true, heroObj: WH.root, cap: { y: 0.2 } };
   },
   // 2. the smell: stink lines, flies, one local pinches her nose, the other fans the air
   stink(t, l, d) {
@@ -218,14 +218,14 @@ const STAGE = {
     const side = V(Math.cos(c.rotation.y), 0, -Math.sin(c.rotation.y)); const hl = cp.clone().addScaledVector(side, -0.3), hr = cp.clone().addScaledVector(side, 0.3);
     walk('worker1', WALK.w1, t, LOOK.worker1, { face: { eyes: 'dot', mouth: l > 3.3 ? 'smile' : 'line', look: [0, 0.3], sweat: 1 }, handLW: l < 3.5 ? hl : null, handRW: l < 3.5 ? hr : null, bob: -40 * Math.sin(Math.PI * set) });
     walk('worker2', WALK.w2, t, LOOK.worker2, { face: { eyes: 'dot', mouth: 'line' } });
-    const u = l / d; camSet(V(mix(-2.6, -1.9, u), mix(1.05, 1.1, u), mix(3.6, 3.4, u)), V(mix(1.6, 1.5, u), 0.75, 2.5), 42); sunAt(V(1, 0, 3));
+    const u = l / d; camSet(V(mix(-2.6, -1.9, u), mix(1.05, 1.1, u), mix(3.6, 3.4, u)), V(mix(s1.p.x, 1.4, 0.45), 0.8, mix(s1.p.z, 2.4, 0.45)), 42); sunAt(V(1, 0, 3));
     return { exp: 1.0, sat: 1.38, bloom: 0.3, dof: 0.9, tint: [1.04, 1.0, 0.94], hero: 0, cap: { y: 0.7 } };
   },
   // 6. the gulls are supposed to eat the small pieces; the engineer points from them to the whale; whip-pan out
   gulls(t, l, d) {
     worldAt(t);
     for (let i = 0; i < 4; i++) gull(V(2.0 + i * 0.75, 0, 11.6 + (i % 2) * 0.6), { t, flip: i % 2 === 0, peck: Math.max(0, Math.sin(t * 3 + i * 1.7)) ** 6, shout: i === 1 && Math.sin(t * 6) > 0.6 });
-    const pe = V(4.7, 0, 4.4); const toG = l < 1.5; stand('engineer', pe, toG ? [3, 12] : [3, 12], LOOK.engineer, { face: { eyes: 'dot', mouth: 'smile', look: [0, 0] }, handRW: toG ? pe.clone().add(V(0.15, 1.35, 0.45)) : pe.clone().add(V(0.42, 1.25, -0.25)) });
+    const pe = V(4.2, 0, 8.0); const toG = l < 1.5; stand('engineer', pe, toG ? [3, 12] : [3, 12], LOOK.engineer, { face: { eyes: 'dot', mouth: 'smile', look: [0, 0] }, handRW: toG ? pe.clone().add(V(0.15, 1.35, 0.45)) : pe.clone().add(V(0.42, 1.25, -0.25)) });
     const w = sstep(d - 0.35, d, l); camSet(V(3.4 + 0.2 * l, 0.42, 14.6), V(mix(4.2, 30, w * w), mix(1.0, 1.4, w), mix(4.0, 9, w)), 34); sunAt(V(4, 0, 8));
     return { exp: 1.0, sat: 1.38, bloom: 0.3, dof: 1.2, focus: 10.5, pinFocus: true, tint: [1.04, 1.0, 0.94], hero: 4, cap: { y: 0.2 } };
   },
@@ -233,7 +233,7 @@ const STAGE = {
   retreat(t, l, d) {
     worldAt(t); WALK.crowd.forEach((w, i) => walk(`sp${i}`, w, t, LOOK.sp[i], { face: { eyes: 'dot', mouth: i % 2 ? 'smile' : 'grin', look: [0.3, 0] } }));
     walk('owner', WALK.ownerC, t, LOOK.owner, { face: { eyes: 'happy', mouth: 'smile' } });
-    const u = l / d; camSet(V(mix(411.5, 410.2, u), 1.5, mix(5.0, 5.6, u)), V(398, 1.25, 6.8), 40); sunAt(V(400, 0, 6));
+    const u = l / d; camSet(V(mix(410.6, 409.8, u), 1.6, mix(14.0, 13.4, u)), V(399.5, 1.2, 6.6), 40); sunAt(V(400, 0, 6));
     return { exp: 1.0, sat: 1.38, bloom: 0.25, dof: 0.6, tint: [1.05, 1.0, 0.93], hero: 6, cap: { y: 0.76 } };
   },
   // 8. 3:45 pm: hands on the T-handle; push
@@ -241,7 +241,6 @@ const STAGE = {
     worldAt(t); const push = sstep(2.5, 2.62, l); PL.set(push); const g = PL.gripY(); const pe = V(PLUNGER[0] + 0.62, 0, PLUNGER[1]);
     stand('engineer', pe, Math.PI * 1.5, LOOK.engineer, { face: { eyes: l > 2.0 ? 'shut' : 'dot', mouth: l > 2.0 ? 'teeth' : 'line', open: 0.4, browAng: 0.5, sweat: l > 1.2 ? 1 : 0 },
       handLW: V(PLUNGER[0], g, PLUNGER[1] + 0.17), handRW: V(PLUNGER[0], g, PLUNGER[1] - 0.17), lean: -0.06 - 0.12 * push, bob: 30 * push });
-    WALK.crowd.forEach((w, i) => walk(`sp${i}`, w, t, LOOK.sp[i], { face: { eyes: 'wide', mouth: 'o' } }));
     const u = l / d; camSet(V(mix(PLUNGER[0] - 1.2, PLUNGER[0] - 0.8, u), mix(0.55, 0.62, u), mix(PLUNGER[1] - 1.9, PLUNGER[1] - 1.5, u)), V(PLUNGER[0] + 0.45, 1.0, PLUNGER[1] + 0.05), 40); sunAt(V(395, 0, 6));
     return { exp: 1.0, sat: 1.38, bloom: 0.3, dof: 1.2, tint: [1.05, 1.0, 0.93], hero: 0, cap: { y: 0.3 } };
   },
@@ -255,7 +254,7 @@ const STAGE = {
     worldAt(t); const up = l > 1.3;
     SP.forEach((p, i) => stand(`sp${i}`, p, Math.PI * 1.5, LOOK.sp[i], { face: up ? { eyes: 'wide', mouth: 'o', look: [0, -1], brow: 1 } : { eyes: 'happy', mouth: 'grin', blush: 1 }, handLW: !up && i % 2 ? p.clone().add(V(0, 1.62, 0.3)) : null, handRW: !up ? p.clone().add(V(0, 1.62, -0.3)) : null, bob: !up ? -12 * Math.abs(Math.sin(l * 9 + i)) : 0 }));
     put('reporter', V(REPORTER[0], 0, REPORTER[1]), { ...LOOK.reporter, turn: -2, face: { eyes: 'dot', mouth: 'line' }, handRW: V(REPORTER[0] - 0.45, 1.45, REPORTER[1]) });
-    const u = l / d; camSet(V(mix(389.6, 390.8, u), 1.2, mix(8.4, 8.1, u)), V(400.5, mix(1.35, 1.6, u), 6.4), 38); sunAt(V(400, 0, 6));
+    const u = l / d; camSet(V(mix(395.2, 395.8, u), 1.3, mix(10.6, 10.2, u)), V(400.6, mix(1.3, 1.5, u), 6.6), 40); sunAt(V(400, 0, 6));
     return { exp: 1.0, sat: 1.38, bloom: 0.25, dof: 0.6, tint: [1.05, 1.0, 0.93], hero: 2, cap: { y: 0.76 } };
   },
   // 11. the rain of blubber: pieces land in the gaps; everyone runs; the reporter keeps filming
@@ -263,8 +262,8 @@ const STAGE = {
     worldAt(t); WALK.run.forEach((w, i) => { const s = w.at(t); walk(`sp${i}`, w, t, LOOK.sp[i], { face: s.moving ? { eyes: 'wide', mouth: 'open', open: 1, sweat: 1 } : { eyes: 'wide', mouth: 'o', look: [0, -1] }, handLW: s.moving ? s.p.clone().add(V(0, 1.62, 0.12)) : null, handRW: s.moving ? s.p.clone().add(V(0, 1.62, -0.12)) : null }); });
     put('reporter', V(REPORTER[0], 0, REPORTER[1]), { ...LOOK.reporter, turn: 1, face: { eyes: 'lid', mouth: 'line', look: [-0.5, 0] }, handRW: V(REPORTER[0] - 0.45, 1.45, REPORTER[1]) });
     const shake = LAND.reduce((a, L) => a + (L && t - L.t > 0 && t - L.t < 0.25 ? (0.25 - (t - L.t)) * 0.12 * Math.sin((t - L.t) * 90) * L.r * 3 : 0), 0);
-    const u = l / d; camSet(V(mix(400.0, 400.8, u), mix(3.4, 3.7, u) + shake, mix(19.5, 20.3, u)), V(400.3, 0.9 + shake * 0.5, 6.4), 44); sunAt(V(400, 0, 6));
-    return { exp: 1.0, sat: 1.38, bloom: 0.25, dof: 0.4, tint: [1.05, 1.0, 0.93], hero: 2, cap: { y: 0.18 } };
+    const u = l / d; camSet(V(mix(390.8, 391.4, u), 1.5 + shake, mix(10.2, 10.0, u)), V(397.5, 1.0 + shake * 0.5, 5.0), 44); sunAt(V(400, 0, 6));
+    return { exp: 1.0, sat: 1.38, bloom: 0.25, dof: 0.4, tint: [1.05, 1.0, 0.93], hero: 8, cap: { y: 0.18 } };
   },
   // 12. slow motion (a speed ramp; the physics keeps its own clock): the 136 kg piece meets the new car
   car(t, l, d) {
@@ -284,8 +283,8 @@ const STAGE = {
     worldAt(t);
     const se = walk('engineer', WALK.eng14, t, LOOK.engineer, { face: { eyes: 'lid', mouth: 'frown', sweat: 1, look: [-0.3, 0] } }); if (!se.moving) { used.pop(); nB--; walk('engineer', WALK.eng14, t, LOOK.engineer, { face: { eyes: 'lid', mouth: 'frown', sweat: 1, look: [-0.3, 0] }, handRW: se.p.clone().add(V(0.0, 1.66, 0.05 * Math.sin(l * 12))) }); }
     walk('worker1', WALK.w14a, t, LOOK.worker1, { face: { eyes: 'wide', mouth: 'o' } }); walk('worker2', WALK.w14b, t, LOOK.worker2, { face: { eyes: 'dot', mouth: 'frown' } });
-    const u = l / d; camSet(V(mix(3.4, 3.9, u), mix(5.2, 4.7, u), mix(14.2, 13.4, u)), V(mix(3.0, 3.6, u), 1.2, 2.2), 42); sunAt(V(2, 0, 3));
-    return { exp: 1.0, sat: 1.34, bloom: 0.3, dof: 0.5, tint: [1.05, 1.0, 0.92], hero: 0, cap: { y: 0.7 } };
+    const u = l / d; camSet(V(mix(4.6, 4.9, u), mix(3.9, 3.6, u), mix(11.6, 10.9, u)), V(mix(3.8, 4.1, u), 1.15, 2.6), 40); sunAt(V(2, 0, 3));
+    return { exp: 1.0, sat: 1.34, bloom: 0.3, dof: 0.5, tint: [1.05, 1.0, 0.92], wide: true, hero: 0, cap: { y: 0.2 } };
   },
   // 15. the bulldozer pushes sand over what is left; crane up and away
   bury(t, l, d) {
@@ -293,7 +292,7 @@ const STAGE = {
     const pushed = 9.6 - z; berm.visible = true; const bz = z - DZ.bladeX - 0.45; berm.position.set(1.0, 0, bz); berm.scale.set(1.8, 0.25 + pushed * 0.14, 0.45 + pushed * 0.12);
     stand('engineer', V(6.6, 0, 6.4), [1, 4], LOOK.engineer, { face: { eyes: 'lid', mouth: 'line' } }); stand('worker1', V(7.5, 0, 7.3), [1, 4], LOOK.worker1, { face: { eyes: 'dot', mouth: 'line' } });
     const u = ease(l / d); camSet(V(mix(9.0, 30, u), mix(2.2, 22, u), mix(13.0, 42, u)), V(mix(2.5, 4, u), mix(1.2, 0, u), mix(3.6, 2, u)), mix(42, 46, u)); sunAt(V(3, 0, 5));
-    return { exp: 1.0 - 0.05 * u, sat: 1.34, bloom: 0.3, dof: 0.4, tint: [1.07, 0.98, 0.9], wide: l > 1.6, hero: 0, heroObj: l > 1.6 ? DZ.root : null, cap: { y: 0.66 } };
+    return { exp: 1.0 - 0.05 * u, sat: 1.34, bloom: 0.3, dof: 0.4, tint: [1.07, 0.98, 0.9], wide: true, heroObj: DZ.root, cap: { y: 0.2 } };
   },
 };
 
@@ -309,7 +308,7 @@ function render(t) {
   cam.updateMatrixWorld(true);
   const subjects = used.map((u, i) => ({ id: `${u.kind}${i}`, name: u.name, kind: u.kind === 'gull' ? 'gull' : 'char', facing: 1, box: charBox(u), at: u.feet.clone().add(V(0, 1.2, 0)) }));
   if (o.heroObj) { const ob = objBox(o.heroObj); if (ob) subjects.unshift({ id: 'object', kind: 'object', box: ob.box, at: ob.centre }); }
-  const hi = o.heroObj ? 0 : (o.hero ?? 0); if (subjects[hi] && o.hero !== null) subjects[hi].hero = true;
+  const hi = o.heroObj ? 0 : (o.hero ?? 0); if (subjects[hi] && (o.heroObj || o.hero !== null)) subjects[hi].hero = true;
   if (o.dof > 0 && subjects[hi] && !o.pinFocus) o.focus = cam.position.distanceTo(subjects[hi].at);
   // captions: word by word, from the shot start; fade the block in the last 0.12 s before a cut
   const times = wordTimes(s.cap, s.t0); const yF = o.cap?.y ?? 0.64; const fadeOut = 1 - sstep(d - 0.12, d, l) * (s.out === 'end' ? 0 : 1);
