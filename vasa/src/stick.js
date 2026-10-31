@@ -13,6 +13,12 @@ export function makeBoard(sizeM, px, draw) {
   const c = document.createElement('canvas'); c.width = c.height = px; const ctx = c.getContext('2d');
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.02, depthWrite: true, side: THREE.DoubleSide, fog: true });
+  // the whole card sits at ONE depth (its anchor: the body centre, nudged toward the camera), so a character is either in front of
+  // or behind a set piece, never sliced by it (no head or hat poking through walls, masts, racks or furniture)
+  const anchorU = { value: new THREE.Vector3() };
+  mat.onBeforeCompile = (sh) => { sh.uniforms.uAnchor = anchorU; sh.vertexShader = 'uniform vec3 uAnchor;\n' + sh.vertexShader.replace('#include <project_vertex>',
+    '#include <project_vertex>\n  { vec4 ac = projectionMatrix * viewMatrix * vec4(uAnchor, 1.0); gl_Position.z = clamp(ac.z / ac.w, -1.0, 1.0) * gl_Position.w; }'); };
+  mat.customProgramCacheKey = () => 'board-flat-depth';
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(sizeM, sizeM), mat); mesh.renderOrder = 2;
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 32), new THREE.MeshBasicMaterial({ color: 0x1a1210, transparent: true, opacity: 0.3, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1;
@@ -26,6 +32,8 @@ export function makeBoard(sizeM, px, draw) {
       ctx.setTransform(px / 1024 * (pose.flip ? -1 : 1), 0, 0, px / 1024, px / 2, px / 2);
       ctx.lineJoin = ctx.lineCap = 'round'; draw(ctx, pose); tex.needsUpdate = true;
       if (tint) mat.color.copy(tint); else mat.color.setRGB(1, 1, 1);
+      { const toCam = camera.position.clone().sub(feet); toCam.y = 0; const dist = toCam.length(); toCam.normalize();
+        anchorU.value.copy(feet).add(new THREE.Vector3(0, sizeM * 0.36, 0)).addScaledVector(toCam, Math.min(pose.depthNudge ?? 0.35, dist * 0.5)); }
       const g = ground ?? feet.y; shadow.visible = pose.shadow !== false;
       shadow.position.set(feet.x, g + 0.006, feet.z); const s = sizeM * 0.2 * (pose.shadowW || 1); shadow.scale.set(s * 2, s, 1);
     } };

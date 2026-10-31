@@ -108,6 +108,7 @@ Not HD-2D (no pixel sprites, no tilt-shift toy band, no RPG UI), not a 3D animat
 - Characters must not take 3D shading; tint only, or they stop reading as drawings.
 - Statues and ornaments repeated identically read as toy soldiers: vary size, pose and spacing.
 - Poses switched inside an `if` pop; blend every pose with keyframes and easing (a deliberate one-frame comic pop is the only exception). Held props sit between the palms; a hand-over interpolates from one palm to the other.
+- An upright card standing next to a mast, wall or rack gets sliced by it (a head or hat pokes through the set): give the whole card ONE depth, its body centre nudged ~0.35 m toward the camera (`makeBoard` does this in the vertex shader), so a character is entirely in front of or behind a set piece.
 - A board placed (or an arm solved) before the shot's camera is set faces the previous shot's camera and turns edge-on: stage each frame in two passes (camera first, then cast).
 - Billboards are lit from the front only: keep a front fill on heroes in dark sets, and lift mid-tones in dark scenes except the one beat that must go dark.
 - Review before delivery: contact sheets every 1–2 s, 0.2 s strips of every key action, `framecheck.mjs` with 0 problems or each one justified, `blackdetect` and −14 LUFS on the final file.
