@@ -47,6 +47,11 @@ Not HD-2D (no pixel sprites, no tilt-shift toy band, no RPG UI), not a 3D animat
 - Water, flags, sails, foliage, particles always have a little life, even in a held shot.
 - Subframe motion blur only for genuinely fast objects; otherwise crisp.
 
+**Physical truth (the user's rules, checked every frame):**
+- **Working room.** Every object in use has room to work: a character stands beside the table, cart, machine or door it uses, at arm's reach (~0.6 m for a 1.6 m character), never inside it. Doors swing through clear space. Aisles are wider than the carts and vans that use them. Set props rest on surfaces and held props touch the palm; nothing floats or interpenetrates. Every character and prop gets a 3D box, and no box may overlap a set collider.
+- **Real physics.** Anything that falls, rolls, is thrown, bounces, slides, tips or sloshes is simulated as a rigid body (g = 9.81 m/s², real mass, friction, restitution) and baked deterministically. It is never hand-eased. A rolling wheel turns distance / radius. Thrown things fly ballistic arcs. Heavy things carry momentum and settle. Contacts land exactly on the ground or surface.
+- **Walking.** Feet plant and never skate: stride length × step rate = ground speed. A walker faces the way they travel in every direction (front, both 3/4, both profiles, back) and turns at corners with a step, as a snap between drawings. Paths go around set pieces. The camera follows the walker; the set never slides through a character. A walker is always clearly in front of or behind each set piece along a free path.
+
 ## 6. Camera grammar
 
 | Move | What it expresses | Can serve |

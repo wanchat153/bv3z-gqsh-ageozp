@@ -10,3 +10,4 @@
 | 6 Camera | high, far 3/4 camera through a tilt-shift band | eye-level and low cinematic shots, cuts every 2–4 s, roll with a tilting floor | story-driven shorts |
 | 7 Sound | fantasy RPG score | orchestral/pluck colours, comic stings, location ambience | short narrative comedy |
 | Size | 1920×1080 | 1080×1920 | vertical Shorts |
+| 5 Motion | — | working room for every object, rigid-body physics for anything that moves on its own, planted feet that turn every way, no set sliding through a walker | the user's review of the cheese short |
