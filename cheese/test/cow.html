@@ -1,0 +1,6 @@
+<!doctype html><html><body style="margin:0;background:#888"><script type="module">
+import { drawCow } from '../src/stick.js';
+const c = document.createElement('canvas'); c.width = 1024; c.height = 512; document.body.appendChild(c); const x = c.getContext('2d');
+for (let i = 0; i < 2; i++) { x.save(); x.translate(256 + i * 512, 200); x.scale(0.45, 0.45); x.strokeRect(-512, -512, 1024, 1024); x.lineJoin = x.lineCap = 'round'; drawCow(x, { t: 1, eat: i * 0.6, happy: i === 1, chew: true }); x.restore(); }
+window.READY = true; window.grab = () => c.toDataURL('image/jpeg', 0.9).split(',')[1];
+</script></body></html>

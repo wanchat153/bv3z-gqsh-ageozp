@@ -277,6 +277,7 @@ function shotAt(t) { for (const s of SHOTS.list) if (t < s.t1) return s; return 
 function render(t) {
   t = clamp(t, 0, DUR - 1e-4); hideAll(); WORM.mesh.visible = false;
   const s = shotAt(t); const l = t - s.t0, d = s.t1 - s.t0;
+  STAGE[s.stage](t, l, d); hideAll(); WORM.mesh.visible = false;   // pass 1 settles the camera
   const o = STAGE[s.stage](t, l, d) || {};
   cam.updateMatrixWorld(true);
   const subjects = used.map((u, i) => ({ id: `char${i}`, kind: 'char', back: u.back, box: charBox(u), at: u.feet.clone().add(new THREE.Vector3(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
