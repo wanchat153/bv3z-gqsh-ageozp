@@ -62,7 +62,7 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       vec3 pD=dir*R*rf; pD.y=abs(pD.y)*1.05;
       vec3 p=mix(pF,pD,smoothstep(0.05,0.7,te));
       ${HGLSL}
-      float Rt=R*0.62+0.18*rise; float rt=R*0.46*(0.25+0.75*rf);
+      float Rt=R*0.42+0.05*rise; float rt=R*0.30*(0.25+0.75*rf);
       float th=aR.w*6.2831853-te*0.5;
       vec3 rad=vec3(cos(az),0.0,sin(az));
       vec3 pT=rad*(Rt+rt*cos(th))+vec3(0.0,Hc+rt*sin(th)*0.85,0.0);
@@ -109,7 +109,7 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       ${RGLSL}
       vec3 p=dir*R*rf; p.y*=1.05;
       ${HGLSL}
-      float Rt=R*0.62+0.18*rise; float rt=R*0.46*1.02;
+      float Rt=R*0.42+0.05*rise; float rt=R*0.30*1.02;
       float th=mix(0.35,2.6,aR.w)-te*0.5;
       vec3 rad=vec3(cos(az),0.0,sin(az));
       vec3 pT=rad*(Rt+rt*cos(th))+vec3(0.0,Hc+rt*sin(th)*0.85,0.0);
@@ -121,7 +121,7 @@ export function buildFx(scene, WV, MV, DIR, HV, PATH_ALL) {
       float v=abs(snoise(q*2.4+3.0));
       float top=smoothstep(0.55,0.95,(p.y-Hc*0.6)/max(Rn,1.0));
       float keep=max((1.0-smoothstep(0.015,0.04,v))*step(0.45,p.y/max(Hc+rt,1.0)), top*step(aS.x,0.6));
-      vC=vec4(vec3(0.05,0.032,0.024)+vec3(0.30,0.14,0.05)*uI*0.12, 0.07*keep*smoothstep(0.8,2.5,te));
+      vC=vec4(vec3(0.05,0.032,0.024)+vec3(0.30,0.14,0.05)*uI*0.12, 0.05*keep*smoothstep(0.8,2.5,te));
       vec4 mv=modelViewMatrix*vec4(uC+p,1.0);
       gl_PointSize=(keep<0.01||te<0.0)?0.0:clamp(0.45*(Rn/10.5*0.6+0.4)*uScale/-mv.z,1.0,40.0);
       gl_Position=projectionMatrix*mv;

@@ -21,9 +21,9 @@ export function grainTexture(seed, size = 256, scale = 1) {
   g.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; return t;
 }
-const CLOTH = grainTexture(21); CLOTH.repeat.set(6, 10);
-const LEATHER = grainTexture(22, 256, 0.6); LEATHER.repeat.set(3, 3);
-const mat = (c, rough, metal = 0, bump = null, bs = 0.6) => {
+export const CLOTH = grainTexture(21); CLOTH.repeat.set(6, 10);
+export const LEATHER = grainTexture(22, 256, 0.6); LEATHER.repeat.set(3, 3);
+export const mat = (c, rough, metal = 0, bump = null, bs = 0.6) => {
   const m = new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: metal });
   if (bump) { m.bumpMap = bump; m.bumpScale = bs; }
   return m;
@@ -45,7 +45,7 @@ export function limb(pts, radii, material, segs = 24, radial = 16, caps = true) 
 }
 
 // a draped cloth surface around the body: rows from y0 down to y1; ring = ellipse (rx, rz) opened at the front by gap(v)
-function drape({ y0, y1, rx, rz, gap, folds = 0, foldK = 9, rows = 28, cols = 72, zoff = 0, seed = 1 }) {
+export function drape({ y0, y1, rx, rz, gap, folds = 0, foldK = 9, rows = 28, cols = 72, zoff = 0, seed = 1 }) {
   const g = new THREE.BufferGeometry(); const pos = [], uv = [], idx = [];
   const rr = mulberry(seed); const ph = Array.from({ length: 4 }, () => rr() * 6.28);
   for (let i = 0; i <= rows; i++) {
