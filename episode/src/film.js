@@ -1,17 +1,12 @@
-// Countdown — 3D Particle Fireball (clean, no grain). Every frame is a pure function of t.
+// Cat Flip — wordless toon short. Every frame is a pure function of t.
 import * as THREE from './three.module.js';
-import { DUR, T, PAD, ENG, rocketH, ACC, EV } from './timeline.js';
-import { clamp, mix } from './models.js';
-import { buildWorld } from './world.js';
-import { buildPad, buildSea, makeLaunchBox } from './pad.js';
-import { makeSignalman } from './train.js';
-import { buildFx, FBR, NOISE } from './fx.js';
+import { DUR, T, LEDGE_Y, CAT_Y0, tau, TAU_OFF, FALL_T, T_LAND, EV } from './timeline.js';
+import { clamp, mix, sstep } from './toon.js';
+import { buildSet, makeButterfly } from './set.js';
+import { makeCat, poseCat, LEG, STAND, makeDog } from './chars.js';
+import { buildInner, poseInner, INNER_O } from './inner.js';
 
 const W = innerWidth, HH = innerHeight;
-const sstep = (a, b, x) => { const u = clamp((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
-const WV = new THREE.Vector3(PAD[0], 0, PAD[2]);
-const EV3 = new THREE.Vector3(...ENG);
-
 const canvas = document.createElement('canvas');
 document.body.style.margin = '0'; document.body.style.background = '#000';
 document.body.appendChild(canvas);
@@ -20,192 +15,227 @@ renderer.setPixelRatio(1); renderer.setSize(W, HH, false);
 renderer.outputColorSpace = THREE.LinearSRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x141a2c, 0.0006);   // only the faintest air perspective at range
-const camera = new THREE.PerspectiveCamera(50, W / HH, 0.02, 6000);
+const camera = new THREE.PerspectiveCamera(45, W / HH, 0.005, 1000);
 
-const FB = { I: 0, pos: new THREE.Vector3(), te: -1, flash: 0 };
-function fireballState(t) {
-  const te = t - T.ign; FB.te = te;
-  if (te < 0) { FB.I = 0; FB.flash = 0; FB.pos.set(WV.x, 3, WV.z); return; }
-  const R = FBR.R0 * (1 - Math.exp(-te * FBR.k)) + FBR.lin * te;
-  const rise = Math.max(te - 1.6, 0);
-  const Hc = mix(R * 0.45, R * 0.62 + FBR.rise * Math.pow(rise, FBR.riseP), sstep(1.6, 6.5, te));
-  FB.pos.set(WV.x, Math.max(3, Hc), WV.z);
-  FB.flash = te < 0.5 ? Math.exp(-te * 7) : Math.exp(-3.5) * Math.exp(-(te - 0.5) * 4);
-  FB.I = 1.0 + 4.0 * FB.flash - 0.35 * sstep(3, 16, te);
-}
-{
-  const es = new THREE.Scene();
-  es.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide,
-    vertexShader: `varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
-    fragmentShader: `varying vec3 vD; void main(){ float y=vD.y; vec3 c=mix(vec3(0.22,0.27,0.44),vec3(0.05,0.07,0.14),smoothstep(0.0,0.7,y));
-      c+=vec3(0.7,0.4,0.3)*pow(max(0.0,dot(vD,normalize(vec3(1.0,0.05,-0.3)))),6.0); if(y<0.0) c=vec3(0.05,0.045,0.04); gl_FragColor=vec4(c*1.3,1.0);} ` })));
-  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(es, 0.02).texture; scene.environmentIntensity = 0.3;
-}
-const world = buildWorld(scene, renderer, FB);
-const PADS = buildPad(scene);
-const seaMat = buildSea(scene, FB);
-const DUMMY = new THREE.Vector3(0, -500, 0);
-const fx = buildFx(scene, WV, DUMMY, new THREE.Vector3(0, 0, -1), DUMMY, 10);
-fx.motes.visible = fx.wake.visible = fx.felt.visible = fx.air.visible = false;
-const NO_EMBERS = true;
-
-// ---------- lights ----------
-const hemi = new THREE.HemisphereLight(0x5a6aa8, 0x1a140f, 0.6); scene.add(hemi);
-const dawn = new THREE.DirectionalLight(0xffb89a, 0.35); dawn.position.set(400, 60, -150); scene.add(dawn);
-const fireLight = new THREE.PointLight(0xffd8a0, 0, 0, 1.0); scene.add(fireLight);
-const sun = new THREE.DirectionalLight(0xffc890, 0);
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
-Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 8, bottom: -8, near: 1, far: 300 });
+const hemi = new THREE.HemisphereLight(0xd6ecff, 0x9a8a6a, 1.15); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02;
+Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 40 });
 scene.add(sun); scene.add(sun.target);
-const fillLight = new THREE.DirectionalLight(0xffd8a0, 0); fillLight.position.set(0, 0.2, 8); scene.add(fillLight); scene.add(fillLight.target);
-// xenon floodlights on the rocket
-const floods = [];
-for (const [dx, dz] of [[-40, 32], [40, 32], [0, 48]]) {
-  const s = new THREE.SpotLight(0xdfe8ff, 1500, 0, 0.13, 0.5, 2.0); s.position.set(PAD[0] + dx, 1.5, PAD[2] + dz); s.target.position.set(PAD[0], 24, PAD[2]); scene.add(s); scene.add(s.target); floods.push(s);
-  const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.4), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6.5, 7), fog: false })); lamp.position.copy(s.position); lamp.lookAt(s.target.position); scene.add(lamp);
-}
-// the engines: a hot point light, a crisp glowing core
-const engLight = new THREE.PointLight(0xffc070, 0, 0, 2.0); scene.add(engLight);
-const coreMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uA: { value: 0 } },
-  vertexShader: `varying vec3 vL; void main(){ vL=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
-  fragmentShader: `varying vec3 vL; uniform float uA; void main(){ float u=clamp(0.5-vL.y/1.0,0.0,1.0); float r=length(vL.xz)/(0.5*(1.0-u)+0.02);
-    float diamonds=0.75+0.25*cos(u*38.0); float a=uA*exp(-r*r*1.6)*(1.0-u)*diamonds; gl_FragColor=vec4(vec3(1.0,0.86,0.6)*a*3.0+vec3(0.6,0.75,1.0)*a*exp(-u*8.0),1.0);} ` });
-const core = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.02, 1, 32, 8, true), coreMat); scene.add(core);
+const SET = buildSet(scene);
+const CAT = makeCat(); scene.add(CAT.root);
+const DOG = makeDog(); scene.add(DOG.root);
+const BF = makeButterfly(); scene.add(BF.g);
+const IN = buildInner(scene);
+const DOG_HOME = new THREE.Vector3(2.55, SET.WALL_TOP + 0.13, 1.3);
 
-// ---------- cast ----------
-const SM = makeSignalman({ hard: true, coat: 0xb8b0a0 }); SM.root.position.copy(EV3); scene.add(SM.root);
-SM.arm.rotation.set(2.0, 0, 0.05);
-const boxLight = new THREE.PointLight(0xdfe6ff, 0.6, 0, 2.0); boxLight.position.set(0.3, 1.9, 0.9); scene.add(boxLight);
-const BOX = makeLaunchBox(); BOX.g.position.set(0.62, 0, 0.35); BOX.g.rotation.y = -0.25; scene.add(BOX.g);
-BOX.top.rotation.x = 0.35;
-const RIM = { value: 0 };
-function addRim(m) { if (m.__r) return; m.__r = 1; m.onBeforeCompile = (sh) => { sh.uniforms.uRim = RIM; sh.fragmentShader = 'uniform float uRim;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n float fr = pow(1.0 - clamp(abs(dot(normal, normalize(vViewPosition))), 0.0, 1.0), 4.0);\n totalEmissiveRadiance += vec3(1.0, 0.72, 0.42) * fr * uRim;'); }; m.customProgramCacheKey = () => 'rim'; }
-SM.root.traverse((o) => { if (o.material) addRim(o.material); });
-
-const mkPts = (n, seed, m) => { const g = new THREE.BufferGeometry(); let a = seed | 0; const rnd = () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; };
-  const A = new Float32Array(n * 4), B = new Float32Array(n * 4); for (let i = 0; i < n * 4; i++) { A[i] = rnd(); B[i] = rnd(); }
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3)); g.setAttribute('aR', new THREE.BufferAttribute(A, 4)); g.setAttribute('aS', new THREE.BufferAttribute(B, 4));
-  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5); const p = new THREE.Points(g, m); p.frustumCulled = false; scene.add(p); return p; };
-const SPR = `varying vec4 vC; void main(){ vec2 d=gl_PointCoord-0.5; float r=dot(d,d)*4.0; if(r>1.0) discard; gl_FragColor=vec4(vC.rgb, vC.a*exp(-r*2.6)); }`;
-const HFN = `float rh(float t){ return t<${T.lift.toFixed(2)}?0.0:0.5*${ACC.toFixed(1)}*(t-${T.lift.toFixed(2)})*(t-${T.lift.toFixed(2)}); }`;
-// exhaust plume: emitted continuously from the bells (periodic, so each particle keeps its own emission time)
-const PL = 0.5;
-const plumeMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uT: { value: 0 }, uScale: { value: 1 } },
-  vertexShader: `attribute vec4 aR; attribute vec4 aS; uniform float uT,uScale; varying vec4 vC; ${HFN}
-  void main(){ float age=mod(uT-aR.x*${PL.toFixed(2)},${PL.toFixed(2)}); float te=uT-age;
-    float on=te>${T.ign.toFixed(2)}?1.0:0.0;
-    float a0=aR.y*6.2831853; vec3 e=vec3(${PAD[0].toFixed(1)}+cos(a0)*1.3*aR.z, 1.5+rh(te)-0.3, ${PAD[2].toFixed(1)}+sin(a0)*1.3*aR.z);
-    float vd=55.0+25.0*aS.x; vec3 p=e+vec3(cos(a0),0.0,sin(a0))*(2.0+6.0*aS.y)*age+vec3(0.0,-vd*age,0.0);
-    float under=max(0.0,-p.y+0.5); p.y=max(p.y,0.5); p.x+=sign(cos(a0+0.3))*under*1.4; p.z+=sin(a0)*under*0.4;
-    float k=age/${PL.toFixed(2)};
-    vec3 col=k<0.25?mix(vec3(1.0,0.95,0.8),vec3(1.0,0.7,0.35),k/0.25):mix(vec3(1.0,0.7,0.35),vec3(0.6,0.25,0.08),(k-0.25)/0.75);
-    float a=on*(1.0-k)*0.12;
-    vC=vec4(col*2.2,a);
-    vec4 mv=modelViewMatrix*vec4(p,1.0);
-    gl_PointSize=a<0.003?0.0:clamp((1.5+6.0*k)*uScale/-mv.z,2.0,90.0); gl_Position=projectionMatrix*mv; }`,
-  fragmentShader: SPR });
-const plume = mkPts(9000, 31, plumeMat);
-// the climb's trail: fixed emission times, so it hangs in the sky where it was laid
-const trailMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uT: { value: 0 }, uScale: { value: 1 }, uI: { value: 0 } },
-  vertexShader: NOISE + `attribute vec4 aR; attribute vec4 aS; uniform float uT,uScale,uI; varying vec4 vC; ${HFN}
-  void main(){ float te=${(T.lift + 0.3).toFixed(2)}+pow(aR.x,1.15)*${(DUR - T.lift).toFixed(2)}; float age=uT-te;
-    float h=rh(te); vec3 e=vec3(${PAD[0].toFixed(1)}, 1.5+h-6.0, ${PAD[2].toFixed(1)});
-    float rad=1.2+2.2*sqrt(max(age,0.0))+0.004*h;
-    vec3 q=vec3(aR.y*5.0,h*0.03,age*0.2);
-    vec3 p=e+vec3(cos(aR.z*6.2831853),0.0,sin(aR.z*6.2831853))*rad*sqrt(aR.w)+vec3(snoise(q),snoise(q+3.0)*0.5,snoise(q+7.0))*rad*0.7+vec3(2.5*age,0.0,0.6*age);
-    float a=age<0.0?0.0:smoothstep(0.0,0.4,age)*0.20*exp(-age/26.0);
-    float lit=exp(-age*1.5);
-    vec3 col=vec3(0.33,0.36,0.44)+vec3(1.0,0.72,0.42)*lit*1.4+vec3(0.35,0.22,0.18)*max(0.0,cos(aR.z*6.2831853))*0.6;
-    vC=vec4(col,a);
-    vec4 mv=modelViewMatrix*vec4(p,1.0);
-    gl_PointSize=a<0.003?0.0:clamp(rad*1.7*uScale/-mv.z,1.0,80.0); gl_Position=projectionMatrix*mv; }`,
-  fragmentShader: SPR });
-const trail = mkPts(45000, 47, trailMat);
-
-// ---------- shots and camera ----------
-const SHOTS = [0, T.cut2, T.cut3, T.cut4, DUR];
-const shotOf = (t) => { for (let i = SHOTS.length - 2; i >= 0; i--) if (t >= SHOTS[i]) return i; return 0; };
-function heroCam(c, z, y, ang) { c.pos.set(0, y, z); const D = z - PAD[2]; c.tgt.set(0, y + D * Math.tan(ang), PAD[2]); }
-const tmp = new THREE.Vector3();
-function camAt(t) {
-  const c = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 50, roll: 0 };
-  const s = shotOf(t);
-  if (s === 0) {
-    BOX.g.updateMatrixWorld(true); const u = t / T.cut2;
-    c.pos.copy(BOX.top.localToWorld(new THREE.Vector3(-0.015 + 0.01 * u, 0.62 - 0.06 * u, 0.42 - 0.05 * u)));
-    c.tgt.copy(BOX.top.localToWorld(new THREE.Vector3(-0.015, 0.07, -0.01))); c.fov = 42;
-  } else if (s === 1) {
-    const u = (t - T.cut2) / (T.cut3 - T.cut2); heroCam(c, mix(9.6, 8.8, sstep(0, 1, u)), 0.6, THREE.MathUtils.degToRad(12));
-  } else if (s === 2) {
-    const u = (t - T.cut3) / (T.cut4 - T.cut3);
-    c.pos.set(PAD[0] + 26, 2.5 + 0.8 * u, PAD[2] + 38); c.tgt.set(PAD[0] + 1, 9 + Math.max(0, rocketH(t)) * 0.8, PAD[2]); c.fov = 40;
-    const sh = (t > T.ign ? 0.03 * Math.exp(-(t - T.ign) * 0.8) : 0); c.pos.x += sh * Math.sin(t * 61); c.pos.y += sh * Math.sin(t * 47 + 1.3);
+// ---------- the cat through the film ----------
+const L = LEG;
+const QS = new URLSearchParams(location.search); const HEADP = +(QS.get('hp') ?? -0.45), HEADY = +(QS.get('hy') ?? -0.9);
+function catAt(t) {
+  const p = STAND(); const pos = new THREE.Vector3(); let rotY = -Math.PI / 2, rotX = 0, rotZ = 0;
+  const tr = tau(t) - TAU_OFF;             // world seconds since leaving the ledge
+  if (t < T.off) {
+    // asleep on its back along the rail; nose twitch, sneeze, slide toward the edge
+    const breathe = 0.04 * Math.sin(t * 2.4);
+    p.aF = p.aR = Math.PI; p.arch = breathe * 0.5;
+    p.legs = { FL: L(0.7, 1.1), FR: L(0.5, 1.3), HL: L(-0.3, -1.0), HR: L(-0.5, -0.8) };
+    p.eye = { open: 0 }; p.tail = { curl: -0.2, up: -0.5, sway: 0.9 };
+    p.head = { pitch: HEADP, yaw: HEADY, roll: 0 };
+    const tw = sstep(T.twitch, T.twitch + 0.15, t) * (1 - sstep(T.sneeze - 0.1, T.sneeze, t));
+    p.head.roll += 0.06 * tw * Math.sin(t * 45);
+    const sn = Math.exp(-Math.max(0, t - T.sneeze) * 9) * (t > T.sneeze ? 1 : 0);
+    p.head.pitch += -0.5 * sn; p.arch += 0.25 * sn;
+    p.eye = { open: t > T.sneeze ? 0.2 * (1 - sn) : 0 };
+    const sl = sstep(T.slide, T.off, t);
+    pos.set(0, CAT_Y0 + 0.02 * sn - 0.04 * sl * sl, -0.06 + 0.36 * sl * sl);
+    rotX = 0.35 * sl * sl;                  // tipping over the front edge
+  } else if (tr < FALL_T) {
+    const s = tr;
+    pos.set(0, CAT_Y0 - 0.04 - 4.9 * s * s, 0.30 + 0.5 * s);
+    rotX = 0.35 * (1 - sstep(0.0, 0.2, s));
+    const f = sstep(0.12, 0.24, s), r = sstep(0.22, 0.34, s), x = sstep(0.32, 0.42, s);
+    p.aF = Math.PI * (1 - f); p.aR = Math.PI * (1 - r);
+    const flail = 1 - sstep(0.08, 0.14, s), wob = Math.sin(t * 7.0);
+    const fl = (a, b) => mix(a, b, 1);
+    p.legs = {
+      FL: L(mix(mix(0.3 * wob, 0.95, sstep(0.1, 0.16, s)), mix(0.25, 0.15, x), r), mix(mix(0.4, 1.7, sstep(0.1, 0.16, s)), mix(0.35, 0.15, x), r), 0.55 * flail + 0.12 * x),
+      FR: L(mix(mix(-0.3 * wob, 0.95, sstep(0.1, 0.16, s)), mix(0.25, 0.15, x), r), mix(mix(0.4, 1.7, sstep(0.1, 0.16, s)), mix(0.35, 0.15, x), r), 0.55 * flail + 0.12 * x),
+      HL: L(mix(mix(-0.4, -0.35, f), mix(0.55, -0.15, x), r), mix(mix(-0.3, -0.15, f), mix(-1.5, -0.25, x), r), 0.5 * flail + 0.3 * (f - r) + 0.12 * x),
+      HR: L(mix(mix(0.4, -0.35, f), mix(0.55, -0.15, x), r), mix(mix(-0.3, -0.15, f), mix(-1.5, -0.25, x), r), 0.5 * flail + 0.3 * (f - r) + 0.12 * x),
+    };
+    p.arch = 0.22 * x;
+    p.head = { pitch: 0.25 * f, yaw: 0, roll: 0 };
+    p.eye = { open: 1, size: mix(0.5, 1.0, x), look: [0, -0.6 * f] };
+    p.tail = { curl: mix(-0.2, 0.7, x), up: mix(-0.3, 0.9, x), sway: 0.9 * (1 - f) - 1.4 * (f - r) + 0.2 * r };
   } else {
-    const u = (t - T.cut4) / (DUR - T.cut4);
-    const ang = mix(12, 25, sstep(0.3, 0.85, u));
-    heroCam(c, mix(9.4, 7.6, sstep(0, 1, u)), mix(0.6, 0.5, u), THREE.MathUtils.degToRad(ang)); c.fov = mix(50, 58, sstep(0.3, 0.85, u));
-    const s2 = sstep(T.cam - 1.6, T.cam, t) * Math.exp(-Math.max(0, t - T.cam) * 0.8) * 0.02;
-    c.pos.x += s2 * Math.sin(t * 61.0) * 0.6; c.pos.y += s2 * Math.sin(t * 47.0 + 1.3) * 0.6;
+    // landed: absorb, stand, sit proud; later stroll over to the pup and sit beside him
+    const s = tr - FALL_T; const ld = new THREE.Vector3(0, 0.255, 0.30 + 0.5 * FALL_T);
+    const sq = Math.exp(-s * 10) * Math.sin(Math.min(Math.PI, s * 18));
+    pos.copy(ld); pos.y -= 0.07 * sq;
+    p.legs = { FL: L(0.15, 0.35 * sq), FR: L(0.15, 0.35 * sq), HL: L(-0.15, -0.5 * sq), HR: L(-0.15, -0.5 * sq) };
+    p.eye = { open: 1, size: 1 }; p.tail = { curl: 0.8, up: 1.0, sway: 0.1 * Math.sin(t * 2) };
+    const sit = sstep(T_LAND + 1.0, T_LAND + 1.6, t) * (1 - sstep(T.catWalk - 0.3, T.catWalk, t));
+    rotX = -0.45 * sit; pos.y -= 0.03 * sit;
+    p.legs.HL = L(mix(-0.15, -1.35, sit), mix(0, -2.2, sit)); p.legs.HR = L(mix(-0.15, -1.35, sit), mix(0, -2.2, sit));
+    p.legs.FL.sw += 0.45 * sit; p.legs.FR.sw += 0.45 * sit;
+    p.head = { pitch: 0.4 * sit, yaw: 0.6 * sit * sstep(T.pan, T.pan + 1, t) };
+    p.eye.open = mix(1, 0.55, sit * sstep(T_LAND + 1.4, T_LAND + 2.0, t));
+    // walk over to the pup
+    const wk = sstep(T.catWalk, T.catWalk + 2.8, t);
+    if (t > T.catWalk) {
+      const end = new THREE.Vector3(2.0, 0.255, 2.5);
+      pos.lerp(end, wk); pos.y = 0.255;
+      rotY = mix(-Math.PI / 2, Math.PI * 0.18, sstep(T.catWalk, T.catWalk + 0.6, t));
+      const ph = (t - T.catWalk) * 9.0, go = 1 - sstep(T.catWalk + 2.4, T.catWalk + 2.9, t);
+      p.legs = { FL: L(0.35 * Math.sin(ph) * go, 0.3 * Math.max(0, Math.cos(ph)) * go), FR: L(-0.35 * Math.sin(ph) * go, 0.3 * Math.max(0, -Math.cos(ph)) * go), HL: L(-0.35 * Math.sin(ph) * go, -0.3 * Math.max(0, -Math.cos(ph)) * go), HR: L(0.35 * Math.sin(ph) * go, -0.3 * Math.max(0, Math.cos(ph)) * go) };
+      const sit2 = sstep(T.catWalk + 2.9, T.catWalk + 3.5, t);
+      rotX = -0.45 * sit2; pos.y -= 0.03 * sit2;
+      p.legs.HL = L(mix(p.legs.HL.sw, -1.35, sit2), mix(p.legs.HL.bend, -2.2, sit2)); p.legs.HR = L(mix(p.legs.HR.sw, -1.35, sit2), mix(p.legs.HR.bend, -2.2, sit2));
+      p.legs.FL.sw += 0.45 * sit2; p.legs.FR.sw += 0.45 * sit2;
+      p.head = { pitch: 0.35 * sit2, yaw: -0.5 * sstep(T.catWalk + 3.2, T.catWalk + 3.8, t) };
+      const blink = sstep(42.6, 42.9, t) * (1 - sstep(43.1, 43.5, t));
+      p.eye = { open: mix(1, 0.55, sit2) * (1 - blink), size: 1 };
+      p.tail = { curl: 0.9, up: 1.2 - 0.6 * sit2, sway: 0.25 * Math.sin(t * 3) };
+    }
+  }
+  return { pos, rotY, rotX, rotZ, pose: p };
+}
+
+// ---------- the pup ----------
+function dogAt(t) {
+  const pos = DOG_HOME.clone(); let rotY = -Math.PI / 2, rotZ = 0;
+  const legs = { FL: L(-1.2, 0.0), FR: L(-1.2, 0.0), HL: L(1.1, -0.2), HR: L(1.1, -0.2) }; // lying sphinx-like
+  let eye = { open: 1, size: 1, look: [0, 0] }, tongue = 0, stars = false, headP = 0, headR = 0;
+  if (t > T_LAND - 0.3) eye.size = mix(1, 1.5, sstep(T_LAND - 0.3, T_LAND + 0.2, t)) * (1 - 0.3 * sstep(T.dogLie, T.dogLie + 0.5, t));
+  const roll = sstep(T.dogLie, T.dogLie + 1.0, t);
+  rotZ = Math.PI * roll;
+  if (t > T.dogLie) {
+    const wig = sstep(T.dogLie + 1.0, T.dogLie + 1.3, t) * Math.sin(t * 16) * (1 - sstep(T.dogRoll - 0.1, T.dogRoll, t));
+    rotZ += 0.15 * wig; legs.FL = L(mix(-1.2, 0.6, roll) + 0.3 * wig, 0.6); legs.FR = L(mix(-1.2, 0.6, roll) - 0.3 * wig, 0.6); legs.HL = L(mix(1.1, -0.4, roll), -0.6); legs.HR = L(mix(1.1, -0.4, roll), -0.6);
+    tongue = roll; eye = { open: 1, size: 0.8 };
+  }
+  if (t > T.dogRoll) {
+    // rolls off the wall toward the lawn, lands flat on his back
+    const s = t - T.dogRoll; const fallT = 0.45;
+    const u = clamp(s / fallT, 0, 1);
+    pos.z = mix(DOG_HOME.z, DOG_HOME.z + 0.62, u); pos.y = s < fallT ? DOG_HOME.y + 0.08 * Math.sin(Math.PI * u) - (DOG_HOME.y - 0.14) * u * u : 0.14;
+    rotZ = Math.PI + 0.4 * Math.sin(Math.PI * u);
+    const b = s > fallT ? Math.exp(-(s - fallT) * 7) * Math.abs(Math.sin((s - fallT) * 16)) : 0; pos.y += 0.06 * b;
+    legs.FL = L(0.9, 0.2 + 0.2 * Math.sin(s * 3)); legs.FR = L(0.7, 0.3); legs.HL = L(-0.8, -0.2); legs.HR = L(-0.6, -0.3);
+    stars = s > fallT + 0.1; eye = { open: 1, size: 0.45, look: [Math.sin(t * 6) * 0.6, Math.cos(t * 6) * 0.6] }; tongue = 1; headR = 0.2 * Math.sin(t * 4);
+  }
+  return { pos, rotY, rotZ, legs, eye, tongue, stars, headP, headR };
+}
+
+// ---------- the butterfly ----------
+function butterflyAt(t, catNose) {
+  const fl = Math.sin(t * 40);
+  let p = new THREE.Vector3(), yaw = 0, flap = 0.9 * fl;
+  const start = new THREE.Vector3(1.4, 4.9, 1.6);
+  if (t < T.land) { const u = sstep(T.fly - 1.2, T.land, t); p.copy(start).lerp(catNose, u); p.y += 0.12 * Math.sin(u * 9) * (1 - u); p.x += 0.1 * Math.sin(u * 7) * (1 - u); yaw = 2.4; }
+  else if (t < T.sneeze) { p.copy(catNose); p.y += 0.02; flap = 0.5 + 0.4 * Math.sin(t * 3); yaw = 2.4; }
+  else if (t < 30) { const u = sstep(T.sneeze, T.sneeze + 2.5, t); p.copy(catNose).lerp(new THREE.Vector3(-1.5, 5.6, 1.2), u); p.y += 0.1 * Math.sin(u * 8); yaw = 3.8; if (t > 7) p.set(-50, -50, -50); }
+  else { // it comes back for the pup's nose at the end
+    const nose = DOG.head.localToWorld(new THREE.Vector3(0, -0.015, 0.17));
+    const u = sstep(40.6, 42.6, t); p.copy(new THREE.Vector3(-0.5, 1.6, 3.2)).lerp(nose, u); p.y += 0.1 * Math.sin(u * 8) * (1 - u) + 0.015; yaw = 0.6;
+    if (t > 42.6) flap = 0.5 + 0.4 * Math.sin(t * 3); if (t < 40.6) p.set(-50, -50, -50);
+  }
+  return { p, yaw, flap };
+}
+
+// ---------- camera ----------
+const headW = () => CAT.head.localToWorld(new THREE.Vector3(0, 0, 0));
+const earW = () => CAT.ears[1].localToWorld(new THREE.Vector3(0, -0.006, 0.02));
+function orbitAt(t, center) {
+  const u = sstep(T.off, T.dive, t);
+  const phi = mix(1.25, 2.6, u) + 0.15 * Math.sin(u * Math.PI * 2), R = mix(1.6, 1.9, Math.sin(u * Math.PI)), h = mix(0.35, -0.2, u) + 0.15 * Math.sin(u * Math.PI);
+  return center.clone().add(new THREE.Vector3(R * Math.cos(phi), h, R * Math.sin(phi)));
+}
+function camAt(t) {
+  const c = { pos: new THREE.Vector3(), tgt: new THREE.Vector3(), fov: 40, inner: false };
+  CAT.root.updateMatrixWorld(true);
+  if (t < T.off) {
+    const H = headW(); const u = t / T.off;
+    const sl = sstep(T.slide, T.off, t);
+    c.pos.copy(H).add(new THREE.Vector3(-0.38 + 0.5 * sl, 0.5 + 0.15 * sl, 1.0 - 0.08 * u + 0.5 * sl));
+    c.tgt.copy(H).add(new THREE.Vector3(0.02 + 0.25 * sl, -0.03 - 0.3 * sl, 0.04 + 0.2 * sl)); c.fov = 38;
+    const sn = Math.exp(-Math.max(0, t - T.sneeze) * 8) * (t > T.sneeze ? 1 : 0); c.pos.y += 0.01 * sn * Math.sin(t * 70);
+  } else if (t < T.dive) {
+    const cen = CAT.root.position.clone(); c.pos.copy(orbitAt(t, cen)); c.tgt.copy(cen); c.fov = 40;
+  } else if (t < T.inner) {
+    const u = sstep(T.dive, T.inner, t) ** 1.6; const e = earW(); const cen = CAT.root.position.clone();
+    const from = orbitAt(T.dive, cen); const fwd = CAT.head.localToWorld(new THREE.Vector3(0, 0, 0.3)).sub(headW()).normalize();
+    const near = e.clone().addScaledVector(fwd, 0.02);
+    c.pos.copy(from).lerp(near, u); c.tgt.copy(cen).lerp(e, sstep(0, 0.5, u)); c.fov = mix(40, 30, u);
+  } else if (t < T.out) {
+    c.inner = true; const u = (t - T.inner) / (T.out - T.inner);
+    const back = sstep(0.9, 1.0, u);
+    const along = IN.path.getPointAt(Math.min(1, sstep(0, 0.28, u)) * (1 - back * 0.9));
+    const look = sstep(0.18, 0.32, u);
+    const lp = new THREE.Vector3(0.55, 0.75, 2.75);
+    const pl = along.clone().lerp(lp, look * (1 - back));
+    const ahead = IN.path.getPointAt(Math.min(1, sstep(0, 0.28, u) + 0.05)).lerp(new THREE.Vector3(0, -0.3, -0.2), look);
+    IN.chamber.updateMatrixWorld(true);
+    c.pos.copy(IN.chamber.localToWorld(pl)); c.tgt.copy(IN.chamber.localToWorld(ahead)); c.fov = 62;
+    c.up = new THREE.Vector3(0, 1, 0).applyQuaternion(IN.chamber.getWorldQuaternion(new THREE.Quaternion()));
+  } else if (t < T.swoop) {
+    const u = sstep(T.out, T.swoop, t); const e = earW(); const cen = CAT.root.position.clone();
+    const away = cen.clone().add(new THREE.Vector3(-0.35, 0.3, 1.7));
+    c.pos.copy(e).lerp(away, u); c.tgt.copy(e).lerp(cen, sstep(0, 0.6, u)); c.fov = mix(30, 42, u);
+  } else if (t < T.pan) {
+    const u = sstep(T.swoop, T_LAND - 0.25, t); const cen = CAT.root.position.clone();
+    const a = new THREE.Vector3(-0.35, 3.75, 2.2), b = new THREE.Vector3(-0.7, 0.2, 2.35);
+    c.pos.copy(a).lerp(b, u); c.tgt.copy(cen).add(new THREE.Vector3(0, mix(0, 0.05, u), 0)); c.fov = mix(42, 40, u);
+    const sh = Math.exp(-Math.max(0, t - T_LAND) * 6) * (t > T_LAND ? 1 : 0); c.pos.y += 0.006 * sh * Math.sin(t * 60);
+  } else if (t < T.catWalk) {
+    const u = sstep(T.pan, T.pan + 1.6, t);
+    const a = new THREE.Vector3(-0.7, 0.2, 2.35), b = new THREE.Vector3(1.25, 1.3, 3.5);
+    c.pos.copy(a).lerp(b, u); c.tgt.copy(new THREE.Vector3(0, 0.3, 0.75)).lerp(new THREE.Vector3(2.4, 1.05, 1.3), u); c.fov = 40;
+    const v = sstep(T.dogRoll - 0.2, T.dogRoll + 0.9, t);
+    c.pos.lerp(new THREE.Vector3(2.05, 0.6, 3.55), v); c.tgt.lerp(new THREE.Vector3(2.35, 0.3, 1.95), v);
+  } else {
+    const u = sstep(T.catWalk, DUR, t);
+    c.pos.set(mix(2.05, 2.15, u), mix(0.6, 0.66, u), mix(3.55, 4.05, u)); c.tgt.set(mix(2.35, 2.3, u), 0.28, mix(1.95, 2.15, u)); c.fov = 40;
   }
   return c;
 }
 
 let POST = {};
 function setup(t) {
-  fireballState(t);
-  const te = FB.te, h = rocketH(t);
-  // the launch box: guard up, finger down, lights go green
-  BOX.guardPiv.rotation.x = -2.1 * sstep(T.cover, T.cover + 0.45, t);
-  const reach = sstep(T.press - 0.9, T.press - 0.05, t), push = sstep(T.press - 0.05, T.press + 0.06, t) * (1 - sstep(T.press + 0.35, T.press + 0.6, t));
-  BOX.hand.position.set(0.12 * (1 - reach), 0.05 * (1 - reach) - 0.008 * push, 0.0);
-  BOX.button.position.y = 0.082 - 0.008 * push;
-  BOX.leds.forEach((m, k) => { const g = sstep(T.press + 0.15 + k * 0.14, T.press + 0.2 + k * 0.14, t); m.color.setRGB(mix(2.5, 0.1, g), mix(0.1, 2.6, g), mix(0.05, 0.3, g)); });
-  BOX.hand.visible = t < T.cut2;
-
-  const cam = camAt(t);
-  camera.position.copy(cam.pos); camera.up.set(0, 1, 0); camera.lookAt(cam.tgt); camera.rotateZ(cam.roll);
-  camera.fov = cam.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
-  const scale = HH / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
-
-  // rocket, arms
-  PADS.rocket.g.position.y = 1.5 + h;
-  PADS.arms.forEach((a, i) => { a.rotation.y = -1.4 * sstep(T.arms + i * 0.2, T.arms + 1.4 + i * 0.2, t); });
-  // engines
-  const on = t >= T.ign;
-  const flick = 0.85 + 0.15 * Math.sin(t * 71) * Math.sin(t * 37.3);
-  const bellY = 1.5 + h - 0.3;
-  engLight.position.set(PAD[0], bellY - 3, PAD[2]); engLight.intensity = on ? 9000 * flick * sstep(T.ign, T.ign + 0.3, t) : 0;
-  const coreLen = on ? mix(4, 30, sstep(T.ign, T.ign + 0.6, t)) * (1 + 0.6 * sstep(T.lift, T.lift + 4, t)) : 0.01;
-  core.visible = on; core.scale.set(2.6, coreLen, 2.6); core.position.set(PAD[0], bellY - coreLen / 2, PAD[2]); coreMat.uniforms.uA.value = on ? 1.0 * flick : 0;
-  plumeMat.uniforms.uT.value = t; plumeMat.uniforms.uScale.value = scale; plume.visible = on;
-  trailMat.uniforms.uT.value = t; trailMat.uniforms.uScale.value = scale; trail.visible = t > T.lift;
-  // the engineer tips his head up to follow the climb
-  SM.head.rotation.set(-0.55 * sstep(T.look, T.look + 2.5, t), 0, 0);
-
-  // blast lights
-  const I = FB.I;
-  RIM.value = 0.45 * I;
-  fireLight.position.copy(FB.pos); fireLight.intensity = I * 160;
-  const src = new THREE.Vector3(PAD[0], Math.max(8, bellY - 6), PAD[2]);
-  const toFb = src.clone().sub(new THREE.Vector3(0, 1, 0)).normalize();
-  sun.target.position.set(0, 0.8, 2); sun.position.copy(sun.target.position).addScaledVector(toFb, 160); sun.intensity = I * 2.4; sun.castShadow = I > 0.01;
-  fillLight.target.position.set(0, 1.4, 0); fillLight.intensity = I * 0.3;
-  hemi.groundColor.setRGB(0.10 + 0.12 * I, 0.08 + 0.085 * I, 0.06 + 0.05 * I);
-  scene.fog.color.setRGB(0.075 + 0.05 * I, 0.09 + 0.03 * I, 0.15 + 0.015 * I);
-  world.starMat.opacity = 0.5 * (1 - clamp(I, 0, 1) * 0.9);
-  world.skyMat.uniforms.uFb.value.copy(FB.pos); world.skyMat.uniforms.uI.value = I;
-  for (const m of world.cloudMats) m.uniforms.uI.value = I;
-  seaMat.uniforms.uI.value = I; seaMat.uniforms.uT.value = t; seaMat.uniforms.uPlume.value.set(PAD[0], bellY - 10, PAD[2]); seaMat.uniforms.uPI.value = on ? 1.5 : 0;
-  for (const m of [fx.fireMat, fx.smokeMat, fx.embMat, fx.dustMat]) { m.uniforms.uTe.value = te; m.uniforms.uScale.value = scale; m.uniforms.uI.value = 1.0 + 1.2 * FB.flash; }
-  fx.dustMat.uniforms.uI.value = I;
-  fx.fire.visible = fx.dust.visible = te >= 0; fx.smoke.visible = fx.embers.visible = false;
-  POST = { bs: 0, bp: new THREE.Vector2(-9, -9), bd: new THREE.Vector2(1, 0), focus: 10, ap: 0,
-    flash: te >= 0 ? 1.6 * Math.exp(-te * 9) : 0, exp: te >= 0 ? 0.9 : 1.35, haze: 0,
-    fade: sstep(0, 0.5, t) * (1 - sstep(T.fade, DUR, t)) };
+  // cat
+  const ca = catAt(t);
+  CAT.root.position.copy(ca.pos); CAT.root.rotation.set(ca.rotX, ca.rotY, ca.rotZ, 'YXZ'); poseCat(CAT, ca.pose);
+  CAT.root.updateMatrixWorld(true);
+  // pup
+  const d = dogAt(t);
+  DOG.root.position.copy(d.pos); DOG.root.rotation.set(0, d.rotY, 0); DOG.root.rotateZ(d.rotZ);
+  for (const k of ['FL', 'FR', 'HL', 'HR']) { DOG.legs[k].sh.rotation.set(d.legs[k].sw, 0, 0); DOG.legs[k].knee.rotation.x = d.legs[k].bend; }
+  DOG.eyes.forEach((e) => { e.pupil.scale.set(0.75 * d.eye.size, d.eye.size, 0.4); e.pupil.position.x = (d.eye.look ? d.eye.look[0] : 0) * 0.008; e.pupil.position.y = (d.eye.look ? d.eye.look[1] : 0) * 0.008; });
+  DOG.tongue.scale.set(0.9, 0.4, 1.4 * (0.6 + 0.8 * d.tongue)); DOG.tongue.visible = d.tongue > 0.05;
+  DOG.head.rotation.set(d.headP, 0, d.headR);
+  DOG.stars.visible = d.stars; if (d.stars) { DOG.root.remove(DOG.stars); DOG.head.remove(DOG.stars); scene.add(DOG.stars); DOG.head.updateMatrixWorld(true); DOG.stars.position.copy(DOG.head.localToWorld(new THREE.Vector3(0, 0, 0))).add(new THREE.Vector3(0, 0.2, 0)); DOG.stars.rotation.set(0, t * 3.0, 0); }
+  DOG.tail.rotation.x = 0.4 * Math.sin(t * (t > T_LAND && t < T.dogLie ? 14 : 3));
+  DOG.root.updateMatrixWorld(true);
+  // butterfly
+  const nose = CAT.head.localToWorld(new THREE.Vector3(0, 0.005, 0.1));
+  const b = butterflyAt(t, nose); BF.g.position.copy(b.p); BF.g.rotation.set(0, b.yaw, 0);
+  BF.wings.forEach((w) => { w.piv.rotation.z = w.s * b.flap; });
+  // inner world
+  if (t >= T.inner - 0.05 && t < T.out + 0.05) poseInner(IN, clamp((t - T.inner) / (T.out - T.inner), 0, 1), t);
+  // camera
+  const c = camAt(t);
+  camera.position.copy(c.pos); camera.up.copy(c.up || new THREE.Vector3(0, 1, 0)); camera.lookAt(c.tgt);
+  camera.fov = c.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+  // sun follows the action so shadows stay crisp
+  const focus = c.inner ? CAT.root.position : c.tgt;
+  sun.target.position.copy(focus); sun.position.copy(focus).add(new THREE.Vector3(3.5, 7, 4.5));
+  POST = { bs: 0, bp: new THREE.Vector2(-9, -9), bd: new THREE.Vector2(1, 0), focus: 3, ap: 0, flash: 0, exp: 1.0, haze: 0,
+    fade: sstep(0, 0.4, t) * (1 - sstep(T.fade, DUR, t)) };
 }
-const HIDDEN = () => [fx.fire, fx.smoke, fx.embers, fx.dust, fx.motes, fx.wake, fx.air, fx.felt, plume, trail, core];
-function subframes(t) { const s = shotOf(t); if (s === 0) return 1; if (s === 2) return 2; const te = t - T.ign; return (s === 3 && (te < 4.0 || (t > T.cam - 1.4 && t < T.cam + 1.0))) ? 2 : 1; }
+const HIDDEN = () => [];
+function subframes(t) { return ((t > T.sneeze - 0.1 && t < T.off + 0.3) || (t > 31.0 && t < 32.6) || (t > T.dogRoll - 0.1 && t < T.dogRoll + 0.9)) ? 2 : 1; }
+const SHOTS = [0, T.inner, T.out, DUR];
+const shotOf = (t) => (t < T.inner ? 0 : t < T.out ? 1 : 2);
 
 // ---------- post: motion-blur accumulation, depth of field, halation, IMAX grade ----------
 const rtScene = new THREE.WebGLRenderTarget(W, HH, { type: THREE.HalfFloatType, depthBuffer: true, samples: 4 });
@@ -318,7 +348,7 @@ function render(t) {
   fu.tD0.value = dA[0].texture; fu.tD1.value = dA[1].texture; fu.tD2.value = dA[2].texture; fu.tDepth.value = rtDepth.texture;
   fu.uBS.value = POST.bs; fu.uBP.value.copy(POST.bp); fu.uBD.value.copy(POST.bd);
   fu.uFocus.value = POST.focus; fu.uAp.value = POST.ap;
-  const frame = Math.round(t * 24); fu.uFrame.value = frame % 997;
+  const frame = Math.round(t * 24); fu.uFrame.value = 0;
   fu.uWeave.value.set(0, 0);
   fu.uExp.value = POST.exp; fu.uFlash.value = POST.flash; fu.uHaze.value = POST.haze; fu.uFade.value = POST.fade;
   pass(finalMat, null);
