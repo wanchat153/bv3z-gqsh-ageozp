@@ -1,0 +1,16 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<script type="module">
+import * as THREE from '../src/three.module.js';
+import { makeBoard, drawPerson } from '../src/stick.js';
+import { makeWalker } from '../src/gait.js';
+const W = innerWidth, H = innerHeight; const r = new THREE.WebGLRenderer({ preserveDrawingBuffer: true }); r.setSize(W, H); document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color(0xd8e4ee); sc.add(new THREE.HemisphereLight(0xffffff, 0x886644, 2));
+const g = new THREE.GridHelper(20, 40, 0x886644, 0xaa9070); sc.add(g); const fl = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({ color: 0xe6d2a8 })); fl.rotation.x = -Math.PI / 2; fl.position.y = -0.002; sc.add(fl);
+const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x8a5a3a })); box.position.set(0, 0.5, 0); sc.add(box);
+const cam = new THREE.PerspectiveCamera(40, W / H, 0.05, 200); cam.position.set(0, 3.2, 9); cam.lookAt(0, 0.8, 0);
+const w = makeWalker([[0, -2, 2], [0.4, -2, 2], [2.4, 2, 2, {}], [2.5, 2, 2], [2.6, 2, 2, { face: Math.PI }], [3.0, 2, 2], [4.6, 2, -2, { via: true }], [6.2, -2, -2], [6.6, -2, -2, { face: 0 }], [7.0, -2, -2], [8.6, -2, 2, { run: true }], [10, -2, 2]]);
+const b = makeBoard(2.3, 512, drawPerson); sc.add(b.mesh, b.shadow);
+const dots = []; for (let i = 0; i < 2; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry(0.04), new THREE.MeshBasicMaterial({ color: i ? 0xff2222 : 0x2222ff })); d.renderOrder = 9; d.material.depthTest = false; sc.add(d); dots.push(d); }
+window.grab = (t) => { const s = w.at(t); const turn = w.view(t, cam); b.update(cam, s.p, { t, body: '#3f6fb5', hat: 'hardhat', hatCol: '#f2b81a', turn, feetW: s.feet, bob: s.bob, face: { eyes: 'dot', mouth: 'smile' } }); s.feet.forEach((f, i) => dots[i].position.copy(f)); r.render(sc, cam); return r.domElement.toDataURL('image/jpeg', 0.9).split(',')[1]; };
+window.READY = true;
+</script></body></html>
