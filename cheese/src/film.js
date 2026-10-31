@@ -171,11 +171,11 @@ const STAGE = {
   sneak(t, l, d) {
     vaultNight(t); const ax = VT.aisleX(2); const z = mix(2.6, -1.4, l / d);
     VT.cart.position.set(ax + 0.6, 0, z - 0.8); VT.cart.scale.set(1, 1, 1); VT.cartLoad.forEach((w) => (w.visible = false));
-    const fa = V(ax - 0.3, 0, z), fb2 = V(ax + 1.3, 0, z + 0.4);
+    const fa = V(ax - 0.05, 0, z), fb2 = V(ax + 1.05, 0, z + 0.4);
     put(B.vault[0], fa, { ...LOOK.thiefA, turn: facingFrom(fa, V(0, 0, -1)), walk: t * 5, face: { eyes: 'dot', mouth: 'smirk', look: [0.5, 0] }, armR: [60, -60, -20], prop: { hand: 'R', kind: 'torch' }, lean: -0.08 }, new THREE.Color(0.6, 0.7, 1.0));
     put(B.vault[1], fb2, { ...LOOK.thiefB, turn: facingFrom(fb2, V(0, 0, -1)), walk: t * 5 + 1, face: { eyes: 'dot', mouth: 'line', look: [-0.4, 0] }, armL: armTo(fb2, -1, V(ax + 1.0, 0.95, z - 0.4)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax + Math.sin(l * 1.7) * 2, 1.5, z - 8)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 1.5 + Math.sin(l * 2.1 + 1) * 2, 3, z - 10));
-    camSet(V(ax + 1.7, 3.4, z + 3.4), V(ax + 0.5, 1.1, z - 0.4), 46);
+    camSet(V(ax + 0.8, 3.3, z + 3.9), V(ax + 0.45, 1.1, z - 0.4), 48);
     return { scene: VT.scene, exp: 1.25, sat: 1.15, bloom: 0.5, bloomT: 0.85, dof: 0.6, tint: [0.75, 0.85, 1.15], hero: 0 };
   },
   // 10. loading: the cart sags, a wheel escapes and rolls into the lens
@@ -189,7 +189,7 @@ const STAGE = {
     put(B.vault[0], fa, { ...LOOK.thiefA, turn: slip > 0 ? facingFrom(fa, V(0, 0, 1)) : 0, walk: slip > 0 ? t * 12 : null, run: slip > 0 ? 1 : 0, face: { eyes: slip > 0 ? 'wide' : 'dot', mouth: slip > 0 ? 'open' : 'smirk', open: 0.8, sweat: slip > 0 ? 1 : 0 }, armL: [-110, -40, 20], armR: [110, -40, -20] }, new THREE.Color(0.6, 0.7, 1.0));
     put(B.vault[1], fb2, { ...LOOK.thiefB, face: { eyes: 'wide', mouth: 'o', look: [0.4, 0.3] }, armL: armTo(fb2, -1, V(ax + 0.7, 1.2, z - 0.8)), armR: armTo(fb2, 1, V(ax + 0.9, 1.2, z - 0.8)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax, 0.3, rz)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 0.6, 0.6, z - 0.8));
-    const p = l < 2.0 ? V(ax + 1.2, 1.7, z + 3.8) : V(ax + 0.35, 0.35, z + 7.4); camSet(p, l < 2.0 ? V(ax + 0.6, 1.1, z - 0.3) : V(ax + 0.3, 0.4, rz - 1.0), l < 2.0 ? 44 : 50);
+    const p = l < 2.0 ? V(ax + 0.6, 1.7, z + 4.4) : V(ax + 0.35, 0.35, z + 7.4); camSet(p, l < 2.0 ? V(ax + 0.55, 1.1, z - 0.3) : V(ax + 0.3, 0.4, rz - 1.0), l < 2.0 ? 44 : 50);
     if (l >= 2.0) { VT.hemi.intensity = 0.7; VT.torches[0].intensity = 18; }
     return { scene: VT.scene, exp: l >= 2.0 ? 1.4 : 1.25, sat: 1.15, bloom: 0.5, bloomT: 0.85, dof: 0.6, tint: [0.75, 0.85, 1.15], hero: l < 2.0 ? 1 : 0, heroObj: l >= 2.0 ? runaway : null };
   },
