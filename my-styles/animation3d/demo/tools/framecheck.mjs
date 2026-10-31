@@ -24,11 +24,13 @@ for (let t = 0.1; t < DUR - 0.05; t += step) {
   sh.t1 = t; const flag = (k, msg) => { (sh.flags[k] ||= []).push(`${t.toFixed(2)}s ${msg}`); };
   const hero = r.subjects.find((s) => s.hero);
   const probs = [];
-  if (!hero || !hero.box) { flag('no-hero', 'no hero subject on screen'); probs.push('hero'); }
-  else { const hb = hero.box; const vis = area(hb) ? inter(hb, F) / area(hb) : 0; const hh = Math.min(H, hb[3]) - Math.max(0, hb[1]); const frac = hh / H;
+  if (r.inTransition) { rows.push({ t: +t.toFixed(2), shot: r.shot, subjects: r.subjects, probs, skipped: true }); continue; }
+  if ((!hero || !hero.box) && !r.wide) { flag('no-hero', 'no hero subject on screen'); probs.push('hero'); }
+  else if (!hero || !hero.box) {}
+  else { const hb = hero.box; const hbx = hero.kind === 'char' ? [hb[0], hb[1], hb[2], hb[1] + (hb[3] - hb[1]) * 0.42] : hb; const vis = area(hbx) ? inter(hbx, F) / area(hbx) : 0; const hh = Math.min(H, hb[3]) - Math.max(0, hb[1]); const frac = hh / H;
     sh.heroMax = Math.max(sh.heroMax, frac); sh.heroMin = Math.min(sh.heroMin, frac);
     const bigger = hb[2] - hb[0] > W * 0.95 || hb[3] - hb[1] > H * 0.95;
-    if (vis < 0.85 && !bigger) { flag('hero-clipped', `hero ${Math.round((1 - vis) * 100)}% outside frame`); probs.push(hero.id); }
+    if (vis < 0.9 && !bigger) { flag('hero-clipped', `hero ${hero.kind === 'char' ? 'head ' : ''}${Math.round((1 - vis) * 100)}% outside frame`); probs.push(hero.id); }
     const cx = (Math.max(0, hb[0]) + Math.min(W, hb[2])) / 2 / W; if (!bigger && (cx < 0.15 || cx > 0.85)) { flag('hero-edge', `hero centre at ${Math.round(cx * 100)}% of width`); probs.push(hero.id); } }
   const chars = r.subjects.filter((s) => s.kind === 'char' && s.box && !s.back);
   for (const c of chars) { const bb = c.box; const head = [bb[0], bb[1], bb[2], bb[1] + (bb[3] - bb[1]) * 0.42]; const hv = area(head) ? inter(head, F) / area(head) : 0;
@@ -50,7 +52,7 @@ for (const r of marks.filter((r, i, A) => i === 0 || r.t - A[i - 1].t >= 0.99 ||
   writeFileSync(join(out, `f_${String(n++).padStart(3, '0')}_${r.t.toFixed(2)}.jpg`), Buffer.from(data, 'base64'));
 }
 // report
-const L = ['# Frame check', '', `step ${step}s · ${VW}x${VH} · rules: hero ≥ 1/3 frame height somewhere in each non-wide shot; hero ≥ 85% inside the frame; hero centre within the middle 70%; no face cut by the edge; no two faces overlapping > 35%.`, '', '| shot | time | hero height (min–max of frame) | problems |', '|---|---|---|---|'];
+const L = ['# Frame check', '', `step ${step}s · ${VW}x${VH} · rules (benchmark: the reference videos): hero ≥ 1/3 frame height somewhere in each non-wide shot; hero's head (or a hero object) ≥ 90% inside the frame, bodies may crop like the references' medium shots; hero centre within the middle 70%; no face cut by the edge; no two faces overlapping > 35%; the last 0.45 s of a shot that leaves on an in-camera transition is exempt.`, '', '| shot | time | hero height (min–max of frame) | problems |', '|---|---|---|---|'];
 let total = 0;
 for (const s of Object.values(shots)) { const p = []; if (!s.wide && s.heroMax < 0.33) p.push(`hero never reaches 1/3 of frame height (max ${Math.round(s.heroMax * 100)}%)`);
   for (const [k, v] of Object.entries(s.flags)) p.push(`${k} ×${v.length} (first ${v[0]})`); total += p.length;

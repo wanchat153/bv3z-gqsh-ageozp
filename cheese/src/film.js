@@ -149,7 +149,7 @@ const STAGE = {
   cows2(t, l, d) {
     DA.update(t); WH.dairy.visible = false; DA.bills.forEach((b) => (b.visible = false)); hay(true);
     for (let i = 0; i < 2; i++) put(B.cow[i], V(8.8 + i * 1.6, 0, 3.4 + i * 0.4), { t, flip: i === 1, eat: 0.6 + 0.3 * Math.sin(t * 5 + i), happy: true, chew: true }, null, 0);
-    put(B.dairy[0], V(10.9, 0, 4.4), { ...LOOK.maker, face: { eyes: 'happy', mouth: 'grin' }, armL: [-110, -30, 20] });
+    put(B.dairy[0], V(10.0, 0, 5.2), { ...LOOK.maker, face: { eyes: 'happy', mouth: 'grin', look: [-0.4, 0] }, armL: [-110, -30, 20] });
     camSet(V(mix(9.0, 9.6, l / d), 1.4, 8.8), V(9.8, 1.0, 3.3), 48);
     return { scene: DA.scene, exp: 1.1, sat: 1.3, bloom: 0.35, dof: 0.8, tint: [1.05, 1.0, 0.92], hero: 0 };
   },
@@ -170,7 +170,7 @@ const STAGE = {
     put(B.vault[0], fa, { ...LOOK.thiefA, walk: t * 5, face: { eyes: 'dot', mouth: 'smirk', look: [0.5, 0] }, armR: [60, -60, -20], prop: { hand: 'R', kind: 'torch' }, lean: -0.08 }, new THREE.Color(0.6, 0.7, 1.0));
     put(B.vault[1], fb2, { ...LOOK.thiefB, walk: t * 5 + 1, face: { eyes: 'dot', mouth: 'line', look: [-0.4, 0] }, armL: armTo(fb2, -1, V(ax + 1.0, 0.95, z - 0.4)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax + Math.sin(l * 1.7) * 2, 1.5, z - 8)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 1.5 + Math.sin(l * 2.1 + 1) * 2, 3, z - 10));
-    camSet(V(ax + 2.2, 5.6, z + 5.0), V(ax + 0.4, 1.0, z - 0.6), 44);
+    camSet(V(ax + 1.7, 3.4, z + 3.4), V(ax + 0.5, 1.1, z - 0.4), 46);
     return { scene: VT.scene, exp: 1.25, sat: 1.15, bloom: 0.5, bloomT: 0.85, dof: 0.6, tint: [0.75, 0.85, 1.15], hero: 0 };
   },
   // 10. loading: the cart sags, a wheel escapes and rolls into the lens
@@ -184,7 +184,7 @@ const STAGE = {
     put(B.vault[0], fa, { ...LOOK.thiefA, walk: slip > 0 ? t * 12 : null, run: slip > 0 ? 1 : 0, face: { eyes: slip > 0 ? 'wide' : 'dot', mouth: slip > 0 ? 'open' : 'smirk', open: 0.8, sweat: slip > 0 ? 1 : 0 }, armL: [-110, -40, 20], armR: [110, -40, -20] }, new THREE.Color(0.6, 0.7, 1.0));
     put(B.vault[1], fb2, { ...LOOK.thiefB, face: { eyes: 'wide', mouth: 'o', look: [0.4, 0.3] }, armL: armTo(fb2, -1, V(ax + 0.7, 1.2, z - 0.8)), armR: armTo(fb2, 1, V(ax + 0.9, 1.2, z - 0.8)) }, new THREE.Color(0.6, 0.7, 1.0));
     torch(0, fa.clone().add(V(0.3, 1.0, 0)), V(ax, 0.3, rz)); torch(1, fb2.clone().add(V(0, 1.0, 0)), V(ax + 0.6, 0.6, z - 0.8));
-    const p = l < 2.0 ? V(ax + 1.8, 1.8, z + 3.6) : V(ax + 0.35, 0.35, z + 7.4); camSet(p, l < 2.0 ? V(ax + 0.4, 1.0, z - 0.5) : V(ax + 0.3, 0.4, rz - 1.0), l < 2.0 ? 44 : 50);
+    const p = l < 2.0 ? V(ax + 1.2, 1.7, z + 3.8) : V(ax + 0.35, 0.35, z + 7.4); camSet(p, l < 2.0 ? V(ax + 0.6, 1.1, z - 0.3) : V(ax + 0.3, 0.4, rz - 1.0), l < 2.0 ? 44 : 50);
     if (l >= 2.0) { VT.hemi.intensity = 0.7; VT.torches[0].intensity = 18; }
     return { scene: VT.scene, exp: l >= 2.0 ? 1.4 : 1.25, sat: 1.15, bloom: 0.5, bloomT: 0.85, dof: 0.6, tint: [0.75, 0.85, 1.15], hero: l < 2.0 ? 1 : 0, heroObj: l >= 2.0 ? runaway : null };
   },
@@ -194,31 +194,31 @@ const STAGE = {
     DK.police.position.set(4.6, 0, 3.4); DK.police.rotation.y = -0.5; const fl = Math.sin(t * 18) > 0; DK.red.visible = fl; DK.blue.visible = !fl; DK.pr.intensity = fl ? 20 : 0; DK.pbl.intensity = fl ? 0 : 20;
     DK.sparks.forEach((s, i) => { const k = (t * 3 + i * 0.13) % 1; s.position.set(vx - 1.2 - k * 1.5, 0.05 + Math.sin(i) * 0.1 + k * 0.4 - k * k * 0.6, 2.0 + (i % 5 - 2) * 0.15); s.visible = l < 1.8; });
     const tint = fl ? new THREE.Color(1.0, 0.6, 0.6) : new THREE.Color(0.6, 0.7, 1.15);
-    const f1 = V(0.6, 0, 4.4), f2 = V(1.5, 0, 4.6), wp = V(1.05, 0.95, 4.75);
+    const f1 = V(1.0, 0, 4.4), f2 = V(1.75, 0, 4.6), wp = V(1.38, 0.95, 4.75);
     if (l > 1.4) {
       put(B.night[0], f1, { ...LOOK.thiefA, face: { eyes: 'lid', mouth: 'frown', sweat: 1, look: [0.2, 0.1] }, armR: armTo(f1, 1, wp.clone().add(V(-0.2, 0, 0))) }, tint, 0);
       put(B.night[1], f2, { ...LOOK.thiefB, face: { eyes: 'lid', mouth: 'line', look: [-0.2, 0.1] }, armL: armTo(f2, -1, wp.clone().add(V(0.2, 0, 0))) }, tint, 0);
-      put(B.night[2], V(3.0, 0, 4.0), { ...LOOK.cop, face: { eyes: 'lid', mouth: 'smirk', look: [-0.6, 0] }, armL: [70, 20, 40], armR: [-70, 20, -40] }, tint, 0);
+      put(B.night[2], V(2.55, 0, 3.7), { ...LOOK.cop, face: { eyes: 'lid', mouth: 'smirk', look: [-0.6, 0] }, armL: [70, 20, 40], armR: [-70, 20, -40] }, tint, 0);
     }
     WH.out.visible = false; heldWheelNight.visible = l > 1.4; heldWheelNight.position.copy(wp); heldWheelNight.rotation.set(0, 0, Math.PI / 2);
-    const p = l < 1.4 ? V(mix(-6, -4, l / 1.4), 1.2, 9.5) : V(mix(1.4, 1.2, (l - 1.4) / 2.2), 1.5, mix(8.6, 7.6, (l - 1.4) / 2.2)); camSet(p, l < 1.4 ? V(vx, 1.2, 2.0) : V(1.4, 1.25, 4.4), l < 1.4 ? 44 : 40);
+    const p = l < 1.4 ? V(mix(-6, -4, l / 1.4), 1.2, 9.5) : V(mix(1.8, 1.7, (l - 1.4) / 2.2), 1.55, mix(10.0, 9.2, (l - 1.4) / 2.2)); camSet(p, l < 1.4 ? V(vx, 1.2, 2.0) : V(1.75, 1.25, 4.2), l < 1.4 ? 44 : 44);
     return { scene: NI, exp: 1.3, sat: 1.25, bloom: 0.6, bloomT: 0.8, dof: 0.8, tint: [0.9, 0.9, 1.1], flash: 0.85 * sstep(d - 0.3, d, l), hero: l < 1.4 ? null : 0, heroObj: l < 1.4 ? DK.van : null };
   },
   // 12. two years later: the golden wheel, a wedge shared (the held breath)
   later(t, l, d) {
     vaultDay(t, 1); const ax = VT.aisleX(2); const tbl = V(ax, 0, -3.4); WH.vault.visible = true; WH.vault.position.set(ax, 1.0 + WHEEL.h / 2, -3.4); tableG.position.copy(tbl); tableG.visible = true;
-    const fb = V(ax - 0.62, 0, -3.95), fm = V(ax + 0.62, 0, -3.75); const cut = l > 1.2, give = clamp((l - 1.8) / 0.5, 0, 1), bite = l > 2.5;
+    const fb = V(ax - 0.55, 0, -3.95), fm = V(ax + 0.55, 0, -3.75); const cut = l > 1.2, give = clamp((l - 1.8) / 0.5, 0, 1), bite = l > 2.5;
     const wedgeAt = V(mix(ax - 0.3, ax + 0.35, ease(give)), mix(1.25, 1.45, ease(give)), -3.3);
     put(B.vault[0], fb, { ...LOOK.banker, face: { eyes: 'happy', mouth: 'smile', look: [0.5, 0] }, armR: give < 1 ? armTo(fb, 1, cut && give === 0 ? V(ax - 0.15, 1.3, -3.4) : wedgeAt) : [40, 150, -12], prop: give < 0.5 ? (cut ? { hand: 'R', kind: 'wedge' } : { hand: 'R', kind: 'knife', rot: -0.5 + 0.3 * Math.sin(l * 12) }) : null });
     put(B.vault[1], fm, { ...LOOK.maker, face: { eyes: bite ? 'shut' : 'wide', mouth: bite ? 'smile' : 'o', blush: bite ? 1 : 0, look: [-0.5, 0] }, armL: give > 0.4 ? armTo(fm, -1, bite ? fm.clone().add(V(-0.05, 1.32, 0.1)) : wedgeAt) : [-40, 150, 12], prop: give >= 0.5 ? { hand: 'L', kind: 'wedge' } : null });
-    camSet(V(ax + mix(0.1, 0.0, l / d), mix(1.6, 1.5, l / d), mix(0.4, -0.3, ease(l / d))), V(ax, 1.3, -3.7), 42);
+    camSet(V(ax + mix(0.1, 0.0, l / d), mix(1.6, 1.5, l / d), mix(1.0, 0.3, ease(l / d))), V(ax, 1.3, -3.7), 42);
     return { scene: VT.scene, exp: 1.15, sat: 1.3, bloom: 0.5, dof: 1.2, tint: [1.07, 1.0, 0.88], hero: 1 };
   },
   // 13. rise: up the aisle to the skylights, into the light
   rise(t, l, d) {
     vaultDay(t, 1); const ax = VT.aisleX(2); tableG.visible = true; WH.vault.visible = true;
-    put(B.vault[0], V(ax - 0.62, 0, -3.95), { ...LOOK.banker, face: { eyes: 'happy', mouth: 'smile' } }); put(B.vault[1], V(ax + 0.62, 0, -3.75), { ...LOOK.maker, face: { eyes: 'shut', mouth: 'smile', blush: 1 }, prop: { hand: 'L', kind: 'wedge' }, armL: [-60, -60, 20] });
-    const u = ease(l / d); camSet(V(ax, mix(1.5, 9.2, u), mix(-0.3, -3.4, u)), V(ax, mix(1.3, 12, u), mix(-3.6, -3.7, u)), mix(42, 60, u));
+    put(B.vault[0], V(ax - 0.55, 0, -3.95), { ...LOOK.banker, face: { eyes: 'happy', mouth: 'smile' } }); put(B.vault[1], V(ax + 0.55, 0, -3.75), { ...LOOK.maker, face: { eyes: 'shut', mouth: 'smile', blush: 1 }, prop: { hand: 'L', kind: 'wedge' }, armL: [-60, -60, 20] });
+    const u = ease(l / d); camSet(V(ax, mix(1.5, 9.2, u), mix(0.3, -3.4, u)), V(ax, mix(1.3, 12, u), mix(-3.6, -3.7, u)), mix(42, 60, u));
     return { scene: VT.scene, exp: 1.15 + 0.6 * u, sat: 1.3, bloom: 0.6 + 0.6 * u, dof: 0.5, tint: [1.07, 1.0, 0.88], wide: true, hero: 1 };
   },
 };
@@ -239,11 +239,11 @@ function render(t) {
   STAGE[s.stage](t, l, d); hideAll();            // pass 1 settles the camera for this frame
   const o = STAGE[s.stage](t, l, d) || {};       // pass 2 places boards and solves arms against that camera
   cam.updateMatrixWorld(true);
-  const subjects = used.map((u, i) => ({ id: `${u.kind}${i}`, kind: u.kind === 'cow' ? 'char' : 'char', back: u.back, box: charBox(u), at: u.feet.clone().add(V(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
+  const subjects = used.map((u, i) => ({ id: `${u.kind}${i}`, kind: u.kind, back: u.back, box: charBox(u), at: u.feet.clone().add(V(0, 1.2 * u.board.sizeM / 2.3, 0)) }));
   if (o.heroObj) { const ob = objBox(o.heroObj); if (ob) subjects.unshift({ id: 'object', kind: 'object', box: ob.box, at: ob.centre }); }
   const hi = o.heroObj ? 0 : (o.hero ?? 0); if (subjects[hi]) subjects[hi].hero = true;
   if (o.dof > 0 && subjects[hi] && !o.pinFocus) o.focus = cam.position.distanceTo(subjects[hi].at);
-  LAST = { shot: s.stage, wide: !!o.wide, subjects: subjects.map(({ at, ...r }) => r) };
+  LAST = { shot: s.stage, wide: !!o.wide, inTransition: s.out !== 'cut' && s.out !== 'end' && s.out !== 'continue' && l > d - 0.45, subjects: subjects.map(({ at, ...r }) => r) };
   const fade = sstep(0, 0.35, t) * (1 - sstep(DUR - 0.9, DUR - 0.05, t));
   POST.render(o.scene || OUT, cam, { ...o, fade });
 }
