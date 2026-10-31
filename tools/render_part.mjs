@@ -10,7 +10,7 @@ const [ep, s, e, out] = [resolve(process.argv[2]), +process.argv[3], +process.ar
 const FPS = +(process.env.FPS || 60), NW = +(process.env.WORKERS || 2), CHROME = process.env.CHROME || '/usr/bin/google-chrome';
 const VW = +(process.env.WIDTH || 1080), VH = +(process.env.HEIGHT || 1920);
 const FMT = process.env.FMT || 'png', PRESET = process.env.PRESET || 'veryfast', CRF = process.env.CRF || '10';
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.jpg': 'image/jpeg', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2' };
 const srv = http.createServer((rq, rs) => { try { const p = join(ep, decodeURIComponent(rq.url.split('?')[0])); if (!p.startsWith(ep) || !statSync(p).isFile()) throw 0; rs.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }); createReadStream(p).pipe(rs); } catch { rs.writeHead(404); rs.end(); } });
 await new Promise((r) => srv.listen(0, '127.0.0.1', r)); const URL0 = `http://127.0.0.1:${srv.address().port}/studio.html`;
 mkdirSync(out + '/f', { recursive: true });
