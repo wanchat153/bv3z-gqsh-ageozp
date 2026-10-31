@@ -135,7 +135,7 @@ const STAGE = {
   // 6. the cathedral of cheese: crane up and back
   cathedral(t, l, d) {
     vaultDay(t, 0.4); const ax = VT.aisleX(2); const feet = V(ax, 0, -4.0);
-    const tm = turnAt(l, 2.6, 3, 0); put(B.vault[0], feet, { ...LOOK.maker, turn: tm, face: { eyes: 'wide', mouth: 'o', open: 0.9, look: [0, -0.4] } }); put(B.vault[1], V(ax + 0.9, 0, -3.6), { ...LOOK.banker, turn: turnAt(l, 3.0, 3, -1), face: { eyes: 'glasses', mouth: 'smirk' } });
+    const tm = turnAt(l, 2.6, 3, 0); put(B.vault[0], feet, { ...LOOK.maker, turn: tm, face: { eyes: 'wide', mouth: 'o', open: 0.9, look: [0, -0.4] } }); put(B.vault[1], V(ax + 0.6, 0, -5.2), { ...LOOK.banker, turn: turnAt(l, 3.0, 3, -1), face: { eyes: 'glasses', mouth: 'smirk' } });
     const u = ease(l / d); camSet(V(ax + mix(0.2, 0.6, u), mix(1.1, 9.0, u), mix(-1.6, 6.5, u)), V(ax, mix(1.9, 2.5, u), mix(-8, -24, u)), mix(46, 52, u));
     return { scene: VT.scene, exp: 1.15, sat: 1.3, bloom: 0.55, bloomT: 0.85, dof: 0.6, flash: 0.8 * (1 - sstep(0, 0.35, l)), tint: [1.06, 1.0, 0.88], wide: true, heroObj: VT.inst };
   },
