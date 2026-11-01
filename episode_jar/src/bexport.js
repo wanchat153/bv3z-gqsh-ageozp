@@ -37,7 +37,8 @@ export async function begin(id, ts) {
       opacity: m.opacity, transparent: m.transparent, alphaTest: m.alphaTest, side: m.side, vc: m.vertexColors, blending: m.blending, depthWrite: m.depthWrite,
       map: await texOf(m.map), normalMap: await texOf(m.normalMap), ns: m.normalScale ? m.normalScale.x : 1, emissiveMap: await texOf(m.emissiveMap), alphaMap: await texOf(m.alphaMap) }; } return m.uuid; };
   for (const o of NODES) { o.updateMatrix(); const n = { name: o.name, parent: o.parent && o.parent !== S ? o.parent.name : null, m: arr(o.matrix), v: o.visible, type: o.isInstancedMesh ? 'inst' : o.isMesh ? 'mesh' : o.isSprite ? 'sprite' : o.isLight ? 'light' : o.isPoints ? 'points' : 'group', ro: o.renderOrder };
-    if (o.isMesh) { const g = o.geometry; if (!geos.has(g.uuid)) { geos.add(g.uuid); await up(`geo/${g.uuid}.bin`, new Blob([packGeo(g)])); } n.geo = g.uuid; n.groups = g.groups.map((x) => [x.start, x.count, x.materialIndex]);
+    if (o.isMesh && !(o.geometry && o.geometry.attributes.position)) n.type = 'group';   // empty geometry (built lazily or never)
+    else if (o.isMesh) { const g = o.geometry; if (!geos.has(g.uuid)) { geos.add(g.uuid); await up(`geo/${g.uuid}.bin`, new Blob([packGeo(g)])); } n.geo = g.uuid; n.groups = g.groups.map((x) => [x.start, x.count, x.materialIndex]);
       n.mat = Array.isArray(o.material) ? await Promise.all(o.material.map(matOf)) : [await matOf(o.material)]; n.shadow = o.castShadow;
       if (o.isInstancedMesh) { const k = o.count; const b = new Float32Array(k * 16 + (o.instanceColor ? k * 3 : 0)); b.set(o.instanceMatrix.array.subarray(0, k * 16)); if (o.instanceColor) b.set(o.instanceColor.array.subarray(0, k * 3), k * 16);
         await up(`inst/${o.name}.bin`, new Blob([b])); n.count = k; n.icol = !!o.instanceColor; } }
