@@ -1,7 +1,7 @@
 // three.js → Blender: export one shot as <out>/world.json + geo/ tex/ inst/ bins + frames/fNNNN.json + flats/<node>_NNNN.png
 // usage: node tools/blender/export_shot.mjs <filmDir> <shotId> <outDir> [--every N] [--from F --to F]
 // Frame range = the shot's own frames plus the frames of the transitions in and out of it (FRAMEMAP), at the film's FPS.
-import { mkdirSync, writeFileSync, createReadStream, statSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, createReadStream, statSync } from 'node:fs';
 import { resolve, join, extname, dirname } from 'node:path';
 import http from 'node:http';
 import { createRequire } from 'node:module';
@@ -24,7 +24,8 @@ const F0 = from ?? R.f0, F1 = to ?? R.f1; const fr = []; for (let f = F0; f <= F
 mkdirSync(out + '/frames', { recursive: true }); mkdirSync(out + '/flats', { recursive: true }); mkdirSync(out + '/tex', { recursive: true });
 await p.evaluate(async () => { window.__bx = await import('./src/bexport.js'); });
 const meta = await p.evaluate(async ({ id, ts }) => window.__bx.begin(id, ts), { id, ts: fr.map((f) => (f + 0.5) / R.fps) });
-writeFileSync(out + '/shot.json', JSON.stringify({ id, fps: R.fps, frames: fr, ...meta }, null, 1));
+const LK = existsSync(join(dir, 'blender_looks.json')) ? JSON.parse(readFileSync(join(dir, 'blender_looks.json'), 'utf8')) : {};
+writeFileSync(out + '/shot.json', JSON.stringify({ id, look: LK[id] || 'three', fps: R.fps, frames: fr, ...meta }, null, 1));
 for (const f of fr) { const d = await p.evaluate(({ t, f }) => window.__bx.frame(t, f), { t: (f + 0.5) / R.fps, f });
   writeFileSync(`${out}/frames/f${String(f).padStart(4, '0')}.json`, JSON.stringify(d)); }
 console.log('exported', id, fr.length, 'frames', F0, '…', F1); await b.close(); srv.close();

@@ -10,7 +10,7 @@ on:
       every: { description: 'render every Nth frame (1 = all; >1 for quick looks, holds frames)', default: '1' }
       samples: { description: 'Cycles samples (OIDN denoised)', default: '24' }
       scale: { description: 'resolution percent of 1080x1920', default: '100' }
-      look: { description: 'render_shot look preset', default: 'hall' }
+      look: { description: 'render_shot look preset (auto = blender_looks.json)', default: 'auto' }
       finish: { description: 'true = composite to mp4', default: 'true' }
       range: { description: 'frames to composite, all or A-B', default: 'all' }
 jobs:

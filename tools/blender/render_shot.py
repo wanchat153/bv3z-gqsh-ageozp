@@ -17,7 +17,7 @@ import bpy
 from mathutils import Matrix, Vector
 
 ap = argparse.ArgumentParser(); ap.add_argument('shot'); ap.add_argument('out'); ap.add_argument('--frames', default='')
-ap.add_argument('--samples', type=int, default=32); ap.add_argument('--scale', type=int, default=100); ap.add_argument('--look', default='hall')
+ap.add_argument('--samples', type=int, default=32); ap.add_argument('--scale', type=int, default=100); ap.add_argument('--look', default='auto')
 ap.add_argument('--nocull', action='store_true'); ap.add_argument('--blend', default=''); ap.add_argument('--bounces', type=int, default=2); ap.add_argument('--adaptive', type=float, default=0.03); ap.add_argument('--png', action='store_true', help='also write a quick graded PNG next to each EXR')
 A = ap.parse_args(sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else sys.argv[1:])
 D = A.shot; SH = json.load(open(os.path.join(D, 'shot.json'))); WJ = json.load(open(os.path.join(D, 'world.json'))); os.makedirs(A.out, exist_ok=True)
@@ -28,8 +28,9 @@ def P(v): return C @ Vector(v)
 
 # per-world multipliers on top of the physically matched conversion (1 = the three.js film's own light levels)
 LOOKS = {
-  'hall': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.7),
-  'city': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.2),
+  'three': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.7, tint=(1, 1, 1), dof=1.0),   # the three.js film's own levels
+  'hall': dict(sun=0.5, point=2.2, hemi=0.6, env=0.6, ao=1.2, tint=(0.88, 0.82, 1.0), dof=5.0),   # reference: muted lavender stone, firelit subjects, soft background
+  'city': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.2, tint=(1, 1, 1), dof=1.0),
 }
 L = LOOKS.get(A.look, LOOKS['hall'])
 
@@ -55,7 +56,10 @@ def env_cubes():
 AX, ENV_D, ENV_S = env_cubes()
 hs = SH['hemi'][0] if SH['hemi'] else {'sky': [0, 0, 0], 'ground': [0, 0, 0], 'i': 0}
 EK = SH.get('envIntensity', 0) * L['env']
-AMB_D = [ENV_D[i] * EK + np.array([g + (s_ - g) * (a[2] * 0.5 + 0.5) for g, s_ in zip(hs['ground'], hs['sky'])]) * hs['i'] / math.pi * L['hemi'] for i, a in enumerate(AX)]
+if A.look == 'auto': A.look = SH.get('look', 'three')
+LOOKS.update(json.loads(os.environ.get('LOOKS_JSON', '{}'))); L = {**LOOKS['three'], **LOOKS.get(A.look, {})}   # LOOKS_JSON env: look-dev overrides
+EK = SH.get('envIntensity', 0) * L['env']
+AMB_D = [np.array(L['tint']) * (ENV_D[i] * EK + np.array([g + (s_ - g) * (a[2] * 0.5 + 0.5) for g, s_ in zip(hs['ground'], hs['sky'])]) * hs['i'] / math.pi * L['hemi']) for i, a in enumerate(AX)]
 AMB_S = list(ENV_S)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -394,7 +398,7 @@ for f in frames:
     fo = d.get('focus') or {}; dist = max(0.05, fo.get('dist', 5)); aper = fo.get('aper') or 26 * (fo.get('amt') or 0) * max(0.3, dist) / 5   # film px at 1920 high
     cam.dof.use_dof = aper > 0.01
     if cam.dof.use_dof:
-        Ap = 2 * aper * 2 * math.tan(math.radians(cm_['fov']) / 2) / 1920   # lens diameter (scene units) that gives the film's CoC
+        Ap = L['dof'] * 2 * aper * 2 * math.tan(math.radians(cm_['fov']) / 2) / 1920   # lens diameter (scene units) that gives the film's CoC
         cam.dof.focus_distance = dist; cam.dof.aperture_fstop = (cam.lens * 0.001) / Ap; cam.dof.aperture_blades = 0
     hz = d.get('haze'); set_haze(hz)
     bg = list(BG)

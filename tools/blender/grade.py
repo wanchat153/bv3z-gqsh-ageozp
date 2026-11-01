@@ -4,7 +4,6 @@ usage as a script: python3 tools/blender/grade.py a.exr [b.exr …]   → a.png 
 """
 import sys, os
 import numpy as np
-from PIL import Image, ImageFilter
 
 def read_exr(p):
     import OpenEXR
@@ -39,8 +38,8 @@ def finish(lin, bloom_amt=0.3, bloom_th=1.0, vig=0.3, sat=1.16, contrast=1.1, ti
     t = np.clip((v - 0.45) / 0.5, 0, 1); c = c * (1 - vig * t * t * (3 - 2 * t))[..., None] * fade
     return np.clip(c, 0, 1)
 
-def to_img(c): return Image.fromarray((c * 255 + 0.5).astype(np.uint8))
+def save(c, p): import cv2; cv2.imwrite(p, (np.clip(c, 0, 1)[..., ::-1] * 255 + 0.5).astype(np.uint8))
 
 if __name__ == '__main__':
     for p in sys.argv[1:]:
-        to_img(finish(read_exr(p))).save(os.path.splitext(p)[0] + '.png'); print('graded', p)
+        save(finish(read_exr(p)), os.path.splitext(p)[0] + '.png'); print('graded', p)
