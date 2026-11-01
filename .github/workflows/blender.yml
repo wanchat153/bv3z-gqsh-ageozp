@@ -11,7 +11,8 @@ on:
       samples: { description: 'Cycles samples (OIDN denoised)', default: '24' }
       scale: { description: 'resolution percent of 1080x1920', default: '100' }
       look: { description: 'render_shot look preset', default: 'hall' }
-      finish: { description: 'true = composite the whole film to mp4', default: 'true' }
+      finish: { description: 'true = composite to mp4', default: 'true' }
+      range: { description: 'frames to composite, all or A-B', default: 'all' }
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -76,6 +77,8 @@ jobs:
         with: { path: r, pattern: 'r-*', merge-multiple: true }
       - run: node tools/blender/export_overlays.mjs ${{ inputs.episode_dir }} ovl
         env: { CHROME: /usr/bin/google-chrome }
-      - run: python tools/blender/composite.py ${{ inputs.episode_dir }} r ovl comp --mp4 out.mp4 | tail -2
+      - run: |
+          R="${{ inputs.range }}"; X=""; if [ "$R" != "all" ]; then X="--from ${R%-*} --to ${R#*-}"; fi
+          python tools/blender/composite.py ${{ inputs.episode_dir }} r ovl comp $X --mp4 out.mp4 | tail -2
       - uses: actions/upload-artifact@v4
         with: { name: video, path: out.mp4, retention-days: 14 }
