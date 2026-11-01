@@ -14,6 +14,7 @@ on:
       finish: { description: 'true = composite to mp4', default: 'true' }
       range: { description: 'frames to composite, all or A-B', default: 'all' }
       from_runs: { description: 'finish: also take frames from these earlier run ids (comma list; later wins)', default: '' }
+permissions: { actions: read, contents: read }
 jobs:
   plan:
     runs-on: ubuntu-latest
