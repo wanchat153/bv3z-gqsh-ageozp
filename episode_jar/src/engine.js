@@ -113,7 +113,7 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
     uTint: { value: new THREE.Vector3(1, 1, 1) }, uVig: { value: 0.14 }, uCapOn: { value: 1 }, uContrast: { value: 1.04 } },
   `uniform sampler2D tS,tCap,tOv,tB0,tB1,tB2; uniform float uBloom; uniform vec3 uBloomTint; uniform vec2 uPx; uniform float uSharp,uFade,uSat,uVig,uCapOn,uContrast; uniform vec3 uTint; varying vec2 vUv;
     vec3 tap(vec2 uv){ vec2 h=uPx*0.25; return 0.25*(texture2D(tS,uv+vec2(-h.x,-h.y)).rgb+texture2D(tS,uv+vec2(h.x,-h.y)).rgb+texture2D(tS,uv+vec2(-h.x,h.y)).rgb+texture2D(tS,uv+vec2(h.x,h.y)).rgb); }
-    vec3 grade(vec3 c){ c*=uTint; c=1.22*c/(1.0+0.32*c); c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2)); c=(c-0.5)*uContrast+0.5;
+    vec3 grade(vec3 c){ c*=uTint; c=1.22*c/(1.0+0.32*c); c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2)); c=(c-0.5)*uContrast+0.5; c=c*c*(3.0-2.0*c)*0.35+c*0.65;   /* gentle S-curve: deeper shadows, richer mids (depth) */
       float l=dot(c,vec3(0.3,0.55,0.15)); return mix(vec3(l),c,uSat); }
     void main(){ vec3 c=tap(vUv);
       vec3 n=(tap(vUv+vec2(uPx.x,0.0))+tap(vUv-vec2(uPx.x,0.0))+tap(vUv+vec2(0.0,uPx.y))+tap(vUv-vec2(0.0,uPx.y)))*0.25;

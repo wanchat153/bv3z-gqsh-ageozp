@@ -1,0 +1,81 @@
+name: blender
+# three.js film → Blender Cycles: each job exports a slice of one shot from the film page (tools/blender/export_shot.mjs),
+# path-traces it (render_shot.py), grades it (composite.py --pack); the finish job adds transitions, overlays, captions, audio.
+on:
+  workflow_dispatch:
+    inputs:
+      episode_dir: { description: 'film folder (studio.html, src, FRAMEMAP.json, fonts, audio.flac)', default: 'episode_jar' }
+      shots: { description: 'all, or comma list like S01,S02', default: 'all' }
+      chunk: { description: 'frames per job', default: '10' }
+      every: { description: 'render every Nth frame (1 = all; >1 for quick looks, holds frames)', default: '1' }
+      samples: { description: 'Cycles samples (OIDN denoised)', default: '24' }
+      scale: { description: 'resolution percent of 1080x1920', default: '100' }
+      look: { description: 'render_shot look preset', default: 'hall' }
+      finish: { description: 'true = composite the whole film to mp4', default: 'true' }
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: |
+          python3 - <<'PY' >> $GITHUB_OUTPUT
+          import json
+          FM = json.load(open('${{ inputs.episode_dir }}/FRAMEMAP.json')); S, T = FM['shots'], FM['transitions']
+          K = {'crash','whip','dolly-blur','dissolve','push-cut','match-dissolve','flare','smoke','fast-orbit','pan-dissolve','dissolve-descend'}
+          want = None if '${{ inputs.shots }}' == 'all' else set('${{ inputs.shots }}'.split(','))
+          ch, ev = int('${{ inputs.chunk }}'), int('${{ inputs.every }}'); m = []
+          for k, s in enumerate(S):
+            if want and s['id'] not in want: continue
+            f0, f1 = s['f0'], s['f1'] - 1
+            if k > 0 and T[k - 1]['kind'] in K: f0 = min(f0, T[k - 1]['f0'])
+            if k < len(T) and T[k]['kind'] in K: f1 = max(f1, T[k]['f1'])
+            fr = list(range(f0, f1 + 1, ev))
+            for i in range(0, len(fr), ch): m.append({'shot': s['id'], 'a': fr[i], 'b': fr[min(len(fr), i + ch) - 1], 'i': len(m)})
+          assert len(m) <= 256, len(m)
+          print('matrix=' + json.dumps({'include': m}))
+          PY
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: npm install --no-audit --no-fund
+      - run: pip install -q bpy==5.2.3 OpenEXR opencv-python-headless numpy
+      - name: room environment (cached bake)
+        uses: actions/cache@v4
+        with: { path: tools/blender/cache, key: room-env-v1 }
+      - run: node tools/blender/export_shot.mjs ${{ inputs.episode_dir }} ${{ matrix.shot }} x/${{ matrix.shot }} --from ${{ matrix.a }} --to ${{ matrix.b }} --every ${{ inputs.every }}
+        env: { CHROME: /usr/bin/google-chrome }
+      - run: python tools/blender/render_shot.py x/${{ matrix.shot }} r/${{ matrix.shot }} --samples ${{ inputs.samples }} --scale ${{ inputs.scale }} --look ${{ inputs.look }} 2>&1 | grep -v "^Fra:\|Remaining\|DeprecationWarning\|use_nodes"
+      - run: python tools/blender/composite.py --pack ${{ inputs.episode_dir }} r/${{ matrix.shot }} ${{ matrix.shot }}
+      - uses: actions/upload-artifact@v4
+        with: { name: 'r-${{ matrix.i }}', path: r, retention-days: 3, compression-level: 0 }
+  finish:
+    needs: render
+    if: ${{ inputs.finish == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+      - run: npm install --no-audit --no-fund && sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: pip install -q OpenEXR opencv-python-headless numpy
+      - uses: actions/download-artifact@v4
+        with: { path: r, pattern: 'r-*', merge-multiple: true }
+      - run: node tools/blender/export_overlays.mjs ${{ inputs.episode_dir }} ovl
+        env: { CHROME: /usr/bin/google-chrome }
+      - run: python tools/blender/composite.py ${{ inputs.episode_dir }} r ovl comp --mp4 out.mp4 | tail -2
+      - uses: actions/upload-artifact@v4
+        with: { name: video, path: out.mp4, retention-days: 14 }

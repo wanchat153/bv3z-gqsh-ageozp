@@ -81,13 +81,13 @@ export function buildGate(scene) {
   const cr = crest(1.6); cr.position.set(0, 6.9, 0.02); scene.add(cr);
   for (const s of [-1, 1]) { const x = makeCard(0.6, 0.9, 128, (c, W, H) => { c.clearRect(0, 0, W, H); c.fillStyle = '#3a3036'; c.fillRect(W * 0.42, 0, W * 0.16, H); c.fillRect(W * 0.1, H * 0.3, W * 0.8, H * 0.14); }, { transparent: true, lit: true }); x.position.set(s * 2.6, 6.9, 0.02); scene.add(x); }
   // ---- towers ----
-  for (const s of [-1, 1]) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.3, 13, 40, 1, true), mat(TEX.stone(WALL), 5, 5)); tw.position.set(s * 8.2, 6.5, -0.3); tw.castShadow = tw.receiveShadow = true; scene.add(tw);
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.4, 0.6, 40), PH(0xd8d0c2)); cap.position.set(s * 8.2, 13.1, -0.3); scene.add(cap);
-    for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; const m = P.rbox(0.5, 0.7, 0.4, WALL, 0.03); m.position.set(s * 8.2 + Math.sin(a) * 2.45, 13.7, -0.3 + Math.cos(a) * 2.45); m.rotation.y = a; scene.add(m); }
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(2.7, 5.6, 40, 1, true), mat(TEX.scales('#5a6274'), 8, 3)); cone.material.side = THREE.DoubleSide; cone.position.set(s * 8.2, 17.0, -0.3); cone.castShadow = true; scene.add(cone);
-    const fin = P.ball(0.14, '#e8b838', 0.006); fin.position.set(s * 8.2, 19.9, -0.3); scene.add(fin);
-    const b = bannerCard(1.1, 3.6); b.position.set(s * 8.2 - s * 0.6, 7.6, 2.0); b.rotation.y = s * 0.42; scene.add(b);
-    for (let k = 0; k < 3; k++) { const sl = makeCard(0.18, 0.7, 32, (c, W, H) => { c.fillStyle = '#2a2430'; c.fillRect(0, 0, W, H); }, {}); const a = s * (0.2 + k * 0.35); sl.position.set(s * 8.2 + Math.sin(a) * 2.32, 4 + k * 3, -0.3 + Math.cos(a) * 2.32); sl.rotation.y = a; scene.add(sl); } }
+  for (const s of [-1, 1]) { const tw = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.3, 13, 40, 1, true), mat(TEX.stone(WALL), 5, 5)); tw.position.set(s * 6.9, 6.5, -0.3); tw.castShadow = tw.receiveShadow = true; scene.add(tw);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.4, 0.6, 40), PH(0xd8d0c2)); cap.position.set(s * 6.9, 13.1, -0.3); scene.add(cap);
+    for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; const m = P.rbox(0.5, 0.7, 0.4, WALL, 0.03); m.position.set(s * 6.9 + Math.sin(a) * 2.45, 13.7, -0.3 + Math.cos(a) * 2.45); m.rotation.y = a; scene.add(m); }
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(2.7, 5.6, 40, 1, true), mat(TEX.scales('#5a6274'), 8, 3)); cone.material.side = THREE.DoubleSide; cone.position.set(s * 6.9, 17.0, -0.3); cone.castShadow = true; scene.add(cone);
+    const fin = P.ball(0.14, '#e8b838', 0.006); fin.position.set(s * 6.9, 19.9, -0.3); scene.add(fin);
+    const b = bannerCard(1.1, 3.6); b.position.set(s * 6.9 - s * 0.6, 7.6, 2.0); b.rotation.y = s * 0.42; scene.add(b);
+    for (let k = 0; k < 3; k++) { const sl = makeCard(0.18, 0.7, 32, (c, W, H) => { c.fillStyle = '#2a2430'; c.fillRect(0, 0, W, H); }, {}); const a = s * (0.2 + k * 0.35); sl.position.set(s * 6.9 + Math.sin(a) * 2.32, 4 + k * 3, -0.3 + Math.cos(a) * 2.32); sl.rotation.y = a; scene.add(sl); } }
   for (const s of [-1, 1]) { const b = bannerCard(1.0, 3.4); b.position.set(s * 4.6, 6.0, 0.03); scene.add(b); }
   // ---- door leaves folded back inside the tunnel, the portcullis ----
   const plank = mat(TEX.planks('#7a4a2a', 6), 1, 1);
@@ -112,7 +112,7 @@ export function buildGate(scene) {
     g.globalAlpha = 1; const road = (w, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(512 - w, 0); g.lineTo(512 + w, 0); g.lineTo(512 + w * 1.25, 1024); g.lineTo(512 - w * 1.25, 1024); g.closePath(); g.fill(); };
     road(250, '#d8b884'); road(232, '#e2c492');
     for (let i = 0; i < 2500; i++) { g.fillStyle = ['#c8a470', '#f0d8a8', '#b8946a'][i % 3]; g.globalAlpha = 0.6; const x = 512 + (rr() - 0.5) * 520, y = rr() * 1024; g.fillRect(x, y, 3 + rr() * 5, 2 + rr() * 3); }
-    g.globalAlpha = 0.5; g.strokeStyle = '#a8845a'; g.lineWidth = 14; for (const x of [-120, -70, 70, 120]) { g.beginPath(); g.moveTo(512 + x, 0); g.bezierCurveTo(512 + x * 1.1, 400, 512 + x * 0.9, 700, 512 + x * 1.2, 1024); g.stroke(); }
+    g.globalAlpha = 0.85; g.strokeStyle = '#8a6a44'; g.lineWidth = 18; for (const x of [-120, -70, 70, 120]) { g.beginPath(); g.moveTo(512 + x, 0); g.bezierCurveTo(512 + x * 1.1, 400, 512 + x * 0.9, 700, 512 + x * 1.2, 1024); g.stroke(); }
     g.globalAlpha = 1; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; })();
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshPhongMaterial({ map: groundT, shininess: 4 })); ground.rotation.x = -Math.PI / 2; ground.position.set(0, 0, 20); ground.receiveShadow = true; scene.add(ground);
   const tuftG = new THREE.ConeGeometry(0.05, 0.22, 4); const tufts = new THREE.InstancedMesh(tuftG, toon(new THREE.Color('#5aa83a')), 900); { const M = new THREE.Matrix4(); let n = 0;

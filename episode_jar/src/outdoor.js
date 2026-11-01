@@ -16,7 +16,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const PH = (c, sh = 8) => new THREE.MeshPhongMaterial({ color: c, shininess: sh });
 const G = (x, m, s) => Math.exp(-((x - m) ** 2) / (2 * s * s));
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-export const PAL = V(-8, 0, -185);   // palace centre (ground height filled in by buildOutdoor)
+export const PAL = V(-14, 0, -125);   // palace centre (ground height filled in by buildOutdoor)
 
 // terrain height: camp plateau, slope down to the valley, the palace hill, rolling sides
 export function height(x, z) {
@@ -124,7 +124,7 @@ export function buildOutdoor(scene) {
   const lp = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 1.8, 6), PH(0x5a3a26)); lp.position.set(-3.3, height(-3.3, 2) + 0.9, 2); camp.add(lp);
   const lan = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.16), new THREE.MeshPhongMaterial({ color: 0xffd080, emissive: 0xffa040, emissiveIntensity: 0.0 })); lan.position.set(-3.3, height(-3.3, 2) + 1.75, 2.12); camp.add(lan); O.lantern = lan;
   // ---- the palace on the far hill ----
-  PAL.y = height(PAL.x, PAL.z); const cs = castle(); cs.position.copy(PAL); cs.scale.setScalar(0.6); scene.add(cs); O.castle = cs;
+  PAL.y = height(PAL.x, PAL.z); const cs = castle(); cs.position.copy(PAL); cs.scale.setScalar(0.85); scene.add(cs); O.castle = cs;
   // collapse dust column (stacked soft puffs) + debris chunks
   const puffT = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const rg = g.createRadialGradient(64, 64, 0, 64, 64, 64);
     rg.addColorStop(0, 'rgba(255,240,220,1)'); rg.addColorStop(0.55, 'rgba(240,210,180,0.7)'); rg.addColorStop(1, 'rgba(230,200,170,0)'); g.fillStyle = rg; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();

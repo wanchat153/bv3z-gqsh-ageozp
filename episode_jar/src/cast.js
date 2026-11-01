@@ -17,26 +17,59 @@ function head(c, p) {
 }
 function tears(c, p) { if (!p.tears) return; for (const s of [-1, 1]) { const x = s * 70; c.beginPath(); c.moveTo(x - 6, -280); c.quadraticCurveTo(x - 30 * s * 0 - 4, -230, x + 2, -200); c.lineWidth = 10; c.strokeStyle = '#7cc8ff'; c.stroke(); } }
 
-// ---- robe body: a tall rounded tube from the chin to the floor ----
-function robe(c, p, col, w = 118) {
-  const top = -150, bot = 440 - (p.hem || 0);
-  const path = () => { c.beginPath(); c.moveTo(-w, bot); c.lineTo(-w, top + 70); c.quadraticCurveTo(-w, top, -w + 70, top); c.lineTo(w - 70, top); c.quadraticCurveTo(w, top, w, top + 70); c.lineTo(w, bot); c.closePath(); };
-  path(); formFill(c, col, -w, top, w, bot, 0.3);
-  C(c, () => { path(); c.clip(); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(w * 0.45, top, w, bot - top);   // shadow side
+// ---- the body rig: every robed character bends. The robe is drawn in two passes — the LOWER pass (skirt / lap, below the
+// sash) stays planted with the legs, the UPPER pass (torso, collar, sash, armour, arms, head) turns about the waist by p.lean.
+// The sash sits on the waist line and hides the joint, so the robe reads as one piece. p.legs: 'stand' (default) | 'walk' |
+// 'run' | 'sit' | 'fly'; p.walk = gait phase (radians). In 'sit' the upper body drops by the thigh length onto a lap.
+let PART = 'all', RIG = { W: 145, drop: 0, legs: 'stand' };
+const lower = () => PART === 'lower', upper = () => PART !== 'lower';
+function robeShade(c, path, col, w, top, bot) { path(); formFill(c, col, -w, top, w, bot, 0.3);
+  C(c, () => { path(); c.clip(); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(w * 0.45, top - 400, w + 60, bot - top + 800);
     c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(-w + 18, top + 40, 26, bot - top - 60); });
-  path(); c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.stroke();
-  for (const x of [-34, 34]) { ell(c, x, bot + 4, 30, 12); c.fillStyle = INK; c.fill(); }   // shoe tips under the hem
+  path(); c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.stroke(); }
+function robe(c, p, col, w = 118) {
+  const top = -150, W = RIG.W, legs = RIG.legs;
+  if (PART === 'upper') {   // torso: chin to just past the waist (the sash covers the joint)
+    const b = W + 26; const path = () => { c.beginPath(); c.moveTo(-w, b); c.lineTo(-w, top + 70); c.quadraticCurveTo(-w, top, -w + 70, top); c.lineTo(w - 70, top); c.quadraticCurveTo(w, top, w, top + 70); c.lineTo(w, b); c.quadraticCurveTo(0, b + 14, -w, b); c.closePath(); };
+    robeShade(c, path, col, w, top, b); return { top, bot: b, w }; }
+  if (PART === 'lower') {
+    if (legs === 'sit') {   // the lap: hips (dropped) → knees spread → hem at the ankles
+      const h = W + RIG.drop - 12, k = h + 64, bot = 424 - (p.hem || 0);
+      const path = () => { c.beginPath(); c.moveTo(-w, h); c.quadraticCurveTo(-w - 30, k - 20, -w - 26, k); c.lineTo(-w - 12, bot); c.lineTo(w + 12, bot); c.lineTo(w + 26, k); c.quadraticCurveTo(w + 30, k - 20, w, h); c.closePath(); };
+      robeShade(c, path, col, w + 26, h, bot);
+      c.beginPath(); c.moveTo(-w - 22, k + 2); c.quadraticCurveTo(0, k + 22, w + 22, k + 2); c.lineWidth = 6; c.strokeStyle = 'rgba(26,18,40,0.55)'; c.stroke();   // knee fold
+      line(c, [[0, k + 12], [0, bot - 6]], 6, 'rgba(26,18,40,0.45)');
+      for (const x of [-52, 52]) { ell(c, x, bot + 6, 34, 13); c.fillStyle = INK; c.fill(); }
+      return { top, bot, w }; }
+    const bot = (legs === 'walk' || legs === 'run' || legs === 'fly' ? 398 : 440) - (p.hem || 0), h = W - 12;
+    const flare = legs === 'fly' ? 40 : legs === 'run' ? 18 : 0;
+    const path = () => { c.beginPath(); c.moveTo(-w, h); c.lineTo(-w - flare, bot); c.quadraticCurveTo(0, bot + 10, w + flare, bot); c.lineTo(w, h); c.closePath(); };
+    robeShade(c, path, col, w + flare, h, bot);
+    if (legs === 'stand') for (const x of [-34, 34]) { ell(c, x, bot + 4, 30, 12); c.fillStyle = INK; c.fill(); }   // shoe tips under the hem
+    return { top, bot, w }; }
+  // PART 'all' (legacy single tube)
+  const bot = 440 - (p.hem || 0);
+  const path = () => { c.beginPath(); c.moveTo(-w, bot); c.lineTo(-w, top + 70); c.quadraticCurveTo(-w, top, -w + 70, top); c.lineTo(w - 70, top); c.quadraticCurveTo(w, top, w, top + 70); c.lineTo(w, bot); c.closePath(); };
+  robeShade(c, path, col, w, top, bot);
+  for (const x of [-34, 34]) { ell(c, x, bot + 4, 30, 12); c.fillStyle = INK; c.fill(); }
   return { top, bot, w };
 }
-function crossCollar(c, col = '#f6f2e6') {  // white crossed lapels (inventor)
+// legs under the hem: dark trousers + shoes. walk/run: alternate steps (lifted foot), fly: kicked out and bent
+function legsUnder(c, p) { const m = RIG.legs; if (m === 'stand' || m === 'sit') return;
+  const ph = p.walk || 0, st = Math.sin(ph); const run = m === 'run' ? 1.6 : 1;
+  const feet = m === 'fly' ? [[-120, 400, -0.6], [130, 380, 0.7]] : [[-40 - 14 * st * run, 446 - 22 * run * Math.max(0, st), 0], [40 - 14 * st * run, 446 - 22 * run * Math.max(0, -st), 0]];
+  for (const [fx, fy, a] of feet) { const hx = Math.sign(fx) * 34, hy = 360; const kx = (hx + fx) / 2 + (m === 'fly' ? Math.sign(fx) * 40 : 0), ky = (hy + fy) / 2 + (m === 'fly' ? -30 : 0);
+    line(c, [[hx, hy], [kx, ky], [fx, fy - 14]], 34, INK); line(c, [[hx, hy], [kx, ky], [fx, fy - 14]], 22, '#2a2a3a');
+    C(c, () => { c.translate(fx, fy - 4); c.rotate(a); ell(c, Math.sign(fx) * 10, 0, 36, 14); c.fillStyle = INK; c.fill(); }); } }
+function crossCollar(c, col = '#f6f2e6') { if (lower()) return;  // white crossed lapels (inventor)
   c.beginPath(); c.moveTo(-58, -150); c.lineTo(10, -40); c.lineTo(36, -40); c.lineTo(-30, -150); c.closePath(); ink(c, col, 7);
   c.beginPath(); c.moveTo(58, -150); c.lineTo(-10, -40); c.lineTo(-36, -40); c.lineTo(30, -150); c.closePath(); ink(c, col, 7);
 }
-function lambdaCollar(c, col = '#d23a2a', trim = '#f2b33a') {  // emperor: red λ chevron with gold trim
+function lambdaCollar(c, col = '#d23a2a', trim = '#f2b33a') { if (lower()) return;  // emperor: red λ chevron with gold trim
   c.beginPath(); c.moveTo(-46, -150); c.lineTo(8, -10); c.lineTo(52, -150); c.lineTo(28, -150); c.lineTo(6, -70); c.lineTo(-18, -150); c.closePath(); ink(c, col, 7);
   c.beginPath(); c.moveTo(-8, -82); c.lineTo(30, -12); c.lineWidth = 12; c.strokeStyle = trim; c.stroke();
 }
-function sash(c, y, col, w, h = 34) { c.beginPath(); c.rect(-w, y, 2 * w, h); formFill(c, col, 0, y, 0, y + h, 0.25); c.lineWidth = 6; c.strokeStyle = INK; c.stroke(); }
+function sash(c, y, col, w, h = 34) { if (lower()) return; c.beginPath(); c.rect(-w, y, 2 * w, h); formFill(c, col, 0, y, 0, y + h, 0.25); c.lineWidth = 6; c.strokeStyle = INK; c.stroke(); }
 function arms(c, p, front = true) {
   const a = p.arms || { L: [-150, 150], R: [150, 150] }, b = p.bend || { L: -40, R: 40 };
   const sh = { L: [-96, -90], R: [96, -90] };
@@ -73,7 +106,7 @@ function gauzeHat(c, col = '#1f1d26') {   // minister: black hat with two side w
 }
 
 // ---- torso extras ----
-function scaleArmour(c, top = -150, bot = 150, w = 118) {
+function scaleArmour(c, top = -150, bot = 150, w = 118) { if (lower()) return;
   C(c, () => { c.beginPath(); c.roundRect(-w, top, 2 * w, bot - top, [70, 70, 8, 8]); c.clip();
     c.fillStyle = '#4a5468'; c.fillRect(-w, top, 2 * w, bot - top);
     for (let j = 0; j < 14; j++) for (let i = -6; i <= 6; i++) { const x = i * 36 + (j % 2) * 18, y = top + 10 + j * 22;
@@ -82,9 +115,9 @@ function scaleArmour(c, top = -150, bot = 150, w = 118) {
   ell(c, 0, top + 80, 44, 44); const g = c.createRadialGradient(-12, top + 66, 4, 0, top + 80, 46); g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, '#c8d0de'); g.addColorStop(1, '#8a94a6'); c.fillStyle = g; c.fill(); c.lineWidth = 8; c.strokeStyle = '#3a4050'; c.stroke();
   ell(c, 0, top + 80, 52, 52); c.lineWidth = 6; c.strokeStyle = '#f2c040'; c.stroke();
 }
-function guardBelt(c, y) { c.beginPath(); c.rect(-122, y, 244, 30); ink(c, '#6a3a1e', 6); c.beginPath(); c.roundRect(-22, y - 6, 44, 42, 6); ink(c, '#f2c040', 6); ell(c, 0, y + 15, 7, 7); c.fillStyle = '#d23a2a'; c.fill();
+function guardBelt(c, y) { if (lower()) return; c.beginPath(); c.rect(-122, y, 244, 30); ink(c, '#6a3a1e', 6); c.beginPath(); c.roundRect(-22, y - 6, 44, 42, 6); ink(c, '#f2c040', 6); ell(c, 0, y + 15, 7, 7); c.fillStyle = '#d23a2a'; c.fill();
   c.beginPath(); c.moveTo(-10, y + 36); c.lineTo(10, y + 36); c.lineTo(16, y + 96); c.lineTo(-16, y + 96); c.closePath(); ink(c, '#d23a2a', 5); }
-export function halberd(c, x, yTop, yBot) {
+export function halberd(c, x, yTop, yBot) { if (lower()) return;
   line(c, [[x, yTop], [x, yBot]], 14, INK); line(c, [[x, yTop], [x, yBot]], 7, '#7a4a2a');
   c.beginPath(); c.moveTo(x, yTop - 60); c.lineTo(x + 9, yTop - 10); c.lineTo(x - 9, yTop - 10); c.closePath(); ink(c, '#d8dde6', 5);
   c.beginPath(); c.moveTo(x - 6, yTop); c.quadraticCurveTo(x - 120, yTop - 30, x - 150, yTop + 40); c.quadraticCurveTo(x - 90, yTop + 10, x - 6, yTop + 40); c.closePath(); ink(c, '#d8dde6', 6);
@@ -96,26 +129,35 @@ function face(c, p) { drawEyes(c, p); drawMouth(c, p); tears(c, p);
   if (p.sweat) for (const [x, y, s] of [[-170, -380, 1], [178, -350, 0.8]]) { c.beginPath(); c.moveTo(x, y - 30 * s); c.quadraticCurveTo(x + 18 * s, y + 6, x, y + 12 * s); c.quadraticCurveTo(x - 18 * s, y + 6, x, y - 30 * s); ink(c, '#a9dcff', 6); } }
 function frame(c, p, body) {
   const sq = p.sq || [1, 1]; c.translate(0, 448); c.scale(0.94 * sq[0], 0.94 * sq[1]); c.translate(0, -448 + (p.dy || 0));
-  if (p.armsBehind) arms(c, p); body();
-  C(c, () => { c.translate(0, -150); c.rotate(p.tilt || 0); c.translate(0, 150); p.headFn(); });
-  if (!p.armsBehind) arms(c, p);
+  const legs = p.legs || 'stand'; RIG = { W: p.waistY ?? 145, drop: legs === 'sit' ? 118 : 0, legs };
+  if (legs === 'stand' && !p.lean) {   // the classic single tube (identical to before for standing, upright characters)
+    PART = 'all'; if (p.armsBehind) arms(c, p); body();
+    C(c, () => { c.translate(0, -150); c.rotate(p.tilt || 0); c.translate(0, 150); p.headFn(); });
+    if (!p.armsBehind) arms(c, p); return; }
+  legsUnder(c, p);
+  PART = 'lower'; body();
+  C(c, () => { c.translate(0, RIG.drop); c.translate(0, RIG.W); c.rotate(p.lean || 0); c.translate(0, -RIG.W);
+    PART = 'upper'; if (p.armsBehind) arms(c, p); body();
+    C(c, () => { c.translate(0, -150); c.rotate(p.tilt || 0); c.translate(0, 150); p.headFn(); });
+    if (!p.armsBehind) arms(c, p); });
+  PART = 'all';
 }
 // (frame() needs the head drawer in the pose; wrap each role)
 const role = (bodyFn, headExtras, defaults) => (c, p0) => { const p = { ...defaults, ...p0 };
   p.headFn = () => { if (p.hairUp) { for (let k = -5; k <= 5; k++) { line(c, [[k * 30, -440], [k * 44, -560 - Math.abs(k) * -6]], 10); } } head(c, p); face(c, p); headExtras(c, p); };
   frame(c, p, () => bodyFn(c, p)); };
 export const INVENTOR = role((c, p) => { robe(c, p, '#2f5fc0'); crossCollar(c); sash(c, 130, '#f0b030', 120); },
-  (c, p) => { if (!p.hairUp) topBun(c); else topBun(c, '#1d1a22', false); }, { eyes: 'dash', mouth: 'dot' });
+  (c, p) => { if (!p.hairUp) topBun(c); else topBun(c, '#1d1a22', false); }, { eyes: 'dash', mouth: 'dot', waistY: 147 });
 export const EMPEROR = role((c, p) => { robe(c, p, '#26285a', 112); lambdaCollar(c); sash(c, 150, '#c8301e', 114, 30); },
-  (c, p) => mianHat(c), { eyes: 'dash', mouth: 'frown', brow: 0.18, stache: 'droop' });
+  (c, p) => mianHat(c), { eyes: 'dash', mouth: 'frown', brow: 0.18, stache: 'droop', waistY: 165 });
 export const GUARD = role((c, p) => { robe(c, { ...p, hem: 0 }, '#a8262a', 122); scaleArmour(c, -150, 160, 122); guardBelt(c, 150);
     if (p.halberd !== false) halberd(c, p.halberdX ?? 170, -420, 440); },
-  (c, p) => helmet(c), { eyes: 'dash', mouth: 'line', brow: 0.1 });
+  (c, p) => helmet(c), { eyes: 'dash', mouth: 'line', brow: 0.1, waistY: 165 });
 export const MINISTER = role((c, p) => { robe(c, p, p.col || '#2e6a4a'); crossCollar(c, '#f6f2e6'); sash(c, 130, '#8a5130', 120); },
-  (c, p) => gauzeHat(c), { eyes: 'dash', mouth: 'smile' });
+  (c, p) => gauzeHat(c), { eyes: 'dash', mouth: 'smile', waistY: 147 });
 export const TOWNSFOLK = role((c, p) => { robe(c, p, p.col || '#8a6a4a'); crossCollar(c, '#e8dcc0'); sash(c, 130, p.sash || '#5a3a22', 120); },
   (c, p) => { if (p.hat === 'straw') { c.beginPath(); c.moveTo(-230, -400); c.lineTo(0, -560); c.lineTo(230, -400); c.closePath(); ink(c, '#e0b860', 10); } else topBun(c, '#2a1e1a', false); },
-  { eyes: 'dot', mouth: 'smile' });
+  { eyes: 'dot', mouth: 'smile', waistY: 147 });
 
 // ---- inventor hauling, three-quarter side view (S14), drawn like the reference: the robe is split at the sash into a
 // short upright skirt (hips + legs: the hem steps with the stride, two shoes) and the upper body bent forward at the waist

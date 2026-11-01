@@ -59,11 +59,11 @@ const at = (p) => p.clone().add(V(0, 0.43 * SZ, 0));
 function emperorCourt(c, t, mood) {   // emperor + two guards on the dais; mood: 'stern' | 'laugh'
   const Hh = hall(); const R = right(c); const L = mood === 'laugh';
   const k = L ? Math.sin(t * 14) : 0;
-  Hh.emp.update(c, at(EMPP).add(V(0, L ? 0.02 * Math.abs(k) : 0, 0)), R, { eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'frown', brow: L ? -0.1 : 0.2, tears: L, tilt: L ? 0.12 * Math.sin(t * 7) : 0,
+  Hh.emp.update(c, at(EMPP).add(V(0, L ? 0.02 * Math.abs(k) : 0, 0)), R, { legs: 'sit', lean: L ? 0.12 * k : 0, eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'frown', brow: L ? -0.1 : 0.2, tears: L, tilt: L ? 0.12 * Math.sin(t * 7) : 0,
     arms: L ? { L: [-150, 40], R: [150, 40] } : { L: [-140, 160], R: [140, 160] } }, EMPP.y, 0.3, L ? 0.1 * Math.sin(t * 6) - 0.08 : 0);
-  Hh.g1.update(c, at(G1P), R, { stache: 'droop', eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'frown', brow: L ? -0.1 : 0.22, tears: L, halberdX: -170, tilt: L ? 0.18 + 0.06 * k : 0,
+  Hh.g1.update(c, at(G1P), R, { lean: L ? -0.12 + 0.08 * k : 0, stache: 'droop', eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'frown', brow: L ? -0.1 : 0.22, tears: L, halberdX: -170, tilt: L ? 0.18 + 0.06 * k : 0,
     arms: { L: [-170, 60], R: [140, 160] } }, G1P.y, 0.3, L ? -0.16 + 0.05 * k : 0);
-  Hh.g2.update(c, at(G2P), R, { eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'smirk', brow: L ? -0.1 : 0.1, halberdX: 170, tilt: L ? -0.15 - 0.05 * k : 0,
+  Hh.g2.update(c, at(G2P), R, { lean: L ? 0.14 - 0.08 * k : 0, eyes: L ? 'happy' : 'dash', mouth: L ? 'laugh' : 'smirk', brow: L ? -0.1 : 0.1, halberdX: 170, tilt: L ? -0.15 - 0.05 * k : 0,
     arms: { L: [-140, 160], R: [170, 60] } }, G2P.y, 0.3, L ? 0.18 - 0.05 * k : 0);
 }
 function hideCourt() { const Hh = hall(); for (const f of [Hh.emp, Hh.g1, Hh.g2]) { f.mesh.visible = false; f.shadow.visible = false; } }
@@ -193,7 +193,7 @@ SHOT.S10 = (t) => { const Hh = hall(); const c = camOf('S10');
   const close = [cp.clone().add(V(0.02, 0.36, 0.2)), cp.clone().add(V(0, 0.13, 0)), 40];
   const [p, g, f] = keys([[20.3, close[0], close[1], close[2]], [21.0, close[0].clone().add(V(0, 0.02, 0.02)), close[1], 39], [21.32, ...wide], [22.6, wide[0].clone().add(V(0, 0.01, -0.25)), wide[1], 38]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); Hh.inv.mesh.visible = false; Hh.inv.shadow.visible = false; for (const x of [Hh.g1, Hh.g2]) { x.mesh.visible = false; x.shadow.visible = false; }
-    Hh.emp.update(c, at(EMPP), R, { eyes: 'dash', mouth: 'frown', brow: 0.22, stache: 'droop', arms: EMP_HOLD, bend: { L: -40, R: -60 } }, EMPP.y, 0.3); Hh.emp.mesh.visible = t > 21.02; Hh.emp.shadow.visible = t > 21.02;   /* looking straight down into the bowl the billboard would face the lens */
+    Hh.emp.update(c, at(EMPP), R, { legs: 'sit', eyes: 'dash', mouth: 'frown', brow: 0.22, stache: 'droop', arms: EMP_HOLD, bend: { L: -40, R: -60 } }, EMPP.y, 0.3); Hh.emp.mesh.visible = t > 21.02; Hh.emp.shadow.visible = t > 21.02;   /* looking straight down into the bowl the billboard would face the lens */
     Hh.X.cup.visible = true; Hh.X.cup.position.copy(cp); for (let i = 0; i < 8; i++) Hh.J.setBall(i, 'held'); Hh.H.flick(t); };
   const fd = t < 21.1 ? c.position.distanceTo(cp) : c.position.distanceTo(at(EMPP));
   return { haze: HAZE_HALL, scene: Hh.S, camera: c, prep, focus: { dist: fd, range: t < 21.1 ? 0.08 : 0.8, amt: 0.8 } }; };
@@ -205,8 +205,8 @@ SHOT.S11 = (t) => { const Hh = hall(); const c = camOf('S11');
     Hh.J.root.visible = false; Hh.X.banquet.visible = true; Hh.X.flames.forEach((fl) => { fl.scale.y = 0.14 * (1 + 0.1 * Math.sin(t * 25 + fl.id)); });
     SEATS.forEach(([x, z, col], i) => { const m = Hh.mins[i]; m.mesh.visible = true; const k = Math.sin(t * 15 + i * 1.7);
       let a = at(V(x, 0.36, z)), roll = 0.12 * k * (i % 2 ? 1 : -1);
-      if (i === 3) { const u = sst(22.95, 23.45, t); roll = 1.35 * u + 0.05 * k; a = a.add(V(-0.45 * u, -0.62 * u, 0.1 * u)); }
-      m.update(c, a, R, { col, eyes: 'happy', mouth: 'laugh', tears: i % 2 === 0, brow: -0.1, tilt: 0.1 * k, arms: i === 3 ? { L: [-170, -120], R: [170, -150] } : { L: [-150, 40 + 20 * k], R: [150, 40 - 20 * k] } }, 0, i === 3 ? 0 : 0.0, roll); });
+      if (i === 3) { const u = sst(22.95, 23.45, t); roll = 0.55 * u + 0.05 * k; a = a.add(V(-0.45 * u, -0.62 * u, 0.1 * u)); }
+      m.update(c, a, R, { legs: 'sit', lean: i === 3 ? -0.9 * sst(22.95, 23.45, t) : 0.14 * k * (i % 2 ? 1 : -1), col, eyes: 'happy', mouth: 'laugh', tears: i % 2 === 0, brow: -0.1, tilt: 0.1 * k, arms: i === 3 ? { L: [-170, -120], R: [170, -150] } : { L: [-150, 40 + 20 * k], R: [150, 40 - 20 * k] } }, 0, i === 3 ? 0 : 0.0, roll); });
     for (let i = 0; i < 8; i++) Hh.J.setBall(i, 'held'); Hh.H.flick(t); };
   return { haze: HAZE_HALL, scene: Hh.S, camera: c, prep, focus: { dist: c.position.distanceTo(V(1.8, 1.0, -2.6)), range: 2.0, amt: 0.5 } }; };
 // S12 24.10–26.90 — the emperor mocks from the throne: "the world's most expensive toy" — smirk, then a wink (25.6→)
@@ -214,7 +214,7 @@ SHOT.S12 = (t) => { const Hh = hall(); const c = camOf('S12');
   const [p, g, f] = keys([[24.0, V(0.05, 1.62, -3.4), V(0, 1.5, -6.6), 40], [27.0, V(0.02, 1.62, -3.75), V(0, 1.5, -6.6), 39]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); Hh.inv.mesh.visible = false; Hh.inv.shadow.visible = false; for (const x of [Hh.g1, Hh.g2]) { x.mesh.visible = false; x.shadow.visible = false; }
     const talk = t < 25.5 && Math.sin(t * 17) > 0.2; Hh.emp.mesh.visible = true;
-    Hh.emp.update(c, at(EMPP), R, { eyes: 'dash', wink: t > 25.6, mouth: talk ? 'o' : 'smirk', brow: t > 25.6 ? -0.15 : 0.18, stache: 'droop', tilt: t > 25.6 ? 0.08 : 0, arms: EMP_HOLD, bend: { L: -40, R: -60 } }, EMPP.y, 0.3);
+    Hh.emp.update(c, at(EMPP), R, { legs: 'sit', lean: t > 25.6 ? 0.08 : 0.04 * Math.sin(t * 3), eyes: 'dash', wink: t > 25.6, mouth: talk ? 'o' : 'smirk', brow: t > 25.6 ? -0.15 : 0.18, stache: 'droop', tilt: t > 25.6 ? 0.08 : 0, arms: EMP_HOLD, bend: { L: -40, R: -60 } }, EMPP.y, 0.3);
     placeCup(c); for (let i = 0; i < 8; i++) Hh.J.setBall(i, 'held'); Hh.H.flick(t); };
   return { haze: HAZE_HALL, scene: Hh.S, camera: c, prep, focus: { dist: c.position.distanceTo(at(EMPP)), range: 0.8, amt: 0.75 } }; };
 
@@ -233,18 +233,18 @@ function puffs(scene, n) { const grp = new THREE.Group(); scene.add(grp); const 
   return { burst(p, u, size = 1, col = 0xf0e2c8) { grp.visible = u > 0 && u < 1; sp.forEach((m, i) => { const a = i / n * Math.PI * 2 + i * 0.7, rr = (0.25 + 0.9 * Math.sqrt(u)) * size * (0.7 + 0.3 * Math.sin(i * 3.1));
       m.position.set(p.x + Math.cos(a) * rr, p.y + 0.15 * size + 0.35 * u * size * (0.5 + 0.5 * Math.sin(i)), p.z + Math.sin(a) * rr * 0.6); m.scale.setScalar(size * (0.5 + 0.9 * u)); m.material.opacity = Math.pow(1 - u, 1.4) * 0.85; m.material.color.set(col); }); },
     hide() { grp.visible = false; } }; }
-const FOLK = [[-3.4, 5.4, '#8a6a4a', 'straw'], [3.1, 4.9, '#4a7aa8', null], [-5.2, 9.0, '#6a8a5a', null], [4.6, 8.6, '#9a5a3a', 'straw']];
+const FOLK = [[-3.4, 7.0, '#8a6a4a', 'straw'], [3.2, 6.4, '#4a7aa8', null], [-2.5, 13.8, '#6a8a5a', null], [2.6, 14.2, '#9a5a3a', 'straw']];
 // S13 26.90–29.70 — thrown out of the city: the inventor flies out of the arch (27.1–27.6), lands in the road; the jar follows (28.2–28.6) onto the cart; townsfolk laugh
 SHOT.S13 = (t) => { const Gg = gate(); const c = camOf('S13', 900, 0.1);
-  const [p, g, f] = keys([[26.8, V(0.2, 1.75, 15.0), V(0, 4.6, 0), 62], [29.8, V(0.15, 1.7, 13.9), V(0, 4.5, 0), 61]], t); aim(c, p, g, f);
-  const LAND = V(0.5, 0, 6.8), CART = V(0.0, 0, 3.4);
+  const [p, g, f] = keys([[26.8, V(0.1, 1.9, 18.5), V(0, 5.8, 0), 64], [29.8, V(0.1, 1.85, 17.6), V(0, 5.7, 0), 63]], t); aim(c, p, g, f);
+  const LAND = V(0.4, 0, 9.5), CART = V(-0.4, 0, 3.6);
   const prep = () => { const R = right(c); Gg.G.setMode('day'); Gg.G.flick(t); Gg.g1.mesh.visible = Gg.g2.mesh.visible = false; Gg.g1.shadow.visible = Gg.g2.shadow.visible = false;
     Gg.G.cart.visible = true; Gg.G.cart.position.copy(CART); Gg.G.cart.rotation.y = 0;
     // inventor: arc out of the tunnel, tumbling
     const u = lin(27.1, 27.6, t); let ip, roll = 0, pose;
     if (t < 27.6) { ip = V(mix(0, LAND.x, u), 1.1 + 2.6 * Math.sin(Math.PI * u) * 0.9 + (LAND.y - 1.1) * u, mix(-2.2, LAND.z, u)); roll = -u * Math.PI * 1.6;
-      pose = { eyes: 'wide', mouth: 'o', brow: -0.2, sweat: true, arms: { L: [-190, -120], R: [190, -140] }, bend: { L: 30, R: -30 } }; }
-    else { const k = lin(27.6, 27.8, t); ip = LAND.clone(); roll = 0; pose = { eyes: t < 28.6 ? 'spiral' : 'ring', mouth: t < 28.6 ? 'wobble' : 'line', brow: 0.1, sq: [1 + 0.25 * (1 - k), 1 - 0.25 * (1 - k)], arms: { L: [-150, 150], R: [150, 150] } }; }
+      pose = { legs: 'fly', eyes: 'wide', mouth: 'o', brow: -0.2, sweat: true, arms: { L: [-190, -120], R: [190, -140] }, bend: { L: 30, R: -30 } }; }
+    else { const k = lin(27.6, 27.8, t); ip = LAND.clone(); roll = 0; pose = { legs: 'sit', eyes: t < 28.6 ? 'spiral' : 'ring', mouth: t < 28.6 ? 'wobble' : 'line', brow: 0.1, sq: [1 + 0.25 * (1 - k), 1 - 0.25 * (1 - k)], arms: { L: [-150, 150], R: [150, 150] } }; }
     Gg.inv.mesh.visible = true; Gg.inv.update(c, at(ip), R, pose, 0, 0.3, roll);
     // jar: out of the arch, tumbling, onto the cart bed
     const v = lin(28.2, 28.6, t); Gg.J.root.visible = t > 28.15; const top = CART.clone().add(V(0, 0.68, 0));
@@ -253,7 +253,7 @@ SHOT.S13 = (t) => { const Gg = gate(); const c = camOf('S13', 900, 0.1);
     Gg.J.root.scale.setScalar(0.62); for (let i = 0; i < 8; i++) { Gg.J.setJaw(i, 0.55); Gg.J.setBall(i, 'held'); }
     if (t > 27.55 && t < 28.3) Gg.dust.burst(LAND, lin(27.55, 28.3, t), 1.2); else if (t > 28.55 && t < 29.3) Gg.dust.burst(CART.clone().add(V(0, 0.2, 0.6)), lin(28.55, 29.3, t), 1.8); else Gg.dust.hide();
     FOLK.forEach(([x, z, col, hat], i) => { const m = Gg.folk[i]; m.mesh.visible = true; const lol = t > 27.75; const k = Math.sin(t * 15 + i * 2);
-      m.update(c, at(V(x, 0, z)).add(V(0, lol ? 0.02 * Math.abs(k) : 0, 0)), R, { col, hat, eyes: lol ? 'happy' : 'dot', mouth: lol ? 'laugh' : 'o', tears: lol && i % 2 === 0, tilt: lol ? 0.1 * k : 0, look: [x < 0 ? 0.6 : -0.6, 0],
+      m.update(c, at(V(x, 0, z)).add(V(0, lol ? 0.02 * Math.abs(k) : 0, 0)), R, { lean: lol ? 0.12 * k : 0, col, hat, eyes: lol ? 'happy' : 'dot', mouth: lol ? 'laugh' : 'o', tears: lol && i % 2 === 0, tilt: lol ? 0.1 * k : 0, look: [x < 0 ? 0.6 : -0.6, 0],
         arms: lol ? { L: [-150, 60 + 20 * k], R: [150, 60 - 20 * k] } : { L: [-140, 160], R: [140, 160] } }, 0, 0.3, lol ? 0.06 * k : 0); }); };
   return { haze: haze('day', 0.6), scene: Gg.S, camera: c, prep, focus: { dist: c.position.distanceTo(V(0, 1.5, 6)), range: 5, amt: 0.35 } }; };
 // S17 37.27–40.43 — night, inside the gate: the portcullis is down; the inventor runs up the road and throws himself at the bars, screaming
@@ -261,7 +261,7 @@ SHOT.S17 = (t) => { const Gg = gate(); const c = camOf('S17', 900, 0.1);
   const [p, g, f] = keys([[37.2, V(0.1, 2.0, -10.5), V(0, 2.6, 6), 44], [38.7, V(0.08, 1.95, -9.2), V(0, 2.5, 6), 43], [40.5, V(0.06, 1.9, -8.6), V(0, 2.4, 6), 42]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); Gg.G.setMode('night'); Gg.G.flick(t); Gg.J.root.visible = false; Gg.dust.hide(); Gg.folk.forEach((m) => { m.mesh.visible = false; m.shadow.visible = false; }); Gg.g1.mesh.visible = Gg.g2.mesh.visible = false; Gg.g1.shadow.visible = Gg.g2.shadow.visible = false;
     const u = sst(37.3, 38.5, t); const run = t < 38.5; const ip = V(mix(1.5, 0.15, u), 0, mix(16, -0.05, u)); const ph = t * 14;
-    Gg.inv.mesh.visible = true; Gg.inv.update(c, at(ip).add(V(0, run ? 0.03 * Math.abs(Math.sin(ph)) : 0, 0)), R, run ? { eyes: 'wide', mouth: 'o', sweat: true, brow: -0.2, arms: { L: [-160 + 40 * Math.sin(ph), 40], R: [160 - 40 * Math.sin(ph), 40] } }
+    Gg.inv.mesh.visible = true; Gg.inv.update(c, at(ip).add(V(0, run ? 0.03 * Math.abs(Math.sin(ph)) : 0, 0)), R, run ? { legs: 'run', walk: t * 16, lean: 0.12, eyes: 'wide', mouth: 'o', sweat: true, brow: -0.2, arms: { L: [-160 + 40 * Math.sin(ph), 40], R: [160 - 40 * Math.sin(ph), 40] } }
       : { eyes: 'wide', mouth: Math.sin(t * 22) > -0.3 ? 'o' : 'grit', sweat: true, brow: -0.25, hairUp: Math.sin(t * 9) > 0, arms: { L: [-150, -170], R: [150, -170] }, bend: { L: 40, R: -40 }, dy: 4 * Math.sin(t * 30) }, 0, 0.3); };
   return { haze: haze('night', 0.2), scene: Gg.S, camera: c, prep, focus: { dist: Math.max(1.5, c.position.distanceTo(at(V(0.15, 0, mix(16, 0, sst(37.3, 38.5, t)))))), range: 1.2, amt: 0.6 } }; };
 // S18 40.43–43.60 — night, on the wall walk: a guard leans on the parapet: "Hey, it's the toy guy…" and laughs
@@ -269,7 +269,7 @@ SHOT.S18 = (t) => { const Gg = gate(); const c = camOf('S18', 900, 0.1);
   const [p, g, f] = keys([[40.3, V(11.9, 10.75, 22.5), V(10.6, 10.0, 8.0), 46], [43.7, V(11.85, 10.72, 21.6), V(10.6, 10.0, 8.0), 45]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); Gg.G.setMode('night'); Gg.G.flick(t); Gg.J.root.visible = false; Gg.dust.hide(); Gg.inv.mesh.visible = false; Gg.inv.shadow.visible = false; Gg.folk.forEach((m) => { m.mesh.visible = false; m.shadow.visible = false; });
     const talk = t < 42.0 && Math.sin(t * 17) > 0, lol = t > 42.0; const k = Math.sin(t * 14);
-    Gg.g1.mesh.visible = true; Gg.g1.update(c, at(V(11.75, 9.0, 16.8)), R, { eyes: lol ? 'happy' : 'dash', mouth: lol ? 'laugh' : talk ? 'o' : 'smirk', brow: lol ? -0.1 : 0.05, tears: lol, stache: 'droop', halberd: false, tilt: lol ? 0.1 * k : 0.08,
+    Gg.g1.mesh.visible = true; Gg.g1.update(c, at(V(11.75, 9.0, 16.8)), R, { lean: lol ? 0.18 + 0.06 * k : 0.12, eyes: lol ? 'happy' : 'dash', mouth: lol ? 'laugh' : talk ? 'o' : 'smirk', brow: lol ? -0.1 : 0.05, tears: lol, stache: 'droop', halberd: false, tilt: lol ? 0.1 * k : 0.08,
       arms: { L: [-150, 40], R: [170, -10] }, bend: { L: -40, R: 40 } }, 9.0, 0.3, lol ? 0.05 * k : 0.06);
     Gg.g2.mesh.visible = true; Gg.g2.update(c, at(V(11.2, 9.0, 11.0)), R, { eyes: lol ? 'happy' : 'dot', mouth: lol ? 'laugh' : 'line', halberdX: 170 }, 9.0, 0.3); };
   return { haze: haze('night', 0.2), scene: Gg.S, camera: c, prep, focus: { dist: c.position.distanceTo(V(11.75, 9.9, 16.8)), range: 1.5, amt: 0.5 } }; };
@@ -334,9 +334,9 @@ SHOT.S14 = (t) => { const Oo = out(); const c = camOf('S14', 900, 0.1); const SL
 const ss01 = (x) => x * x * (3 - 2 * x);
 // S15 31.80–33.10 — sunset at the camp on the hill above the palace: fire, laundry line, the inventor stands by the jar
 SHOT.S15 = (t) => { const Oo = out(); const c = camOf('S15', 900, 0.1);
-  const [p, g, f] = keys([[31.7, V(1.0, 2.9, 9.6), V(-1.0, 0.9, -5), 50], [33.2, V(0.9, 2.8, 9.0), V(-1.0, 0.9, -5), 49]], t); aim(c, p, g, f);
+  const [p, g, f] = keys([[31.7, V(2.6, 4.2, 9.0), V(-1.2, -0.6, -12), 56], [33.2, V(2.5, 4.0, 8.5), V(-1.2, -0.6, -12), 55]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); outReset(Oo); Oo.O.setMode('sunset', { sunDir: V(-0.05, 0.08, -1) }); Oo.O.flick(t); Oo.inv.mesh.visible = true;
-    Oo.inv.update(c, at(onGround(-0.1, 1.2)), R, { eyes: 'dash', mouth: 'line', brow: 0.15, look: [0.3, 0], arms: { L: [-140, 160], R: [140, 160] } }, height(-0.1, 1.2), 0.3); };
+    Oo.inv.update(c, at(onGround(-0.1, 1.2)), R, { legs: 'sit', eyes: 'dash', mouth: 'line', brow: 0.15, look: [0.3, 0], arms: { L: [-140, 160], R: [140, 160] } }, height(-0.1, 1.2), 0.3); };
   return { haze: haze('sunset', 0.3), scene: Oo.S, camera: c, prep, focus: { dist: c.position.distanceTo(onGround(-0.1, 1.2, 0.8)), range: 3, amt: 0.35 } }; };
 // S16 33.10–37.27 — night: he sleeps against the jar (Zzz); a ball drops (33.6), another (34.5), then all eight (35.3–35.7); pull back; he wakes, hair on end (36.5)
 const SLEEP = () => onGround(0.85, 1.65);
@@ -345,8 +345,8 @@ SHOT.S16 = (t) => { const Oo = out(); const c = camOf('S16', 900, 0.1); const JP
   const prep = () => { const R = right(c); outReset(Oo); Oo.O.setMode('night'); Oo.O.flick(t); Oo.inv.mesh.visible = true;
     const awake = t > 36.5; const ord = [1, 2]; const drop = (i) => (i === 1 ? 33.6 : i === 2 ? 34.5 : 35.3 + (i % 4) * 0.08);
     for (let i = 0; i < 8; i++) { const t0 = drop(i), u = lin(t0, t0 + 0.45, t); Oo.J.setJaw(i, 0.55); Oo.J.setBall(i, u <= 0 ? 'held' : u < 1 ? 'fall' : 'caught', u); }
-    Oo.inv.update(c, at(SLEEP()).add(V(0, awake ? 0 : -0.06, 0)), R, awake ? { eyes: 'wide', mouth: 'grit', brow: -0.3, hairUp: true, sweat: true, arms: { L: [-170, -60], R: [170, -60] }, dy: -10 * Math.max(0, Math.sin((t - 36.5) * 18)) }
-      : { eyes: 'closed', mouth: 'o', brow: 0.1, tilt: 0.18, sq: [1, 0.97], arms: { L: [-120, 170], R: [120, 170] }, hold: zzz(t * 0.7) }, height(SLEEP().x, SLEEP().z), 0.3, awake ? 0 : 0.12); };
+    Oo.inv.update(c, at(SLEEP()).add(V(0, awake ? 0 : -0.06, 0)), R, awake ? { legs: 'sit', eyes: 'wide', mouth: 'grit', brow: -0.3, hairUp: true, sweat: true, arms: { L: [-170, -60], R: [170, -60] }, dy: -10 * Math.max(0, Math.sin((t - 36.5) * 18)) }
+      : { legs: 'sit', lean: 0.22, eyes: 'closed', mouth: 'o', brow: 0.1, tilt: 0.18, sq: [1, 0.97], arms: { L: [-120, 170], R: [120, 170] }, hold: zzz(t * 0.7) }, height(SLEEP().x, SLEEP().z), 0.3, awake ? 0 : 0.12); };
   const fd = t < 35.6 ? c.position.distanceTo(at(SLEEP())) : c.position.distanceTo(JP);
   return { haze: haze('night', 0.2), scene: Oo.S, camera: c, prep, focus: { dist: fd, range: 0.8, amt: 0.6 } }; };
 // S19 43.60–46.03 — night, outside the shut gate: the inventor walks back up the road with a lantern, head down
@@ -354,10 +354,10 @@ SHOT.S19 = (t) => { const Gg = gate(); const c = camOf('S19', 900, 0.1);
   const [p, g, f] = keys([[43.5, V(0.4, 1.8, 17.5), V(0, 5.2, 0), 66], [46.1, V(0.35, 1.75, 16.8), V(0, 5.1, 0), 65]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); Gg.G.setMode('night'); Gg.G.flick(t); Gg.J.root.visible = false; Gg.dust.hide(); Gg.folk.forEach((m) => { m.mesh.visible = false; m.shadow.visible = false; }); Gg.g1.mesh.visible = Gg.g2.mesh.visible = false; Gg.g1.shadow.visible = Gg.g2.shadow.visible = false;
     const u = lin(43.6, 46.1, t), ph = t * 8; const ip = V(0.2 + 0.05 * Math.sin(ph / 2), 0, mix(10.5, 14.0, u));
-    Gg.inv.mesh.visible = true; Gg.inv.update(c, at(ip).add(V(0, 0.02 * Math.abs(Math.sin(ph)), 0)), R, { eyes: 'dash', mouth: 'frown', brow: 0.35, tilt: 0.06, look: [0, 0.5], arms: { L: [-130, 160 + 10 * Math.sin(ph)], R: [150, 60] }, bend: { L: -30, R: 30 }, hold: lantern(true) }, 0, 0.3); };
+    Gg.inv.mesh.visible = true; Gg.inv.update(c, at(ip).add(V(0, 0.02 * Math.abs(Math.sin(ph)), 0)), R, { legs: 'walk', walk: t * 8, eyes: 'dash', mouth: 'frown', brow: 0.35, tilt: 0.06, look: [0, 0.5], arms: { L: [-130, 160 + 10 * Math.sin(ph)], R: [150, 60] }, bend: { L: -30, R: 30 }, hold: lantern(true) }, 0, 0.3); };
   return { haze: haze('night', 0.2), scene: Gg.S, camera: c, prep, focus: { dist: c.position.distanceTo(V(0.2, 1.4, 5)), range: 2, amt: 0.5 } }; };
 // S20 46.03–47.33 — the next morning from the camp: far across the valley the palace begins to fall, a dust column rises (46.6→)
-const VIEW = () => onGround(-0.4, 6.5, 2.1);
+const VIEW = () => onGround(1.4, 9.5, 4.6);
 SHOT.S20 = (t) => { const Oo = out(); const c = camOf('S20', 900, 0.1);
   const tgt = PAL.clone().add(V(0, 2, 0)); const [p, g, f] = keys([[46.0, VIEW(), tgt, 44], [47.4, VIEW().add(V(0, 0, -0.3)), tgt, 43]], t); aim(c, p, g, f);
   const prep = () => { const R = right(c); outReset(Oo); Oo.O.setMode('morning', { sunDir: V(-0.55, 0.1, -1) }); Oo.O.setCollapse(0.38 * sst(46.55, 47.4, t)); Oo.inv.mesh.visible = true;
@@ -447,9 +447,16 @@ function render(t) {
   else A = shotAt(s.id, t);
   const ov = (B && trans.p > 0.5 ? B : A).overlay; if (ov) OV.draw(ov); else OV.clear();
   CAP.draw(t, !QS.has('nocap'));
-  E.frame({ A, B, trans, overlay: OV, captions: CAP, vig: 0.16, sat: 1.08, bloom: 0.3, bloomTh: 1.0 });
+  E.frame({ A, B, trans, overlay: OV, captions: CAP, vig: 0.3, sat: 1.16, contrast: 1.1, bloom: 0.3, bloomTh: 1.0 });
 }
 window.__hall = () => hall(); window.DUR = DUR; window.EV = []; window.CUES = CUES; window.render = render;
 window.grabPNG = (t) => { render(t); return E.canvas.toDataURL('image/png').split(',')[1]; };
 window.grab = (t) => { render(t); return E.canvas.toDataURL('image/jpeg', 0.95).split(',')[1]; };
 render(0); window.READY = true;
+// hooks for the Blender exporter (tools/blender/export_shot.mjs)
+window.__ovAt = (t) => { t = clamp(t, 0, DUR - 1e-4); const fr = Math.floor(t * FPS + 1e-6); const k = SHOTS.findIndex((s) => fr >= s.f0 && fr < s.f1);
+  const tr = TRANS.find((x) => fr >= x.f0 && fr <= x.f1); let A, B = null, p = 0;
+  if (tr && KIND[tr.kind]) { const i = TRANS.indexOf(tr); A = shotAt(SHOTS[i].id, t); B = shotAt(SHOTS[i + 1].id, t); p = (fr - tr.f0 + 0.5) / (tr.f1 - tr.f0 + 1); } else A = shotAt(SHOTS[k].id, t);
+  const ov = (B && p > 0.5 ? B : A).overlay; if (ov) OV.draw(ov); else OV.clear(); CAP.draw(t, true);
+  const c = CUES.findIndex((q) => t >= q.t0 && t < q.t1); return { ov: !!ov, cue: c, ovc: OV.tex.image, capc: CAP.tex.image }; };
+window.__shotAt = shotAt; window.__SHOTS = SHOTS; window.__TRANS = TRANS; window.__KIND = KIND; window.__cam = (id) => cam[id]; window.__E = E;
