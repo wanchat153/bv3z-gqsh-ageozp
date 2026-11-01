@@ -10,12 +10,12 @@ const grad = (() => { const d = new Uint8Array([70, 70, 70, 255, 150, 150, 150, 
 export const toon = (c, opts = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: grad, ...opts });
 
 // ink outline: back faces pushed out along the normal, drawn flat
-const INK = new THREE.MeshBasicMaterial({ color: 0x2a1a16, side: THREE.BackSide });
+const INK = new THREE.MeshBasicMaterial({ color: 0x1a1420, side: THREE.BackSide });
 INK.onBeforeCompile = (sh) => { sh.uniforms.uW = { value: 1 }; sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n transformed += normal * OUTLINE_W;'); };
 const inks = new Map();
 function inkMat(w) {
   const k = w.toFixed(4); if (inks.has(k)) return inks.get(k);
-  const m = new THREE.MeshBasicMaterial({ color: 0x2a1a16, side: THREE.BackSide });
+  const m = new THREE.MeshBasicMaterial({ color: 0x1a1420, side: THREE.BackSide });
   m.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\n transformed += normal * ${k};`); };
   m.customProgramCacheKey = () => 'ink' + k; inks.set(k, m); return m;
 }
