@@ -29,7 +29,7 @@ def P(v): return C @ Vector(v)
 # per-world multipliers on top of the physically matched conversion (1 = the three.js film's own light levels)
 LOOKS = {
   'three': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.7, tint=(1, 1, 1), dof=1.0),   # the three.js film's own levels
-  'hall': dict(sun=0.5, point=2.2, hemi=0.6, env=0.6, ao=1.2, tint=(0.88, 0.82, 1.0), dof=5.0),   # reference: muted lavender stone, firelit subjects, soft background
+  'hall': dict(sun=0.5, point=2.2, hemi=0.6, env=0.6, ao=1.2, tint=(0.88, 0.82, 1.0), dof=3.0),   # reference: muted lavender stone, firelit subjects, soft background
   'city': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.2, tint=(1, 1, 1), dof=1.0),
 }
 L = LOOKS.get(A.look, LOOKS['hall'])
