@@ -53,13 +53,13 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
       float coc=clamp(dz/(uFocus*0.9+0.001),0.0,1.0)*uAmt; if(dz<0.0) coc=0.0;
       vec4 b1=texture2D(tB1,vUv), b2=texture2D(tB2,vUv);
       vec4 o=mix(c,b1,smoothstep(0.0,0.5,coc)); o=mix(o,b2,smoothstep(0.45,1.0,coc)); gl_FragColor=o; }`);
-  const cocM = sm({ tColor: { value: null }, tDepth: { value: null }, tAO: { value: null }, aoAmt: { value: 0 }, focus: { value: 3 }, aper: { value: 4 }, maxCoc: { value: 18 }, near: { value: 0.05 }, far: { value: 200 }, range: { value: 0 }, hazeCol: { value: new THREE.Vector3(1, 0.9, 0.8) }, hazeDen: { value: 0 }, hazeStart: { value: 2 }, hazeMax: { value: 0.6 } },
+  const cocM = sm({ tColor: { value: null }, tDepth: { value: null }, tAO: { value: null }, tAOD: { value: null }, aoAmt: { value: 0 }, focus: { value: 3 }, aper: { value: 4 }, maxCoc: { value: 18 }, near: { value: 0.05 }, far: { value: 200 }, range: { value: 0 }, hazeCol: { value: new THREE.Vector3(1, 0.9, 0.8) }, hazeDen: { value: 0 }, hazeStart: { value: 2 }, hazeMax: { value: 0.6 } },
   `#include <packing>
-    varying vec2 vUv; uniform sampler2D tColor, tDepth, tAO; uniform float aoAmt, focus, aper, maxCoc, near, far, range, hazeDen, hazeStart, hazeMax; uniform vec3 hazeCol;
+    varying vec2 vUv; uniform sampler2D tColor, tDepth, tAO, tAOD; uniform float aoAmt, focus, aper, maxCoc, near, far, range, hazeDen, hazeStart, hazeMax; uniform vec3 hazeCol;
     void main(){ float d = texture2D(tDepth, vUv).x; float z = -perspectiveDepthToViewZ(d, near, far);
       float zz = z < focus ? min(z + range, focus) : max(z - range, focus);           // the subject band stays exactly in focus
       float c = clamp(aper * (1.0/focus - 1.0/zz), -maxCoc, maxCoc);
-      vec3 col = texture2D(tColor, vUv).rgb; if (aoAmt > 0.) col *= mix(1., pow(texture2D(tAO, vUv).r, 1.6), aoAmt);
+      vec3 col = texture2D(tColor, vUv).rgb; if (aoAmt > 0.) { float za = -perspectiveDepthToViewZ(texture2D(tAOD, vUv).x, near, far); float own = step(za - z, 0.03 * z + 0.02); col *= mix(1., pow(texture2D(tAO, vUv).r, 1.6), aoAmt * own); }
       if (hazeDen > 0.) col = mix(col, hazeCol, hazeMax * (1. - exp(-max(0., z - hazeStart) * hazeDen)));   // aerial perspective
       gl_FragColor = vec4(col, c); }`);
   const gatherM = sm({ tIn: { value: null }, res: { value: new THREE.Vector2(SW, SH) }, maxCoc: { value: 18 } },
@@ -132,11 +132,11 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
     const f = shot.focus || { amt: 0 };
     if (!f.legacy) {   // lemo-opuscar path: AO + physical spiral DOF. f.amt scales the aperture, f.ao (0..1) the occlusion
       const aoAmt = f.ao ?? 0.85; let a = null; if (aoAmt > 0) { a = ao(shot.scene, cam);
-        // the AO pass re-renders the scene with an override material: sprites, points and see-through cards would occlude as
-        // solid quads (dark squares), so they sit this pass out
+        // the AO pass re-renders the scene with an override material: sprites, points and non-depth-writing see-through cards would occlude as
+        // solid quads (dark squares), so they sit this pass out. character flats too (their full quads would print square contact shadows); the CoC pass then compares the scene depth with the AO pass depth and leaves AO off wherever something nearer (a flat) covers the occluded surface, so flats never show the AO of what stands behind them
         const hid = []; shot.scene.traverse((o) => { if (o.visible && (o.isSprite || o.isPoints || (o.material && !Array.isArray(o.material) && o.material.transparent))) { o.visible = false; hid.push(o); } });
         a.render(renderer, null, null); hid.forEach((o) => { o.visible = true; }); }
-      const u = cocM.uniforms; u.tColor.value = S.scene.texture; u.tDepth.value = S.scene.depthTexture; u.tAO.value = a ? a.gtaoMap : null; u.aoAmt.value = a ? aoAmt : 0;
+      const u = cocM.uniforms; u.tColor.value = S.scene.texture; u.tDepth.value = S.scene.depthTexture; u.tAO.value = a ? a.gtaoMap : null; u.tAOD.value = a ? a.depthTexture : null; u.aoAmt.value = a ? aoAmt : 0;
       u.focus.value = Math.max(0.05, f.dist || 5); u.range.value = f.range ?? 0.6; u.aper.value = f.aper ? f.aper * ss : 26 * (f.amt || 0) * ss * Math.max(0.3, f.dist || 5) / 5; u.maxCoc.value = (f.maxCoc || 22 * Math.min(1, (f.amt || 0) * 1.4)) * ss;
       u.near.value = cam.near; u.far.value = cam.far; const hz = shot.haze || {}; u.hazeDen.value = hz.den || 0; u.hazeStart.value = hz.start ?? 2; u.hazeMax.value = hz.max ?? 0.6; if (hz.col) u.hazeCol.value.set(...hz.col); pass(cocM, rtCoc);
       gatherM.uniforms.tIn.value = rtCoc.texture; gatherM.uniforms.maxCoc.value = u.maxCoc.value; pass(gatherM, S.dof); return S.dof.texture;

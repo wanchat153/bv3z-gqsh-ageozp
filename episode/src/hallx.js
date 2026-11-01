@@ -31,6 +31,7 @@ function candle(h = 0.25) { const g = new THREE.Group(); const s = new THREE.Mes
   const st = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.03, 16), GOLD()); g.add(st); return g; }
 
 export function buildHallExtras(scene, H, flame) {
+  const web0 = web;
   const X = {}; const r = mulberry(21);
   // --- cobwebs on the jar + the floor around it (S08 "later") ---
   X.webs = new THREE.Group(); scene.add(X.webs);
@@ -69,5 +70,6 @@ export function buildHallExtras(scene, H, flame) {
     c.beginPath(); c.ellipse(W * 0.45, Hh * 0.52, W * 0.18, Hh * 0.12, -0.2, 0, 7); c.fillStyle = '#9aa2b8'; c.fill(); c.stroke(); }, { transparent: true, lit: true });
   X.pigeon = pg; scene.add(pg); pg.visible = false;
   X.webs.visible = false;
-  X.web = web; return X;
+  X.web = (w, sd) => { const c = web0(w, sd); c.material.depthWrite = false; return c; };   // thin lines: stay out of the depth/AO pass
+  return X;
 }
