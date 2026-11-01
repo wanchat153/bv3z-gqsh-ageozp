@@ -74,6 +74,8 @@ function eyes(c, p) {
 function mouth(c, p) {
   const k = p.mouth || 'line'; const y = -205;
   if (k === 'line') taper(c, [-36, y + 2], [0, y - 2], [36, y + 2], 13);
+  else if (k === 'dot') { ell(c, 0, y - 6, 12, 10); c.fillStyle = INK; c.fill(); }
+  else if (k === 'laugh') { c.beginPath(); c.moveTo(-70, y - 24); c.quadraticCurveTo(0, y + 80, 70, y - 24); c.closePath(); ink(c, '#5a1f28', 10); c.save(); c.clip(); c.fillStyle = '#fff'; c.fillRect(-70, y - 30, 140, 22); ell(c, 0, y + 40, 34, 20); c.fillStyle = '#e8737f'; c.fill(); c.restore(); }
   else if (k === 'frown') taper(c, [-44, y + 14], [0, y - 22], [44, y + 14], 14);
   else if (k === 'smile') taper(c, [-40, y - 10], [0, y + 32], [40, y - 10], 14);
   else if (k === 'grin') { c.beginPath(); c.moveTo(-60, y - 14); c.quadraticCurveTo(0, y + 60, 60, y - 14); c.closePath(); ink(c, '#fff', 10); line(c, [[-52, y - 2], [52, y - 2]], 6);
@@ -191,3 +193,5 @@ export function walkPose(phase, stride = 60) {
   return { legs: { L: [-42 + s * stride, 440 - lift(s)], R: [42 - s * stride, 440 - lift(-s)] }, arms: { L: [-150 - s * 40, 130], R: [150 + s * 40, 130] } };
 }
 export const clampLook = (v) => [clamp(v[0], -1, 1), clamp(v[1], -1, 1)];
+// building blocks for other character drawers (cast.js in films): faces, hair, hats and ink helpers share one look
+export { ell, ink, line, hex, formFill, eyes as drawEyes, mouth as drawMouth, hair as drawHair, hat as drawHat, stitch, noodle, LW, SKIN };

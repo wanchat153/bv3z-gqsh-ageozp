@@ -3,6 +3,10 @@
 // Sharpness: every shot renders at SS× the output size (default 1.5) with 4× MSAA, then a 4-tap downsample + unsharp mask.
 // Every frame is a pure function of t: the film calls E.frame({...}) from its render(t).
 import * as THREE from './three.module.js';
+import { GTAOPass } from './addons/postprocessing/GTAOPass.js';
+// Ambient occlusion + physical depth of field ported from lemo-opuscar core/three/post.js (MIT):
+// GTAO contact shadows (the soft dark in every crease that makes the reference read as lit 3D), and a 96-tap spiral
+// gather DOF with CoC ∝ |1/focus − 1/z| that never lets a blurred background bleed over a sharp foreground.
 
 const VQ = 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position.xy,0.0,1.0); }';
 
@@ -23,6 +27,14 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
       a: [mk(SW >> 1, SH >> 1), mk(SW >> 2, SH >> 2)], b: [mk(SW >> 1, SH >> 1), mk(SW >> 2, SH >> 2)] };
   });
   const rtComp = mk(SW, SH);
+  const aoPass = new Map();   // per scene: GTAOPass bound to (scene, camera)
+  function ao(scene, camera) { let a = aoPass.get(scene); if (!a) { a = new GTAOPass(scene, camera, SW, SH); a.output = GTAOPass.OUTPUT.Off;
+      a.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.2, thickness: 1, scale: 2.2, distanceFallOff: 0.6, samples: 16 });
+      a.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6 * ss, rings: 2, samples: 16 }); aoPass.set(scene, a); }
+    a.camera = camera; a.gtaoMaterial.uniforms.cameraNear.value = camera.near; a.gtaoMaterial.uniforms.cameraFar.value = camera.far;
+    a.gtaoMaterial.uniforms.cameraProjectionMatrix.value.copy(camera.projectionMatrix); a.gtaoMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(camera.projectionMatrixInverse);
+    a.gtaoMaterial.uniforms.cameraWorldMatrix && a.gtaoMaterial.uniforms.cameraWorldMatrix.value.copy(camera.matrixWorld);
+    a.pdMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(camera.projectionMatrixInverse); return a; }
   const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); const quadScene = new THREE.Scene(); quadScene.add(quad);
   const pass = (mat, target) => { quad.material = mat; renderer.setRenderTarget(target); renderer.render(quadScene, quadCam); };
@@ -41,6 +53,30 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
       float coc=clamp(dz/(uFocus*0.9+0.001),0.0,1.0)*uAmt; if(dz<0.0) coc=0.0;
       vec4 b1=texture2D(tB1,vUv), b2=texture2D(tB2,vUv);
       vec4 o=mix(c,b1,smoothstep(0.0,0.5,coc)); o=mix(o,b2,smoothstep(0.45,1.0,coc)); gl_FragColor=o; }`);
+  const cocM = sm({ tColor: { value: null }, tDepth: { value: null }, tAO: { value: null }, aoAmt: { value: 0 }, focus: { value: 3 }, aper: { value: 4 }, maxCoc: { value: 18 }, near: { value: 0.05 }, far: { value: 200 }, range: { value: 0 }, hazeCol: { value: new THREE.Vector3(1, 0.9, 0.8) }, hazeDen: { value: 0 }, hazeStart: { value: 2 }, hazeMax: { value: 0.6 } },
+  `#include <packing>
+    varying vec2 vUv; uniform sampler2D tColor, tDepth, tAO; uniform float aoAmt, focus, aper, maxCoc, near, far, range, hazeDen, hazeStart, hazeMax; uniform vec3 hazeCol;
+    void main(){ float d = texture2D(tDepth, vUv).x; float z = -perspectiveDepthToViewZ(d, near, far);
+      float zz = z < focus ? min(z + range, focus) : max(z - range, focus);           // the subject band stays exactly in focus
+      float c = clamp(aper * (1.0/focus - 1.0/zz), -maxCoc, maxCoc);
+      vec3 col = texture2D(tColor, vUv).rgb; if (aoAmt > 0.) col *= mix(1., pow(texture2D(tAO, vUv).r, 1.6), aoAmt);
+      if (hazeDen > 0.) col = mix(col, hazeCol, hazeMax * (1. - exp(-max(0., z - hazeStart) * hazeDen)));   // aerial perspective
+      gl_FragColor = vec4(col, c); }`);
+  const gatherM = sm({ tIn: { value: null }, res: { value: new THREE.Vector2(SW, SH) }, maxCoc: { value: 18 } },
+  `varying vec2 vUv; uniform sampler2D tIn; uniform vec2 res; uniform float maxCoc;
+    void main(){ vec4 c0 = texture2D(tIn, vUv); float a0 = abs(c0.a); if (maxCoc < .5 || a0 < .25 && maxCoc < 1.) { gl_FragColor = vec4(c0.rgb, 1.); return; }
+      vec3 acc = c0.rgb / (a0*a0 + 1.); float wsum = 1. / (a0*a0 + 1.);
+      for (int i = 0; i < 96; i++) { float r = maxCoc * sqrt((float(i) + .5) / 96.); float th = float(i) * 2.39996;
+        vec4 s = texture2D(tIn, vUv + vec2(cos(th), sin(th)) * r / res); float sa = abs(s.a);
+        if (s.a > c0.a) sa = min(sa, max(a0, 0.));
+        float w = smoothstep(r - 1.5, r + .5, sa) / (sa*sa + 1.); acc += s.rgb * w; wsum += w; }
+      gl_FragColor = vec4(acc / wsum, 1.); }`);
+  const rtCoc = mk(SW, SH);
+  const bA = [mk(SW >> 2, SH >> 2), mk(SW >> 3, SH >> 3), mk(SW >> 4, SH >> 4)], bB = [mk(SW >> 2, SH >> 2), mk(SW >> 3, SH >> 3), mk(SW >> 4, SH >> 4)];
+  const brightM = sm({ tSrc: { value: null }, uTh: { value: 0.82 } }, 'uniform sampler2D tSrc; uniform float uTh; varying vec2 vUv; void main(){ vec3 c=texture2D(tSrc,vUv).rgb; float l=dot(c,vec3(0.3,0.55,0.15)); gl_FragColor=vec4(c*smoothstep(uTh,uTh+0.5,l),1.0); }');
+  function bloom(src, th) { brightM.uniforms.tSrc.value = src; brightM.uniforms.uTh.value = th; pass(brightM, bA[0]);
+    for (let i = 0; i < 3; i++) { if (i) { copyM.uniforms.tSrc.value = bA[i - 1].texture; pass(copyM, bA[i]); } const w = bA[i].width, h = bA[i].height;
+      blurM.uniforms.tSrc.value = bA[i].texture; blurM.uniforms.uDir.value.set(1.5 / w, 0); pass(blurM, bB[i]); blurM.uniforms.tSrc.value = bB[i].texture; blurM.uniforms.uDir.value.set(0, 1.5 / h); pass(blurM, bA[i]); } }
   const transM = sm({ tA: { value: null }, tB: { value: null }, tM: { value: null }, uKind: { value: 0 }, uP: { value: 0 }, uC: { value: new THREE.Vector2(0.5, 0.5) },
     uR: { value: 0 }, uF: { value: 0.004 }, uRing: { value: 0 }, uAsp: { value: W / H }, uDir: { value: new THREE.Vector2(1, 0) }, uZoom: { value: 0.18 }, uBulge: { value: 0.35 }, uFog: { value: new THREE.Vector3(1.0, 0.86, 0.7) } },
   `uniform sampler2D tA,tB,tM; uniform float uKind,uP,uR,uF,uRing,uAsp,uZoom,uBulge; uniform vec2 uC,uDir; uniform vec3 uFog; varying vec2 vUv;
@@ -73,15 +109,15 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
       vec2 ua=0.5+(vUv-0.5)*(1.0-uZoom*uP), ubb=0.5+(vUv-0.5)*(1.0+uZoom*(1.0-uP));
       gl_FragColor=mix(texture2D(tA,ua),texture2D(tB,ubb),smoothstep(0.0,1.0,uP)); }`);
   // downsample (4 taps) + unsharp mask + grade + vignette + fade + captions
-  const finalM = sm({ tS: { value: null }, tCap: { value: null }, tOv: { value: null }, uPx: { value: new THREE.Vector2(1 / W, 1 / H) }, uSharp: { value: sharpen }, uFade: { value: 1 }, uSat: { value: 1.1 },
+  const finalM = sm({ tS: { value: null }, tCap: { value: null }, tOv: { value: null }, tB0: { value: null }, tB1: { value: null }, tB2: { value: null }, uBloom: { value: 0 }, uBloomTint: { value: new THREE.Vector3(1, 0.85, 0.65) }, uPx: { value: new THREE.Vector2(1 / W, 1 / H) }, uSharp: { value: sharpen }, uFade: { value: 1 }, uSat: { value: 1.1 },
     uTint: { value: new THREE.Vector3(1, 1, 1) }, uVig: { value: 0.14 }, uCapOn: { value: 1 }, uContrast: { value: 1.04 } },
-  `uniform sampler2D tS,tCap,tOv; uniform vec2 uPx; uniform float uSharp,uFade,uSat,uVig,uCapOn,uContrast; uniform vec3 uTint; varying vec2 vUv;
+  `uniform sampler2D tS,tCap,tOv,tB0,tB1,tB2; uniform float uBloom; uniform vec3 uBloomTint; uniform vec2 uPx; uniform float uSharp,uFade,uSat,uVig,uCapOn,uContrast; uniform vec3 uTint; varying vec2 vUv;
     vec3 tap(vec2 uv){ vec2 h=uPx*0.25; return 0.25*(texture2D(tS,uv+vec2(-h.x,-h.y)).rgb+texture2D(tS,uv+vec2(h.x,-h.y)).rgb+texture2D(tS,uv+vec2(-h.x,h.y)).rgb+texture2D(tS,uv+vec2(h.x,h.y)).rgb); }
     vec3 grade(vec3 c){ c*=uTint; c=1.22*c/(1.0+0.32*c); c=pow(clamp(c,0.0,1.0),vec3(1.0/2.2)); c=(c-0.5)*uContrast+0.5;
       float l=dot(c,vec3(0.3,0.55,0.15)); return mix(vec3(l),c,uSat); }
     void main(){ vec3 c=tap(vUv);
       vec3 n=(tap(vUv+vec2(uPx.x,0.0))+tap(vUv-vec2(uPx.x,0.0))+tap(vUv+vec2(0.0,uPx.y))+tap(vUv-vec2(0.0,uPx.y)))*0.25;
-      c=max(c+(c-n)*uSharp*2.0,0.0); c=grade(c);
+      c=max(c+(c-n)*uSharp*2.0,0.0); if(uBloom>0.) c+=(texture2D(tB0,vUv).rgb*0.5+texture2D(tB1,vUv).rgb*0.8+texture2D(tB2,vUv).rgb*1.1)*uBloom*uBloomTint; c=grade(c);
       vec2 v=(vUv-0.5)*vec2(1.0,1.1); c*=1.0-uVig*smoothstep(0.45,0.95,length(v)*1.25); c*=uFade;
       vec4 ov=texture2D(tOv,vUv); c=mix(c,ov.rgb,ov.a);
       vec4 k=texture2D(tCap,vUv); c=mix(c,k.rgb,k.a*uCapOn);
@@ -90,9 +126,21 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
   const dummy = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1); dummy.needsUpdate = true;
 
   function renderShot(i, shot) {
+    if (shot.prep) shot.prep();   // shots sharing one scene set their poses right before their own render
     const S = slot[i]; const cam = shot.camera;
     renderer.setRenderTarget(S.scene); renderer.setClearColor(shot.clear ?? clear, 1); renderer.render(shot.scene, cam);
     const f = shot.focus || { amt: 0 };
+    if (!f.legacy) {   // lemo-opuscar path: AO + physical spiral DOF. f.amt scales the aperture, f.ao (0..1) the occlusion
+      const aoAmt = f.ao ?? 0.85; let a = null; if (aoAmt > 0) { a = ao(shot.scene, cam);
+        // the AO pass re-renders the scene with an override material: sprites, points and see-through cards would occlude as
+        // solid quads (dark squares), so they sit this pass out
+        const hid = []; shot.scene.traverse((o) => { if (o.visible && (o.isSprite || o.isPoints || (o.material && !Array.isArray(o.material) && o.material.transparent))) { o.visible = false; hid.push(o); } });
+        a.render(renderer, null, null); hid.forEach((o) => { o.visible = true; }); }
+      const u = cocM.uniforms; u.tColor.value = S.scene.texture; u.tDepth.value = S.scene.depthTexture; u.tAO.value = a ? a.gtaoMap : null; u.aoAmt.value = a ? aoAmt : 0;
+      u.focus.value = Math.max(0.05, f.dist || 5); u.range.value = f.range ?? 0.6; u.aper.value = f.aper ? f.aper * ss : 26 * (f.amt || 0) * ss * Math.max(0.3, f.dist || 5) / 5; u.maxCoc.value = (f.maxCoc || 22 * Math.min(1, (f.amt || 0) * 1.4)) * ss;
+      u.near.value = cam.near; u.far.value = cam.far; const hz = shot.haze || {}; u.hazeDen.value = hz.den || 0; u.hazeStart.value = hz.start ?? 2; u.hazeMax.value = hz.max ?? 0.6; if (hz.col) u.hazeCol.value.set(...hz.col); pass(cocM, rtCoc);
+      gatherM.uniforms.tIn.value = rtCoc.texture; gatherM.uniforms.maxCoc.value = u.maxCoc.value; pass(gatherM, S.dof); return S.dof.texture;
+    }
     if (f.amt > 0) {
       copyM.uniforms.tSrc.value = S.scene.texture; pass(copyM, S.a[0]);
       for (let k = 0; k < 2; k++) {
@@ -123,7 +171,8 @@ export function createEngine({ W = innerWidth, H = innerHeight, clear = 0xbfe3ff
       u.uDir.value.set(...(T.dir || [1, 0])); u.uZoom.value = T.zoom ?? 0.18; u.uBulge.value = T.bulge ?? 0.35; u.tM.value = T.mask || dummy;
       pass(transM, rtComp); src = rtComp.texture;
     }
-    const f = finalM.uniforms; f.tS.value = src; f.tCap.value = o.captions ? o.captions.tex : dummy; f.uCapOn.value = o.capOn ?? 1; f.tOv.value = o.overlay ? o.overlay.tex : dummy;
+    const bl = o.bloom ?? 0.35; if (bl > 0) bloom(src, o.bloomTh ?? 0.82);
+    const f = finalM.uniforms; f.tS.value = src; f.uBloom.value = bl; f.tB0.value = bA[0].texture; f.tB1.value = bA[1].texture; f.tB2.value = bA[2].texture; f.tCap.value = o.captions ? o.captions.tex : dummy; f.uCapOn.value = o.capOn ?? 1; f.tOv.value = o.overlay ? o.overlay.tex : dummy;
     f.uFade.value = o.fade ?? 1; f.uSat.value = o.sat ?? 1.1; f.uVig.value = o.vig ?? 0.14; f.uTint.value.set(...(o.tint || [1, 1, 1]));
     f.uSharp.value = o.sharpen ?? sharpen; f.uContrast.value = o.contrast ?? 1.04;
     pass(finalM, null);
