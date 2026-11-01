@@ -44,7 +44,7 @@ for (let i = 0; i < ND; i++) { const d = new THREE.Mesh(new THREE.SphereGeometry
 // near-shut caps stay ~0.34 on the setbacks so his reaction still reads in the gap; only the final close hits 0.
 const DOORKEYS = [
   [0, 1], [T.d1close0, 1], [T.d1shut, 0.34], [T.d1shut + 0.06, 0.34], [T.d1open1, 1],
-  [T.stepIn1, 1], [T.d2close0, 1], [T.d2catch, 0.34], [T.d2catch + 0.06, 0.34], [T.d2open1, 0.9],
+  [T.stepIn1, 1], [T.d2close0, 1], [T.d2catch, 0.2], [T.d2catch + 0.06, 0.2], [T.d2open1, 0.9],
   [T.yankDone, 0.9], [T.d3close0, 0.9], [T.leaf1, 0.34], [T.leaf1 + 0.05, 0.34], [T.d3open1, 0.92],
   [T.d4close0, 0.92], [T.leaf2, 0.34], [T.leaf2 + 0.05, 0.34], [T.d4open1, 0.92],
   [T.slowin, 0.92], [T.slowout, 0.92], [T.reach0, 0.92], [T.back1, 0.92],
@@ -61,21 +61,24 @@ function doorOpen(t) {
 
 // ---------- leaf drops ----------
 // each: start time, duration (film-time), x start, x drift, top y, z. The clue drop is long (slow motion reads).
-// leaves drift down THROUGH the door opening (|x|<DW) so they cross the safety beam in front of him.
+// each leaf LEAVES THE PLANT (x0 near the plant's foliage) and drifts RIGHT into the door opening, crossing the
+// safety beam in front of him, so the "the plant is the culprit" logic reads. x = x0 + dx*ease (dx>0 = rightward).
+const PLTOP = PLANT.x + 0.14;        // where the foliage sits
 const DROPS = [
-  { t0: T.d3close0 + 0.1, t1: T.leaf1 + 0.6, x0: 0.22, dx: 0.28, yTop: 2.0, z: BZ - 0.02, clue: false },
-  { t0: T.d4close0 + 0.1, t1: T.leaf2 + 0.6, x0: 0.18, dx: 0.3, yTop: 2.0, z: BZ - 0.02, clue: false },
-  { t0: T.leafSlow0, t1: T.leafSlowCross + 1.4, x0: 0.28, dx: 0.34, yTop: 2.05, z: BZ - 0.02, clue: true },
-  { t0: T.leafTwist, t1: T.leafTwist + 1.6, x0: 0.24, dx: 0.3, yTop: 2.0, z: BZ - 0.02, clue: false },
+  { t0: T.d3close0 + 0.05, t1: T.leaf1 + 0.7, x0: PLTOP, dx: 1.05, yTop: 1.68, z: -1.12, clue: false },
+  { t0: T.d4close0 + 0.05, t1: T.leaf2 + 0.7, x0: PLTOP, dx: 1.1, yTop: 1.62, z: -1.12, clue: false },
+  { t0: T.leafSlow0, t1: T.leafSlowCross + 1.6, x0: PLTOP, dx: 1.1, yTop: 1.7, z: -1.12, clue: true },
+  { t0: T.leafTwist, t1: T.leafTwist + 1.8, x0: PLTOP, dx: 1.08, yTop: 1.66, z: -1.12, clue: false },
 ];
 function leafPos(dp, t) {
   const u = clamp((t - dp.t0) / (dp.t1 - dp.t0), 0, 1);
   const yb = 0.06;                                  // settles on the threshold floor
   const y = mix(dp.yTop, yb, sstep(0, 1, u));
-  const sway = Math.sin(u * Math.PI * 3 + 1) * 0.1 * (1 - u * 0.3);
-  const x = dp.x0 - dp.dx * sstep(0, 1, u) + sway;
+  const sway = Math.sin(u * Math.PI * 3 + 1) * 0.08 * (1 - u * 0.3);
+  const x = dp.x0 + dp.dx * sstep(0, 1, u) + sway;  // drifts from the plant into the opening
+  const z = mix(dp.z, BZ - 0.02, sstep(0, 1, u));
   const spin = u * (dp.clue ? 8 : 14);
-  return { pos: new THREE.Vector3(x, y, dp.z), u, spin };
+  return { pos: new THREE.Vector3(x, y, z), u, spin };
 }
 function activeDrop(t) { for (const dp of DROPS) if (t >= dp.t0 && t <= dp.t1 + 0.4) return dp; return null; }
 
@@ -93,11 +96,11 @@ const KEYS = [
   [T.leaf1, V(0.5, 1.36, 2.0), V(0.05, 1.1, -1.05), 40],
   [T.baffled, V(0.6, 1.4, 2.1), V(0.08, 1.12, -1.0), 40],
   [T.leaf2, V(0.55, 1.4, 2.05), V(0.06, 1.12, -1.0), 40],
-  [T.lookUp, V(0.64, 1.46, 2.12), V(0.06, 1.18, -1.0), 40],
-  // slow clue — ease closer and drift across to favour the beam + plant
-  [T.slowin + 0.3, V(0.5, 1.4, 1.85), V(-0.05, 1.12, -1.05), 39],
-  [T.leafSlowCross, V(0.2, 1.3, 1.65), V(-0.2, 1.0, -1.05), 38],
-  [T.realize, V(0.35, 1.38, 1.8), V(-0.1, 1.08, -1.05), 39],
+  [T.lookUp, V(0.5, 1.46, 2.2), V(-0.1, 1.18, -1.0), 42],
+  // slow clue — pull back and favour the plant + doorway so the leaf's whole arc from the plant reads
+  [T.slowin + 0.3, V(-0.05, 1.46, 2.5), V(-0.5, 1.16, -1.0), 46],
+  [T.leafSlowCross, V(0.0, 1.36, 2.35), V(-0.42, 1.06, -1.0), 45],
+  [T.realize, V(0.12, 1.4, 2.2), V(-0.24, 1.1, -1.0), 43],
   // idea + pluck — favour man and plant together
   [T.eureka, V(-0.15, 1.42, 2.0), V(-0.45, 1.08, -0.95), 40],
   [T.pluck, V(-0.25, 1.38, 1.95), V(-0.5, 1.0, -0.9), 40],
@@ -140,11 +143,15 @@ function manAt(t) {
   m.blink = (Math.sin(w * 1.3) > 0.985 || Math.sin(w * 0.77 + 2) > 0.99) ? 1 : 0;
 
   if (t < T.run) {
-    // stroll in from the right, glance at the lift
-    const u = sstep(T.walkIn0, T.notice + 0.2, t); m.anchor.copy(OUT_R).lerp(THRESH, u);
-    const bob = Math.sin(w * 7) * 14; m.hands.L = { c: [-150, 20 + bob] }; m.hands.R = { c: [150, 20 - bob] };
+    // stroll in from the right with a real walk cycle, then spot the closing doors
+    const u = sstep(T.walkIn0, T.notice + 0.15, t); m.anchor.copy(OUT_R).lerp(THRESH, u);
+    const walking = t > T.walkIn0 + 0.05 && t < T.notice + 0.05; const ph = w * 9;
+    m.walk = ph; m.walkAmp = walking ? 1 : 0;
+    m.dyBounce = walking ? -Math.abs(Math.sin(ph)) * 15 : 0;
+    const sw = walking ? Math.sin(ph) * 32 : 0;
+    m.hands.L = { c: [-150, 26 - sw] }; m.hands.R = { c: [150, 26 + sw] };
     m.mood = 'happy'; m.look = [-0.4, 0.1];
-    if (t > T.notice) { m.mood = 'horror'; m.look = [-0.2, -0.1]; m.tuft = Math.exp(-(t - T.notice) * 5) * Math.sin((t - T.notice) * 30); }
+    if (t > T.notice) { m.mood = 'horror'; m.walkAmp = 0; m.dyBounce = 0; m.look = [-0.2, -0.1]; m.tuft = Math.exp(-(t - T.notice) * 5) * Math.sin((t - T.notice) * 30); }
   } else if (t < T.stepIn0) {
     // bolt + lunge, stick a hand in the gap
     const u = sstep(T.run, T.d1lunge, t); m.anchor.copy(THRESH); m.anchor.x = mix(THRESH.x + 0.5, THRESH.x, u);
@@ -157,14 +164,23 @@ function manAt(t) {
     const u = sstep(T.stepIn0, T.stepIn1, t); m.anchor.copy(THRESH).lerp(INSIDE, u);
     m.mood = 'happy'; m.look = [0, 0]; m.hands.L = { c: [-150, 25] }; m.hands.R = { c: [150, 25] };
   } else if (t < T.yank) {
-    // doors catch his trailing foot
+    // the closing doors pinch his necktie — he's tugged toward the gap
     m.anchor.copy(INSIDE); m.mood = 'happy';
-    if (t > T.d2close0 + 0.2) { m.look = [0, 0.1]; }
-    if (t > T.d2catch - 0.05) { m.mood = t < T.d2catch + 0.3 ? 'horror' : 'nervous'; m.look = [-0.3, 0.8]; m.tilt = -0.1; m.lookW = V(-0.05, 0.15, BZ - 0.05); m.hands.L = { c: [-150, 30] }; m.hands.R = { c: [150, 30] }; }
+    if (t > T.d2close0 + 0.2) m.look = [0, -0.1];
+    if (t > T.d2catch - 0.03) {
+      const e = Math.exp(-(t - T.d2catch) * 5);
+      m.mood = t < T.d2catch + 0.3 ? 'horror' : 'nervous';
+      m.anchor.z += 0.13 * (1 - e); m.tilt = 0.15 * (1 - e * 0.4);     // pulled toward the doors
+      m.look = [0, 0.6]; m.lookW = V(0.0, 0.55, BZ - 0.02);
+      m.hands.L = { c: [-150, 30] }; m.hands.R = { c: [150, 30] };
+    }
   } else if (t < T.d3close0) {
-    // pull the foot in (a little hop), annoyed
-    const e = Math.exp(-(t - T.yank) * 6); m.anchor.copy(INSIDE); m.anchor.y += 0.06 * Math.max(0, Math.sin((t - T.yank) * 10)) * (t < T.yankDone ? 1 : 0);
-    m.mood = 'suspicious'; m.look = [0, 0.3]; m.tilt = 0.04 * e;
+    // he grabs the tie with both hands and yanks it free, then rocks back
+    const e = Math.exp(-(t - T.yank) * 5); m.anchor.copy(INSIDE); m.anchor.z += 0.13 * e;
+    m.mood = t < T.yankDone ? 'despair' : 'suspicious';
+    m.shape = { L: 'open', R: 'open' }; m.over = true;
+    m.hands.L = { c: [-24, -120] }; m.hands.R = { c: [24, -120] };     // both hands at the chest, pulling the tie
+    if (t > T.yankDone) { m.over = false; m.hands.L = { c: [-150, 25] }; m.hands.R = { c: [150, 25] }; m.look = [0, 0.3]; m.tilt = 0.04 * e; }
   } else if (t < T.lookUp) {
     // doors close, a leaf crosses, they bounce — twice. he gets baffled.
     m.anchor.copy(INSIDE); m.mood = 'suspicious'; m.look = [-0.3, -0.2];
@@ -251,7 +267,7 @@ function setup(t) {
   // man + arms
   const m = manAt(t);
   MAN.mesh.position.copy(m.anchor); ARMS.mesh.position.copy(m.anchor);
-  const pose = { mood: m.mood, look: m.look || [0, 0], tilt: m.tilt, sq: m.sq, tuft: m.tuft, sweat: m.sweat, blink: m.blink, dy: 0, hands: {}, shape: m.shape, knife: false };
+  const pose = { mood: m.mood, look: m.look || [0, 0], tilt: m.tilt, sq: m.sq, tuft: m.tuft, sweat: m.sweat, blink: m.blink, dy: m.dyBounce || 0, walk: m.walk || 0, walkAmp: m.walkAmp || 0, hands: {}, shape: m.shape, knife: false };
   if (m.lookW) { const q = toCanvas(MAN, m.lookW); const fx = q[0], fy = q[1] + 330; const L = Math.hypot(fx, fy) || 1; pose.look = [fx / L * Math.min(1, L / 160), fy / L * Math.min(1, L / 160)]; }
   for (const s of ['L', 'R']) { const h = m.hands[s]; pose.hands[s] = h.w ? toCanvas(MAN, h.w) : h.c; }
   MAN.update(camera, m.anchor, right, pose, m.ground, 0.0);

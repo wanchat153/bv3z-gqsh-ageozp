@@ -123,7 +123,7 @@ export function drawButterfly(ctx, p) {
 
 // ---------------- Walt, the man in striped pyjamas (front view) ----------------
 // Canvas units: the plane is 1024 wide; feet at y=+430, top of the hair near -460.
-export const SKIN = '#f6c9a4', SKIN_D = '#e2a582', PJ = '#5b8fd6', PJ_S = '#e9f1fb', HAIR = '#5a3a2a', SLIP = '#e95b4b';
+export const SKIN = '#f6c9a4', SKIN_D = '#e2a582', PJ = '#36456b', PJ_S = '#2f3d61', HAIR = '#3a2a20', SLIP = '#2a2320', SHIRT = '#f4f0e8', TIE = '#9c3545';
 export const MAN_SHOULDER = { L: [-100, -195], R: [100, -195] };
 const UA = 150, FA = 140;
 export function armIK(S, H, side) {
@@ -161,7 +161,7 @@ export function drawManArms(ctx, p) {
     ctx.beginPath(); ctx.moveTo(S[0], S[1]); ctx.lineTo(E[0], E[1]); ctx.lineTo(H[0], H[1]);
     ctx.lineWidth = 48 + LW * 2; ctx.strokeStyle = INK; ctx.stroke(); ctx.lineWidth = 48; ctx.strokeStyle = PJ; ctx.stroke();
     // a white cuff
-    const cx = E[0] + (H[0] - E[0]) * 0.8, cy = E[1] + (H[1] - E[1]) * 0.8; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(E[0] + (H[0] - E[0]) * 0.86, E[1] + (H[1] - E[1]) * 0.86); ctx.lineWidth = 50; ctx.strokeStyle = PJ_S; ctx.stroke();
+    const cx = E[0] + (H[0] - E[0]) * 0.8, cy = E[1] + (H[1] - E[1]) * 0.8; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(E[0] + (H[0] - E[0]) * 0.86, E[1] + (H[1] - E[1]) * 0.86); ctx.lineWidth = 50; ctx.strokeStyle = SHIRT; ctx.stroke();
     const shape = (p.shape && p.shape[k]) || 'open';
     hand(ctx, H, E, shape, side);
     if (k === 'R' && p.knife) knife(ctx, H, E);
@@ -170,17 +170,32 @@ export function drawManArms(ctx, p) {
 export function drawMan(ctx, p) {
   const sq = p.sq || [1, 1]; ctx.translate(0, 430); ctx.scale(sq[0], sq[1]); ctx.translate(0, -430); ctx.translate(0, p.dy || 0);
   const mood = p.mood || 'happy';
-  // legs and slippers
-  for (const s of [-1, 1]) { ctx.beginPath(); ctx.roundRect(s * 48 - 36, 30, 72, 380, 30); fillInk(ctx, PJ); ctx.save(); ctx.beginPath(); ctx.roundRect(s * 48 - 36, 30, 72, 380, 30); ctx.clip(); ctx.fillStyle = PJ_S; for (let x = -3; x <= 3; x++) ctx.fillRect(s * 48 + x * 24 - 4, 30, 8, 380); ctx.restore(); ctx.beginPath(); ctx.roundRect(s * 48 - 36, 30, 72, 380, 30); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
-    ell(ctx, s * 58, 418, 62, 26); fillInk(ctx, SLIP); ell(ctx, s * 58 + s * 4, 404, 30, 10); ctx.fillStyle = '#ffffff'; ctx.fill(); }
+  // legs + dress shoes, with an optional walk swing (p.walk = phase, p.walkAmp = 0..1)
+  const wph = p.walk || 0, wa = p.walkAmp || 0;
+  for (const s of [-1, 1]) {
+    const sw = wa * Math.sin(wph + (s < 0 ? 0 : Math.PI));
+    const lift = Math.max(0, sw) * 40; const len = 380 - lift * 0.5;
+    ctx.save(); ctx.translate(s * 48, 30); ctx.rotate(sw * 0.3);
+    const leg = () => { ctx.beginPath(); ctx.roundRect(-36, 0, 72, len, 26); };
+    leg(); fillInk(ctx, PJ);
+    ctx.save(); leg(); ctx.clip(); ctx.fillStyle = PJ_S; for (let x = -1; x <= 1; x++) ctx.fillRect(x * 26 - 3, 0, 5, len); ctx.restore();   // subtle pinstripe
+    leg(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
+    ell(ctx, 4, len + 6, 60, 24); fillInk(ctx, SLIP); ell(ctx, 4, len + 1, 24, 9); ctx.fillStyle = '#0f0b08'; ctx.fill();   // dress shoe + toe cap
+    ctx.restore();
+  }
   // torso: striped pyjama top
   const torso = () => { ctx.beginPath(); ctx.moveTo(-108, -205); ctx.quadraticCurveTo(-130, -60, -110, 70); ctx.quadraticCurveTo(0, 100, 110, 70); ctx.quadraticCurveTo(130, -60, 108, -205); ctx.quadraticCurveTo(0, -232, -108, -205); ctx.closePath(); };
   torso(); ctx.fillStyle = PJ; ctx.fill(); ctx.save(); torso(); ctx.clip(); ctx.fillStyle = PJ_S; for (let x = -6; x <= 6; x++) ctx.fillRect(x * 24 - 5, -240, 10, 340); ctx.restore(); torso(); ctx.lineWidth = LW; ctx.strokeStyle = INK; ctx.stroke();
-  // collar and buttons
-  ctx.beginPath(); ctx.moveTo(-60, -214); ctx.lineTo(0, -150); ctx.lineTo(60, -214); ctx.lineTo(28, -222); ctx.lineTo(0, -185); ctx.lineTo(-28, -222); ctx.closePath(); fillInk(ctx, PJ_S, LW * 0.8);
-  ctx.beginPath(); ctx.moveTo(-26, -222); ctx.lineTo(0, -186); ctx.lineTo(26, -222); ctx.closePath(); ctx.fillStyle = SKIN; ctx.fill();
-  for (let k = 0; k < 4; k++) { ell(ctx, 0, -120 + k * 52, 9, 9); fillInk(ctx, '#ffffff', LW * 0.5); }
-  ctx.beginPath(); ctx.roundRect(40, -110, 50, 44, 8); ctx.fillStyle = PJ_S; ctx.fill(); ctx.lineWidth = LW * 0.6; ctx.strokeStyle = INK; ctx.stroke();
+  // jacket lapels (navy), white shirt V, a tie, and a breast pocket square
+  ctx.beginPath(); ctx.moveTo(-70, -214); ctx.lineTo(0, -140); ctx.lineTo(70, -214); ctx.lineTo(30, -224); ctx.lineTo(0, -180); ctx.lineTo(-30, -224); ctx.closePath(); fillInk(ctx, PJ_S, LW * 0.8);
+  ctx.beginPath(); ctx.moveTo(-32, -210); ctx.lineTo(0, -120); ctx.lineTo(32, -210); ctx.closePath(); fillInk(ctx, SHIRT, LW * 0.5);   // shirt V
+  ctx.beginPath(); ctx.moveTo(-26, -222); ctx.lineTo(0, -186); ctx.lineTo(26, -222); ctx.closePath(); ctx.fillStyle = SKIN; ctx.fill();   // neck
+  // tie: knot + blade
+  ctx.beginPath(); ctx.moveTo(-12, -198); ctx.lineTo(12, -198); ctx.lineTo(9, -172); ctx.lineTo(-9, -172); ctx.closePath(); fillInk(ctx, TIE, LW * 0.5);
+  ctx.beginPath(); ctx.moveTo(-9, -172); ctx.lineTo(9, -172); ctx.lineTo(17, -70); ctx.lineTo(0, -36); ctx.lineTo(-17, -70); ctx.closePath(); fillInk(ctx, TIE, LW * 0.6);
+  // one jacket button + breast pocket square
+  ell(ctx, 6, -40, 8, 8); fillInk(ctx, PJ_S, LW * 0.4);
+  ctx.beginPath(); ctx.roundRect(44, -120, 46, 30, 5); fillInk(ctx, SHIRT, LW * 0.5);
   // head (tilted)
   ctx.save(); ctx.translate(0, -240); ctx.rotate(p.tilt || 0); ctx.translate(0, -90);
   const look = p.look || [0, 0];

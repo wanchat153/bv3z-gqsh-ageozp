@@ -54,9 +54,8 @@ export function buildSet(scene) {
   // cab ceiling light
   const cabLight = box(0.5, 0.03, 0.4, toon(0xfff6d8), 0.003); cabLight.position.set(0, DH - 0.05, BZ - 0.36); scene.add(cabLight);
   cabLight.userData.mesh.material.emissive = new THREE.Color(0xfff2c8); cabLight.userData.mesh.material.emissiveIntensity = 0.6; out.cabLight = cabLight;
-  // handrail on the cab back wall
-  const hrail = cyl(0.02, 0.02, 2 * DW - 0.2, gold, 0.004, 16); hrail.rotation.z = Math.PI / 2; hrail.position.set(0, 0.95, CBZ + 0.05); scene.add(hrail);
-  for (const s of [-1, 1]) { const br = cyl(0.016, 0.016, 0.08, gold, 0.003, 10); br.rotation.x = Math.PI / 2; br.position.set(s * (DW - 0.14), 0.95, CBZ + 0.03); scene.add(br); }
+  // a short handrail low on each SIDE wall of the cab (out of frame behind the rider; no bar across him)
+  for (const s of [-1, 1]) { const hr = cyl(0.016, 0.016, 0.5, gold, 0.004, 12); hr.position.set(s * (DW - 0.03), 0.92, BZ - 0.4); scene.add(hr); }
 
   // ---- steel door frame surround ----
   const jw = 0.1;
