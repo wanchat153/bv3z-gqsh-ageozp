@@ -318,3 +318,44 @@ export const FARMER_SIDE = (c, p0) => { const p = { eyes: 'dot', mouth: 'line', 
   const elb = [40 - 70 * fly, 70 - 210 * fly], hand = [190 - 150 * fly, 214 - 380 * fly];
   line(c, [sho, elb, hand], 40, INK); line(c, [sho, elb, hand], 26, SH); ell(c, hand[0], hand[1], 26, 24); c.fillStyle = SKN; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke();
 };
+
+// ---- a walker in true profile, facing +x, with a real gait: p.walk = phase (radians; one cycle = two steps ≈ WALK_STRIDE m
+// on the ground, so move the card by phase/2π·WALK_STRIDE and the feet never slide). The stance foot stays on the floor —
+// the hips rise and fall with the legs (no hop). Arms swing against the legs. p: coat, hat 'cap'|null, hatCol, glasses,
+// beard, pack (a rucksack + bedroll on the back), eyes, mouth.
+export const WALK_STRIDE = 0.92;
+export const WALKER_SIDE = (c, p0) => { const p = { coat: '#6a6a4a', eyes: 'dot', mouth: 'line', ...p0 }; const ph = p.walk || 0, SKN = p.skin || SKIN;
+  c.translate(0, 448); c.scale(0.94, 0.94); c.translate(0, -448);
+  const L1 = 150, L2 = 150, R = Math.PI / 180;
+  const leg = (f) => { const a1 = 26 * R * Math.sin(f), kb = (6 + 55 * Math.pow(Math.max(0, Math.cos(f)), 1.2)) * R, a2 = a1 - kb;
+    const k = [L1 * Math.sin(a1), L1 * Math.cos(a1)], ft = [k[0] + L2 * Math.sin(a2), k[1] + L2 * Math.cos(a2)]; return { k, ft, lift: Math.max(0, Math.cos(f)) }; };
+  const A = leg(ph), B = leg(ph + Math.PI); const hipY = 440 - 16 - Math.max(A.ft[1], B.ft[1]); const hip = [0, hipY];
+  const P = (v) => [hip[0] + v[0], hip[1] + v[1]];
+  const drawLeg = (g, col) => { const kn = P(g.k), ft = P(g.ft); line(c, [hip, kn, ft], 42, INK); line(c, [hip, kn, ft], 28, col);
+    C(c, () => { c.translate(ft[0], ft[1] + 6); c.rotate(-0.25 * g.lift); ell(c, 24, 0, 50, 18); c.fillStyle = INK; c.fill(); }); };
+  const sho = [8, hipY - 250]; const arm = (f, col) => { const a = -24 * R * Math.sin(f), e = [sho[0] + 140 * Math.sin(a), sho[1] + 140 * Math.cos(a)], b = a + 22 * R;
+    const hd = [e[0] + 130 * Math.sin(b), e[1] + 130 * Math.cos(b)]; line(c, [sho, e, hd], 38, INK); line(c, [sho, e, hd], 24, col); ell(c, hd[0], hd[1], 24, 22); c.fillStyle = SKN; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke(); };
+  const dark = (h) => { const n = parseInt(h.slice(1), 16); const f = (x) => Math.round(x * 0.78).toString(16).padStart(2, '0'); return '#' + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); };
+  arm(ph, dark(p.coat)); drawLeg(B, '#22222e');
+  if (p.pack) { c.beginPath(); c.roundRect(-190, hipY - 270, 110, 200, 30); ink(c, '#6a5a3a', 7); c.beginPath(); c.roundRect(-205, hipY - 300, 140, 50, 24); ink(c, '#8a3a2a', 6); }
+  // coat in profile: back (left) to chest (right), hem just below the hips, swinging a little with the step
+  const top = hipY - 290, hem = hipY + 70, sw = 10 * Math.sin(ph * 2);
+  const coat = () => { c.beginPath(); c.moveTo(-26, top); c.quadraticCurveTo(-104, top + 10, -104, top + 110); c.quadraticCurveTo(-110, hipY, -100 + sw, hem); c.lineTo(96 + sw, hem - 6); c.quadraticCurveTo(92, hipY - 60, 92, top + 120); c.quadraticCurveTo(90, top + 6, 26, top - 2); c.closePath(); };
+  coat(); formFill(c, p.coat, -104, top, 96, hem, 0.3); C(c, () => { coat(); c.clip(); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(-120, top - 10, 60, hem - top + 20); });
+  coat(); c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(-104, hipY - 30); c.lineTo(94, hipY - 38); c.lineTo(94, hipY - 6); c.lineTo(-106, hipY + 2); c.closePath(); ink(c, '#4a3020', 6);
+  for (let k = 0; k < 4; k++) { ell(c, 72, top + 60 + k * 55, 8, 8); ink(c, '#e8dcc0', 3); }
+  drawLeg(A, '#2c2c3a');
+  // head in profile (same construction as FARMER_SIDE)
+  const hx = 18, hy = top - 150; c.beginPath(); c.rect(-28, top - 60, 56, 70); c.fillStyle = SKN; c.fill();
+  ell(c, hx, hy, 160, 158); const hg = c.createRadialGradient(hx + 40, hy - 70, 20, hx, hy, 180); hg.addColorStop(0, '#fffaf4'); hg.addColorStop(0.65, SKN); hg.addColorStop(1, '#e8d2c4'); c.fillStyle = hg; c.fill(); ringStroke(c, hx, hy, 160, 158, LW * 1.25);
+  c.beginPath(); c.moveTo(hx + 150, hy + 10); c.quadraticCurveTo(hx + 196, hy + 30, hx + 158, hy + 56); c.fillStyle = SKN; c.fill(); c.lineWidth = 9; c.strokeStyle = INK; c.stroke();
+  ell(c, hx - 40, hy + 6, 30, 44); c.fillStyle = SKN; c.fill(); c.lineWidth = 9; c.strokeStyle = INK; c.stroke(); ell(c, hx - 40, hy + 6, 12, 22); c.fillStyle = 'rgba(190,120,110,0.5)'; c.fill();
+  const ex = hx + 88, ey = hy - 18; ell(c, ex, ey, 13, 16); c.fillStyle = INK; c.fill(); taper(c, [ex - 30, ey - 50], [ex, ey - 62], [ex + 30, ey - 56], 12);
+  if (p.glasses) { ell(c, ex + 4, ey, 40, 34); c.lineWidth = 9; c.strokeStyle = INK; c.stroke(); line(c, [[ex - 36, ey - 4], [hx - 20, hy - 10]], 8, INK); }
+  if (p.beard) { c.beginPath(); c.moveTo(hx - 10, hy + 40); c.quadraticCurveTo(hx - 20, hy + 150, hx + 60, hy + 170); c.quadraticCurveTo(hx + 150, hy + 160, hx + 156, hy + 70); c.quadraticCurveTo(hx + 110, hy + 90, hx + 60, hy + 70); c.closePath(); ink(c, p.beardCol || '#6a4a32', 7); }
+  else { const m = p.mouth === 'open'; if (m) { ell(c, hx + 120, hy + 90, 18, 20); c.fillStyle = '#5a1a1a'; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke(); } else line(c, [[hx + 102, hy + 92], [hx + 140, hy + 88]], 9, INK); }
+  if (p.hat === 'cap') { c.beginPath(); c.ellipse(hx - 10, hy - 110, 168, 86, 0, Math.PI, 0); c.closePath(); formFill(c, p.hatCol || '#3a3a32', hx - 170, hy - 200, hx + 160, hy - 110, 0.35); c.lineWidth = LW; c.strokeStyle = INK; c.stroke();
+    c.beginPath(); c.moveTo(hx + 120, hy - 112); c.quadraticCurveTo(hx + 220, hy - 116, hx + 262, hy - 92); c.quadraticCurveTo(hx + 200, hy - 86, hx + 110, hy - 96); c.closePath(); ink(c, '#2a2a22', 7); }
+  arm(ph + Math.PI, p.coat);
+};

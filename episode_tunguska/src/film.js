@@ -12,7 +12,7 @@ import { haze } from './sky.js';
 import { buildTaiga, AIR, CABIN, CORE, R as RF } from './taiga.js';
 import { buildTown } from './town.js';
 import { buildGlobe } from './globe.js';
-import { SCIENTIST, FARMER, FARMER_SIDE, newspaper, CHAIR2D } from './cast.js';
+import { SCIENTIST, FARMER, FARMER_SIDE, WALKER_SIDE, WALK_STRIDE, newspaper, CHAIR2D } from './cast.js';
 
 await Promise.all([['800 40px Montserrat', 'Ab1'], ['800 40px Kanit', 'Ab1'], ['800 40px Kanit', 'กขคภูมิ']].map(([f, s]) => document.fonts.load(f, s)));   // the Thai subset loads only for Thai text
 const QS = new URLSearchParams(location.search);
@@ -33,7 +33,7 @@ const orbit = (c, r, h, a, tgt, fov) => aim(c, V(Math.cos(a) * r, h, Math.sin(a)
 // ================= worlds =================
 let TG = null; function taiga() { if (TG) return TG; const S = new THREE.Scene(); const T = buildTaiga(S); if (!QS.has('toon')) pbrify(S, E.renderer, { env: 0.32 });
   const mk = (fn) => { const f = makeFlat(SZ, 1024, fn); S.add(f.mesh); S.add(f.shadow); f.shadow.material.color.set(0x2a3a1a); return f; };
-  TG = { S, T, farmer: mk(FARMER), kulik: mk(SCIENTIST), porter: mk(FARMER), chair2d: mk(CHAIR2D), side: mk(FARMER_SIDE) }; return TG; }
+  TG = { S, T, farmer: mk(FARMER), kulik: mk(SCIENTIST), porter: mk(FARMER), chair2d: mk(CHAIR2D), side: mk(FARMER_SIDE), kw: mk(WALKER_SIDE), pw: mk(WALKER_SIDE) }; return TG; }
 let TW = null; function town() { if (TW) return TW; const S = new THREE.Scene(); const W = buildTown(S); if (!QS.has('toon')) pbrify(S, E.renderer, { env: 0.15 });
   const f = makeFlat(SZ, 1024, FARMER); S.add(f.mesh); S.add(f.shadow); TW = { S, W, man: f }; return TW; }
 let GL = null; function space() { if (GL) return GL; const S = new THREE.Scene(); const G = buildGlobe(S); G.ring.visible = false; G.arrow.visible = false; G.label.visible = false;
@@ -51,7 +51,7 @@ const HZ = { ...haze('morning', 0.5), max: 0.45 }; const HZA = { ...haze('mornin
 
 // ================= shots =================
 const SHOT = {};
-const tgReset = (W) => { const T = W.T; T.sky.setMode('morning'); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d', 'side']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
+const tgReset = (W) => { const T = W.T; T.sky.setMode('morning'); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d', 'side', 'kw', 'pw']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
 const show = (f) => { f.mesh.visible = true; f.shadow.visible = true; };
 // T01 — high above the flattened forest, slowly turning: everything lies in a circle
 SHOT.T01 = (t) => { const W = taiga(); const c = camOf('T01'); const u = loc('T01', t); orbit(c, 105 - 8 * u, 125 - 6 * u, 0.9 + 0.05 * u, V(0, 0, 0), 48);
@@ -107,10 +107,13 @@ SHOT.T09 = (t) => { const W = taiga(); const c = camOf('T09'); const u = loc('T0
 // T10 — 1927: Kulik and a guide climb through the fallen trunks
 SHOT.T10 = (t) => { const W = taiga(); const c = camOf('T10'); const u = loc('T10', t); const P = V(34, 0, 18); P.y = W.T.H(P.x, P.z);
   const dir = P.clone().setY(0).normalize().negate(); const walk = (k) => P.clone().addScaledVector(dir, k);
-  const [p, g, f] = keys([[0, P.clone().add(V(4, 2.2, 9)), P.clone().add(V(-2, 1.4, 0)), 40], [DD.T10, P.clone().add(V(1, 2.0, 7)), P.clone().add(V(-4, 1.4, -2)), 40]], u); aim(c, p, g, f);
-  const prep = () => { tgReset(W); W.T.blast(1); show(W.kulik); show(W.porter); const a = walk(u * 1.4), b = walk(u * 1.4 - 2.2).add(V(1.2, 0, 1.0));
-    W.kulik.update(c, a.clone().add(V(0, 0.43 * SZ + 0.15 * Math.abs(Math.sin(t * 6)), 0)), right(c), { legs: 'walk', walk: t * 7, hat: 'cap', glasses: true, col: '#6a6a4a', hatCol: '#5a5a42', eyes: 'dot', mouth: 'line', look: [-0.6, 0], arms: { L: [-160, 150], R: [140, -40] } }, a.y, 0.3);
-    W.porter.update(c, b.clone().add(V(0, 0.43 * SZ + 0.15 * Math.abs(Math.sin(t * 6 + 1)), 0)), right(c), { legs: 'walk', walk: t * 7 + 1.5, col: '#b8a888', eyes: 'dash', mouth: 'line', arms: { L: [-150, 160], R: [150, 160] } }, b.y, 0.3); };
+  // tracking side camera: perpendicular to the walking direction, riding along with the pair (they cross the frame in profile)
+  const nrm = V(-dir.z, 0, dir.x); const mid = walk(1.1 * u - 1.0); mid.y = W.T.H(mid.x, mid.z); aim(c, mid.clone().addScaledVector(nrm, 6.6).add(V(0, 1.5, 0)).addScaledVector(dir, -0.4), mid.clone().add(V(0, 1.0, 0)), 42);
+  // a real walk at 1.1 m/s: position and gait phase both come from the distance walked (no foot sliding, no hop)
+  const prep = () => { tgReset(W); W.T.blast(1); show(W.kw); show(W.pw); const v = 1.1, dk = v * u, dp = v * u - 2.0;
+    const a = walk(dk), b = walk(dp).addScaledVector(V(-dir.z, 0, dir.x), -0.6); a.y = W.T.H(a.x, a.z); b.y = W.T.H(b.x, b.z);
+    W.kw.update(c, a.clone().add(V(0, 0.43 * SZ, 0)), dir, { walk: dk / WALK_STRIDE * Math.PI * 2, hat: 'cap', glasses: true, coat: '#6a6a4a', hatCol: '#5a5a42' }, a.y, 0.3);
+    W.pw.update(c, b.clone().add(V(0, 0.43 * SZ, 0)), dir, { walk: dp / WALK_STRIDE * Math.PI * 2 + 0.4, hat: 'cap', beard: true, coat: '#b8a888', hatCol: '#4a4232', pack: true }, b.y, 0.3); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { dist: 9, range: 2.5, amt: 0.45 } }; };
 // T11 — the centre: no crater; the trees still stand, stripped bare like telegraph poles
 SHOT.T11 = (t) => { const W = taiga(); const c = camOf('T11'); const u = loc('T11', t);
