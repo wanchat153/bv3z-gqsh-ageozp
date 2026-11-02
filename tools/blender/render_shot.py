@@ -31,7 +31,7 @@ LOOKS = {
   'three': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.7, tint=(1, 1, 1), dof=1.0),   # the three.js film's own levels
   'hall': dict(sun=0.5, point=2.2, hemi=0.6, env=0.6, ao=1.2, tint=(0.88, 0.82, 1.0), dof=3.0),   # reference: muted lavender stone, firelit subjects, soft background
   'city': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.2, tint=(1, 1, 1), dof=1.0),
-  'taiga': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.5, tint=(1, 1, 1), dof=1.0),
+  'taiga': dict(sun=2.2, point=1.0, hemi=0.6, env=0.55, ao=3.0, tint=(0.85, 0.92, 1.1), dof=1.4),   # HQ: strong low warm key, cool fill, deep contact AO
   'night': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.0, tint=(1, 1, 1), dof=1.0),
   'space': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.5, tint=(1, 1, 1), dof=1.0),
   'flat': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.3, tint=(1, 1, 1), dof=0.0),

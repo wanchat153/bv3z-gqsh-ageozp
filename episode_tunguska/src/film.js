@@ -12,6 +12,7 @@ import { haze } from './sky.js';
 import { buildTaiga, AIR, CABIN, CORE, R as RF } from './taiga.js';
 import { buildTown } from './town.js';
 import { buildGlobe } from './globe.js';
+import { earthTex, asteroidGeo, stoneTex } from './hq.js';
 import { SCIENTIST, FARMER, FARMER_SIDE, WALKER_SIDE, WALK_STRIDE, newspaper, CHAIR2D } from './cast.js';
 
 await Promise.all([['800 40px Montserrat', 'Ab1'], ['800 40px Kanit', 'Ab1'], ['800 40px Kanit', 'กขคภูมิ']].map(([f, s]) => document.fonts.load(f, s)));   // the Thai subset loads only for Thai text
@@ -37,21 +38,23 @@ let TG = null; function taiga() { if (TG) return TG; const S = new THREE.Scene()
 let TW = null; function town() { if (TW) return TW; const S = new THREE.Scene(); const W = buildTown(S); if (!QS.has('toon')) pbrify(S, E.renderer, { env: 0.15 });
   const f = makeFlat(SZ, 1024, FARMER); S.add(f.mesh); S.add(f.shadow); TW = { S, W, man: f }; return TW; }
 let GL = null; function space() { if (GL) return GL; const S = new THREE.Scene(); const G = buildGlobe(S); G.ring.visible = false; G.arrow.visible = false; G.label.visible = false;
-  const rockG = new THREE.IcosahedronGeometry(0.35, 1); const rp = rockG.attributes.position; for (let i = 0; i < rp.count; i++) { const k = 0.8 + 0.4 * Math.abs(Math.sin(i * 7.3)); rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.8, rp.getZ(i) * k); } rockG.computeVertexNormals();
-  const rock = new THREE.Mesh(rockG, new THREE.MeshStandardMaterial({ color: 0x8a7a70, roughness: 0.9, flatShading: true, emissive: 0xff7030, emissiveIntensity: 0 })); S.add(rock); G.rock = rock;
+  const rockG = asteroidGeo(5); rockG.scale(0.35, 0.35, 0.35); const RT = stoneTex(); RT.map.repeat.set(2, 2); RT.normalMap.repeat.set(2, 2);
+  const rock = new THREE.Mesh(rockG, new THREE.MeshStandardMaterial({ color: 0x9a8a80, map: RT.map, normalMap: RT.normalMap, roughness: 0.9, emissive: 0xff7030, emissiveIntensity: 0 })); S.add(rock); G.rock = rock;
   const tailT = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.3, 'rgba(255,150,60,0.7)'); gr.addColorStop(1, 'rgba(255,80,20,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   G.tail = []; for (let j = 0; j < 24; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tailT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); S.add(s); G.tail.push(s); }
   const label = makeCard(5.2, 1.2, 1024, (g, w, h) => { g.clearRect(0, 0, w, h); signText(g, '54,000 กม./ชม.', w / 2, h / 2, 130, '#ffe9a8', '#1b1420', 'Kanit, Montserrat'); }, { transparent: true }); S.add(label); G.speed = label;
   // energy grid: hundreds of tiny flashes on a black card that fill the frame (T14)
   const grid = makeCard(8, 14.2, 1024, () => {}, { transparent: true }); grid.renderOrder = 2; S.add(grid); G.grid = grid;
-  const full = new THREE.Mesh(new THREE.SphereGeometry(5, 96, 48), G.earth.children[0].material.clone()); full.material.side = THREE.FrontSide; S.add(full); G.full = full;
+  const ET = earthTex(); const full = new THREE.Mesh(new THREE.SphereGeometry(5, 192, 96), new THREE.MeshStandardMaterial({ map: ET.map, normalMap: ET.normalMap, roughness: 0.55 })); S.add(full); G.full = full;
+  const cloud = new THREE.Mesh(new THREE.SphereGeometry(5.06, 192, 96), new THREE.MeshStandardMaterial({ map: ET.clouds, transparent: true, roughness: 1, depthWrite: false })); full.add(cloud); cloud.rotation.y = 0.4;
   const atmo = new THREE.Mesh(new THREE.SphereGeometry(5.25, 64, 32), new THREE.MeshBasicMaterial({ color: 0x7ab8ff, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false })); S.add(atmo); G.atmo = atmo;
   GL = { S, G }; return GL; }
 const HZ = { ...haze('morning', 0.5), max: 0.45 }; const HZA = { ...haze('morning', 0.2), start: 60, max: 0.15 };
 
 // ================= shots =================
 const SHOT = {};
-const tgReset = (W) => { const T = W.T; T.sky.setMode('morning'); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d', 'side', 'kw', 'pw']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
+const PORCH_SUN = V(-0.8, 0.42, 0.75);   // T05–T07: a low warm key from the front-left, so the logs, the farmer and the window read in relief
+const tgReset = (W, sun) => { const T = W.T; T.sky.setMode('morning', sun ? { sunDir: sun, center: CABIN } : {}); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d', 'side', 'kw', 'pw']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
 const show = (f) => { f.mesh.visible = true; f.shadow.visible = true; };
 // T01 — high above the flattened forest, slowly turning: everything lies in a circle
 SHOT.T01 = (t) => { const W = taiga(); const c = camOf('T01'); const u = loc('T01', t); orbit(c, 105 - 8 * u, 125 - 6 * u, 0.9 + 0.05 * u, V(0, 0, 0), 48);
@@ -75,14 +78,14 @@ SHOT.T04 = (t) => { const W = taiga(); const c = camOf('T04'); const u = loc('T0
 SHOT.T05 = (t) => { const W = taiga(); const c = camOf('T05'); const u = loc('T05', t); const C = CABIN.clone().setY(W.T.cab.position.y);
   const [p, g, f] = keys([[0, C.clone().add(V(-3.5, 1.7, 6.5)), C.clone().add(V(0.6, 1.3, 0.8)), 40], [DD.T05, C.clone().add(V(-2.6, 1.5, 5.0)), C.clone().add(V(0.6, 1.3, 0.8)), 38]], u); aim(c, p, g, f);
   const k = sst(0.3, 0.6, u) * (1 - 0.6 * sst(1.2, DD.T05, u));
-  const prep = () => { tgReset(W); W.T.blast(0, t); W.T.flash(0.4 * k); W.T.chair.visible = false; show(W.side); W.side.update(c, C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), right(c), { swing: Math.sin(t * 2) * 0.3, eyes: u < 0.4 ? 'dot' : 'ring', mouth: u < 0.4 ? 'line' : 'open', sweat: u > 0.6, brow: u > 0.5 ? -0.2 : 0, blush: u > 0.6, arms: { L: [-150, 160], R: [150, 160] }, col: '#d8c8a0' }, C.y + 0.35, 0.42); };
+  const prep = () => { tgReset(W, PORCH_SUN); W.T.blast(0, t); W.T.flash(0.4 * k); W.T.chair.visible = false; show(W.side); W.side.update(c, C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), right(c), { swing: Math.sin(t * 2) * 0.3, eyes: u < 0.4 ? 'dot' : 'ring', mouth: u < 0.4 ? 'line' : 'open', sweat: u > 0.6, brow: u > 0.5 ? -0.2 : 0, blush: u > 0.6, arms: { L: [-150, 160], R: [150, 160] }, col: '#d8c8a0' }, C.y + 0.35, 0.42); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 },
     overlay: (g, Wd, Hd) => { if (k > 0.01) { const gr = g.createRadialGradient(Wd * 0.7, 0, 0, Wd * 0.7, 0, Hd); gr.addColorStop(0, `rgba(255,245,220,${0.85 * k})`); gr.addColorStop(1, `rgba(255,170,90,${0.25 * k})`); g.fillStyle = gr; g.fillRect(0, 0, Wd, Hd); } } }; };
 // T06 — the blast wave arrives: he is thrown off the chair, the chair tumbles
 SHOT.T06 = (t) => { const W = taiga(); const c = camOf('T06'); const u = loc('T06', t); const C = CABIN.clone().setY(W.T.cab.position.y); const k = sst(0.15, 0.9, u);
   const shake = (1 - sst(0.2, 1.4, u)) * 0.12; const sh = V(Math.sin(t * 61) * shake, Math.sin(t * 47) * shake, 0);
   aim(c, C.clone().add(V(-2.6, 1.6, 6.4)).add(sh), C.clone().add(V(0.0, 1.0, 1.6)), 42);
-  const prep = () => { tgReset(W); W.T.blast(0, t); W.T.chair.visible = false; const P0 = C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), R_ = right(c);
+  const prep = () => { tgReset(W, PORCH_SUN); W.T.blast(0, t); W.T.chair.visible = false; const P0 = C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), R_ = right(c);
     const lift = sst(0.12, 0.45, u), fl = sst(0.12, 0.9, u), land = sst(0.75, 1.0, u);
     show(W.chair2d); const tip = sst(0.15, 0.7, u); W.chair2d.update(c, P0.clone().add(V(0.6 * tip, -0.352 - 0.2 * tip, 0.1 * tip)), R_, { side: true }, C.y + 0.35, 0.35, -1.45 * tip);
     show(W.side); const arc = Math.sin(Math.PI * Math.min(1, fl * 1.1)) * 0.7;
@@ -92,7 +95,7 @@ SHOT.T06 = (t) => { const W = taiga(); const c = camOf('T06'); const u = loc('T0
 // T07 — a window hundreds of km away bursts inward
 SHOT.T07 = (t) => { const W = taiga(); const c = camOf('T07'); const u = loc('T07', t); const C = CABIN.clone().setY(W.T.cab.position.y);
   const [p, g, f] = keys([[0, C.clone().add(V(3.4, 1.9, 4.2)), C.clone().add(V(1.4, 1.8, 0)), 40], [DD.T07, C.clone().add(V(3.0, 1.9, 3.8)), C.clone().add(V(1.4, 1.7, 0.4)), 40]], u); aim(c, p, g, f);
-  const prep = () => { tgReset(W); W.T.blast(0, t); W.T.shatter(sst(0.4, 1.4, u) > 0 ? (u - 0.4) / 1.4 : 0); };
+  const prep = () => { tgReset(W, PORCH_SUN); W.T.blast(0, t); W.T.shatter(sst(0.4, 1.4, u) > 0 ? (u - 0.4) / 1.4 : 0); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // T08 — nights later, far away in Europe: the sky glows; a man reads his newspaper in the street at night
 SHOT.T08 = (t) => { const W = town(); const c = camOf('T08', 400); const u = loc('T08', t);
