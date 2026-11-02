@@ -147,7 +147,7 @@ export function drawChair(c) { const wood = '#b07a46', dark = '#7a4e2a';
 export function drawChairSide(c) { const wood = '#b07a46', dark = '#7a4e2a';
   c.beginPath(); c.moveTo(-150, -60); c.lineTo(-118, -60); c.lineTo(-112, 446); c.lineTo(-140, 446); c.closePath(); ink(c, dark, 7);   // back post + back leg
   for (const y of [-40, 50, 140]) { c.beginPath(); c.roundRect(-160, y, 52, 30, 8); ink(c, wood, 6); }   // slat ends
-  c.beginPath(); c.roundRect(-150, 300, 380, 34, 10); ink(c, wood, 8);   // seat
+  c.beginPath(); c.roundRect(-150, 300, 400, 34, 10); ink(c, wood, 8);   // seat
   c.beginPath(); c.moveTo(196, 334); c.lineTo(222, 334); c.lineTo(218, 446); c.lineTo(194, 446); c.closePath(); ink(c, wood, 7);   // front leg
   line(c, [[-120, 396], [204, 396]], 10, dark); }
 export const CHAIR2D = (c, p = {}) => { c.translate(0, -190); if (p.side) drawChairSide(c); else drawChair(c); };
@@ -267,3 +267,54 @@ export const SCIENTIST = role((c, p) => { robe(c, p, p.col || '#4a5a4a'); if (p.
   (c, p) => { if (p.glasses) glasses(c); if (p.hat === 'cap') peakCap(c, p.hatCol); else ushanka(c, p.hatCol, p.fur); }, { eyes: 'dot', mouth: 'smile', waistY: 147 });
 export const FARMER = role((c, p) => { robe(c, p, p.col || '#d8c8a0'); C(c, () => { c.translate(30 * (p.turn || 0), 0); tunic(c); }); },
   (c, p) => { if (p.beard !== false) p.faceTx(() => beard(c, p.beardCol)); C(c, () => { c.translate(22 * (p.turn || 0), 0); peakCap(c, p.hatCol || '#3a3a32'); }); }, { eyes: 'dot', mouth: 'line', waistY: 147 });
+
+// ---- the farmer in true profile, facing +x (right), seated on the side chair. Same canvas contract (1024 units, origin
+// centre, y down, floor at +440). p: eyes 'dot'|'ring'|'shut', mouth 'line'|'open', sweat, blush, swing (−1..1 shin swing),
+// fly (0..1: the body is blown back off the seat — thigh lifts, arms fly up; pair it with a roll on the card), chair (bool).
+export const FARMER_SIDE = (c, p0) => { const p = { eyes: 'dot', mouth: 'line', chair: true, ...p0 }; const fly = p.fly || 0, sw = p.swing || 0;
+  const SH = '#d8c8a0', SH2 = '#b8a880', TR = '#3a3a4a', SKN = p.skin || SKIN;
+  c.translate(0, 448); c.scale(0.94, 0.94); c.translate(0, -448);
+  if (p.chair && fly < 0.05) drawChairSide(c);
+  const hip = [-30, 250], knee = [250 - 40 * fly, 262 - 150 * fly], foot = [262 + 40 * sw - 20 * fly, 420 - 230 * fly];
+  // far arm (behind the body), far leg (a darker copy, slightly offset)
+  const sho = [10, -96];
+  const elbFar = [-10 - 60 * fly, 60 - 200 * fly], handFar = [150 - 140 * fly, 200 - 360 * fly];
+  line(c, [sho, elbFar, handFar], 38, INK); line(c, [sho, elbFar, handFar], 24, SH2); ell(c, handFar[0], handFar[1], 24, 22); c.fillStyle = SKN; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke();
+  line(c, [[knee[0] - 30, knee[1] + 6], [foot[0] - 34, foot[1] - 10]], 40, INK); line(c, [[knee[0] - 30, knee[1] + 6], [foot[0] - 34, foot[1] - 10]], 26, '#22222e');
+  ell(c, foot[0] - 6, foot[1] + 2, 46, 17); c.fillStyle = INK; c.fill();
+  // near shin + shoe
+  line(c, [knee, foot], 42, INK); line(c, [knee, foot], 28, TR); ell(c, foot[0] + 26, foot[1] + 6, 50, 18); c.fillStyle = INK; c.fill();
+  // tunic: back curve (left), chest (right), skirt over the thigh out to the knee
+  const tun = () => { c.beginPath(); c.moveTo(-30, -150); c.quadraticCurveTo(-112, -140, -112, -40); c.quadraticCurveTo(-118, 150, -100, hip[1] + 40);
+    c.quadraticCurveTo(-90, hip[1] + 76, -20, hip[1] + 74); c.lineTo(knee[0] - 6, knee[1] + 44); c.quadraticCurveTo(knee[0] + 40, knee[1] + 30, knee[0] + 26, knee[1] - 16);
+    c.quadraticCurveTo(knee[0] + 10, knee[1] - 40, knee[0] - 40, knee[1] - 40); c.lineTo(80, hip[1] - 40); c.quadraticCurveTo(96, 60, 92, -60); c.quadraticCurveTo(90, -140, 30, -152); c.closePath(); };
+  tun(); formFill(c, SH, -110, -150, 100, hip[1] + 70, 0.3);
+  C(c, () => { tun(); c.clip(); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(-130, -160, 70, 520); c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(40, -120, 24, 300); });
+  tun(); c.lineWidth = LW * 1.1; c.strokeStyle = INK; c.stroke();
+  line(c, [[60, -120], [72, 150]], 6, 'rgba(60,40,30,0.5)'); for (let k = 0; k < 3; k++) { ell(c, 70, -90 + k * 50, 8, 8); ink(c, '#f2ead8', 3); }   // placket on the chest side
+  c.save(); c.beginPath(); c.moveTo(-116, 168); c.lineTo(88, 158); c.lineTo(90, 192); c.lineTo(-114, 202); c.closePath(); ink(c, '#5a3a22', 6); c.restore();   // belt
+  // neck + head in profile
+  c.beginPath(); c.rect(-30, -200, 60, 70); c.fillStyle = SKN; c.fill(); line(c, [[30, -200], [32, -140]], 8, INK);
+  const hx = 18, hy = -300; ell(c, hx, hy, 160, 158); const hg = c.createRadialGradient(hx + 40, hy - 70, 20, hx, hy, 180); hg.addColorStop(0, '#fffaf4'); hg.addColorStop(0.65, SKN); hg.addColorStop(1, '#e8d2c4'); c.fillStyle = hg; c.fill();
+  ringStroke(c, hx, hy, 160, 158, LW * 1.25);
+  c.beginPath(); c.moveTo(hx + 150, hy + 10); c.quadraticCurveTo(hx + 196, hy + 30, hx + 158, hy + 56); c.fillStyle = SKN; c.fill(); c.lineWidth = 9; c.strokeStyle = INK; c.stroke();   // nose
+  ell(c, hx - 40, hy + 6, 30, 44); c.fillStyle = SKN; c.fill(); c.lineWidth = 9; c.strokeStyle = INK; c.stroke(); ell(c, hx - 40, hy + 6, 12, 22); c.fillStyle = 'rgba(190,120,110,0.5)'; c.fill();   // ear
+  const ex = hx + 88, ey = hy - 18;   // the one visible eye
+  if (p.eyes === 'ring') { ell(c, ex, ey, 26, 30); c.fillStyle = '#fff'; c.fill(); c.lineWidth = 8; c.strokeStyle = INK; c.stroke(); ell(c, ex + 8, ey, 10, 12); c.fillStyle = INK; c.fill(); }
+  else if (p.eyes === 'shut') taper(c, [ex - 22, ey], [ex, ey + 10], [ex + 22, ey], 10);
+  else { ell(c, ex, ey, 13, 16); c.fillStyle = INK; c.fill(); }
+  taper(c, [ex - 30, ey - 50 + (p.brow || 0) * -40], [ex, ey - 62], [ex + 30, ey - 56], 12);   // brow
+  if (p.blush) { ell(c, hx + 70, hy + 50, 34, 18); c.fillStyle = 'rgba(240,120,120,0.3)'; c.fill(); }
+  // beard in profile: from the ear line down round the jaw to under the nose
+  c.beginPath(); c.moveTo(hx - 10, hy + 40); c.quadraticCurveTo(hx - 20, hy + 150, hx + 60, hy + 170); c.quadraticCurveTo(hx + 150, hy + 160, hx + 156, hy + 70); c.quadraticCurveTo(hx + 110, hy + 90, hx + 60, hy + 70); c.closePath(); ink(c, p.beardCol || '#6a4a32', 7);
+  if (p.mouth === 'open') { ell(c, hx + 128, hy + 96, 20, 24); c.fillStyle = '#5a1a1a'; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke(); }
+  else line(c, [[hx + 108, hy + 92], [hx + 146, hy + 88]], 9, INK);
+  if (p.sweat) { c.beginPath(); c.moveTo(hx + 30, hy - 120); c.quadraticCurveTo(hx + 52, hy - 80, hx + 30, hy - 70); c.quadraticCurveTo(hx + 8, hy - 80, hx + 30, hy - 120); ink(c, '#a9dcff', 6); }
+  if (p.hairUp) for (let k = -4; k <= 3; k++) line(c, [[hx + k * 30, hy - 150], [hx + k * 42, hy - 260]], 10);
+  // cap in profile: dome over the crown, peak to the front
+  c.beginPath(); c.ellipse(hx - 10, hy - 110, 168, 86, 0, Math.PI, 0); c.closePath(); formFill(c, p.hatCol || '#3a3a32', hx - 170, hy - 200, hx + 160, hy - 110, 0.35); c.lineWidth = LW; c.strokeStyle = INK; c.stroke();
+  c.beginPath(); c.moveTo(hx + 120, hy - 112); c.quadraticCurveTo(hx + 220, hy - 116, hx + 262, hy - 92); c.quadraticCurveTo(hx + 200, hy - 86, hx + 110, hy - 96); c.closePath(); ink(c, '#2a2a22', 7);
+  // near arm: shoulder → elbow → hand resting on the knee (or flung up)
+  const elb = [40 - 70 * fly, 70 - 210 * fly], hand = [190 - 150 * fly, 214 - 380 * fly];
+  line(c, [sho, elb, hand], 40, INK); line(c, [sho, elb, hand], 26, SH); ell(c, hand[0], hand[1], 26, 24); c.fillStyle = SKN; c.fill(); c.lineWidth = 7; c.strokeStyle = INK; c.stroke();
+};

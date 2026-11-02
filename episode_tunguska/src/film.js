@@ -12,7 +12,7 @@ import { haze } from './sky.js';
 import { buildTaiga, AIR, CABIN, CORE, R as RF } from './taiga.js';
 import { buildTown } from './town.js';
 import { buildGlobe } from './globe.js';
-import { SCIENTIST, FARMER, newspaper, CHAIR2D } from './cast.js';
+import { SCIENTIST, FARMER, FARMER_SIDE, newspaper, CHAIR2D } from './cast.js';
 
 await Promise.all([['800 40px Montserrat', 'Ab1'], ['800 40px Kanit', 'Ab1'], ['800 40px Kanit', 'กขคภูมิ']].map(([f, s]) => document.fonts.load(f, s)));   // the Thai subset loads only for Thai text
 const QS = new URLSearchParams(location.search);
@@ -33,7 +33,7 @@ const orbit = (c, r, h, a, tgt, fov) => aim(c, V(Math.cos(a) * r, h, Math.sin(a)
 // ================= worlds =================
 let TG = null; function taiga() { if (TG) return TG; const S = new THREE.Scene(); const T = buildTaiga(S); if (!QS.has('toon')) pbrify(S, E.renderer, { env: 0.32 });
   const mk = (fn) => { const f = makeFlat(SZ, 1024, fn); S.add(f.mesh); S.add(f.shadow); f.shadow.material.color.set(0x2a3a1a); return f; };
-  TG = { S, T, farmer: mk(FARMER), kulik: mk(SCIENTIST), porter: mk(FARMER), chair2d: mk(CHAIR2D) }; return TG; }
+  TG = { S, T, farmer: mk(FARMER), kulik: mk(SCIENTIST), porter: mk(FARMER), chair2d: mk(CHAIR2D), side: mk(FARMER_SIDE) }; return TG; }
 let TW = null; function town() { if (TW) return TW; const S = new THREE.Scene(); const W = buildTown(S); if (!QS.has('toon')) pbrify(S, E.renderer, { env: 0.15 });
   const f = makeFlat(SZ, 1024, FARMER); S.add(f.mesh); S.add(f.shadow); TW = { S, W, man: f }; return TW; }
 let GL = null; function space() { if (GL) return GL; const S = new THREE.Scene(); const G = buildGlobe(S); G.ring.visible = false; G.arrow.visible = false; G.label.visible = false;
@@ -51,7 +51,7 @@ const HZ = { ...haze('morning', 0.5), max: 0.45 }; const HZA = { ...haze('mornin
 
 // ================= shots =================
 const SHOT = {};
-const tgReset = (W) => { const T = W.T; T.sky.setMode('morning'); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
+const tgReset = (W) => { const T = W.T; T.sky.setMode('morning'); T.fireball(0, 0); T.flash(0); T.shatter(0); T.calendar(0); for (const k of ['farmer', 'kulik', 'porter', 'chair2d', 'side']) { W[k].mesh.visible = false; W[k].shadow.visible = false; } W.T.chair.visible = true; W.T.chair.position.set(0.6, 0.35, 1.0); W.T.chair.rotation.set(0, 0, 0); if (W.q) W.q.visible = false; if (W.dia) W.dia.visible = false; };
 const show = (f) => { f.mesh.visible = true; f.shadow.visible = true; };
 // T01 — high above the flattened forest, slowly turning: everything lies in a circle
 SHOT.T01 = (t) => { const W = taiga(); const c = camOf('T01'); const u = loc('T01', t); orbit(c, 105 - 8 * u, 125 - 6 * u, 0.9 + 0.05 * u, V(0, 0, 0), 48);
@@ -75,7 +75,7 @@ SHOT.T04 = (t) => { const W = taiga(); const c = camOf('T04'); const u = loc('T0
 SHOT.T05 = (t) => { const W = taiga(); const c = camOf('T05'); const u = loc('T05', t); const C = CABIN.clone().setY(W.T.cab.position.y);
   const [p, g, f] = keys([[0, C.clone().add(V(-3.5, 1.7, 6.5)), C.clone().add(V(0.6, 1.3, 0.8)), 40], [DD.T05, C.clone().add(V(-2.6, 1.5, 5.0)), C.clone().add(V(0.6, 1.3, 0.8)), 38]], u); aim(c, p, g, f);
   const k = sst(0.3, 0.6, u) * (1 - 0.6 * sst(1.2, DD.T05, u));
-  const prep = () => { tgReset(W); W.T.blast(0, t); W.T.flash(0.4 * k); W.T.chair.visible = false; show(W.farmer); W.farmer.update(c, C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), right(c), { legs: 'sitside', chair: 'side', turn: 0.8, look: [0.7, 0], swing: Math.sin(t * 2) * 0.3, eyes: u < 0.4 ? 'dot' : 'ring', mouth: u < 0.4 ? 'line' : 'open', sweat: u > 0.6, brow: u > 0.5 ? -0.2 : 0, blush: u > 0.6, arms: { L: [-150, 160], R: [150, 160] }, col: '#d8c8a0' }, C.y + 0.35, 0.42); };
+  const prep = () => { tgReset(W); W.T.blast(0, t); W.T.flash(0.4 * k); W.T.chair.visible = false; show(W.side); W.side.update(c, C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), right(c), { swing: Math.sin(t * 2) * 0.3, eyes: u < 0.4 ? 'dot' : 'ring', mouth: u < 0.4 ? 'line' : 'open', sweat: u > 0.6, brow: u > 0.5 ? -0.2 : 0, blush: u > 0.6, arms: { L: [-150, 160], R: [150, 160] }, col: '#d8c8a0' }, C.y + 0.35, 0.42); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 },
     overlay: (g, Wd, Hd) => { if (k > 0.01) { const gr = g.createRadialGradient(Wd * 0.7, 0, 0, Wd * 0.7, 0, Hd); gr.addColorStop(0, `rgba(255,245,220,${0.85 * k})`); gr.addColorStop(1, `rgba(255,170,90,${0.25 * k})`); g.fillStyle = gr; g.fillRect(0, 0, Wd, Hd); } } }; };
 // T06 — the blast wave arrives: he is thrown off the chair, the chair tumbles
@@ -85,9 +85,8 @@ SHOT.T06 = (t) => { const W = taiga(); const c = camOf('T06'); const u = loc('T0
   const prep = () => { tgReset(W); W.T.blast(0, t); W.T.chair.visible = false; const P0 = C.clone().add(V(0.6, 0.35 + 0.43 * SZ, 1.3)), R_ = right(c);
     const lift = sst(0.12, 0.45, u), fl = sst(0.12, 0.9, u), land = sst(0.75, 1.0, u);
     show(W.chair2d); const tip = sst(0.15, 0.7, u); W.chair2d.update(c, P0.clone().add(V(0.6 * tip, -0.352 - 0.2 * tip, 0.1 * tip)), R_, { side: true }, C.y + 0.35, 0.35, -1.45 * tip);
-    show(W.farmer); const arc = Math.sin(Math.PI * Math.min(1, fl * 1.1)) * 0.75;
-    const pose = u < 0.12 ? { legs: 'sitside', chair: 'side', turn: 0.8, look: [0.7, 0], eyes: 'ring', mouth: 'open', sweat: true } : land > 0.5 ? { legs: 'stand', eyes: 'dash', mouth: 'open', brow: 0.2, tears: false } : { legs: 'fly', eyes: 'ring', mouth: 'open', hairUp: true };
-    W.farmer.update(c, P0.clone().add(V(-0.85 * fl, arc - 0.5 * land, 0.6 * fl)), R_, { ...pose, arms: { L: [-120, -80], R: [120, -80] }, col: '#d8c8a0' }, C.y + 0.35, 0.42, 1.5 * fl); };
+    show(W.side); const arc = Math.sin(Math.PI * Math.min(1, fl * 1.1)) * 0.7;
+    W.side.update(c, P0.clone().add(V(-0.9 * fl, arc - 0.5 * land, 0.6 * fl)), R_, { chair: u < 0.12, fly: fl, eyes: land > 0.6 ? 'shut' : 'ring', mouth: 'open', hairUp: fl > 0.1 && land < 0.5, sweat: u < 0.12 }, C.y + 0.35, 0.42, 1.45 * fl); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 },
     overlay: u > 0.1 && u < 0.7 ? (g, Wd, Hd) => speedLines(g, Wd, Hd, { cx: 0.85, cy: 0.35, amt: Math.min(1, (u - 0.1) / 0.1, (0.7 - u) / 0.2), frame: Math.floor(t * 30), col: '230,210,170' }) : null }; };
 // T07 — a window hundreds of km away bursts inward
