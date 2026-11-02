@@ -31,6 +31,10 @@ LOOKS = {
   'three': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.7, tint=(1, 1, 1), dof=1.0),   # the three.js film's own levels
   'hall': dict(sun=0.5, point=2.2, hemi=0.6, env=0.6, ao=1.2, tint=(0.88, 0.82, 1.0), dof=3.0),   # reference: muted lavender stone, firelit subjects, soft background
   'city': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.2, tint=(1, 1, 1), dof=1.0),
+  'taiga': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.5, tint=(1, 1, 1), dof=1.0),
+  'night': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.0, tint=(1, 1, 1), dof=1.0),
+  'space': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.5, tint=(1, 1, 1), dof=1.0),
+  'flat': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.3, tint=(1, 1, 1), dof=0.0),
 }
 L = LOOKS.get(A.look, LOOKS['hall'])
 
@@ -329,7 +333,14 @@ for nd in WJ['nodes']:
                     if s0.is_linked: nt.links.new(s0.links[0].from_socket, mm.inputs[6])
                     else: mm.inputs[6].default_value = s0.default_value
                     nt.links.new(at.outputs['Color'], mm.inputs[7]); nt.links.new(mm.outputs[2], s0)
+                    if bs.type == 'BSDF_PRINCIPLED':   # the ambient fill reads the albedo too
+                        for gnode in [x for x in nt.nodes if x.type == 'GROUP' and x.node_tree and x.node_tree.name.startswith('AMB')]: nt.links.new(mm.outputs[2], gnode.inputs['Color'])
                 sl.link = 'OBJECT'; sl.material = m2
+        # Object Info hands the instancer the MESH, so object-linked slots would be lost: give the source its own mesh with its materials
+        mats_ = [sl.material for sl in src.material_slots]; src.data = src.data.copy()
+        for i, m_ in enumerate(mats_):
+            if i < len(src.data.materials): src.data.materials[i] = m_
+        for sl in src.material_slots: sl.link = 'DATA'
 
 # ---------------- sprites → camera-facing cards ----------------
 SPR = {}
@@ -360,6 +371,10 @@ for x in list(N): N.remove(x)
 wo = N.new('ShaderNodeOutputWorld'); bgn = N.new('ShaderNodeBackground'); lp = N.new('ShaderNodeLightPath'); cm = N.new('ShaderNodeMix'); cm.data_type = 'RGBA'; cm.name = 'bg'
 cm.inputs[6].default_value = (0, 0, 0, 1); Lk(lp.outputs['Is Camera Ray'], cm.inputs['Factor']); Lk(cm.outputs[2], bgn.inputs['Color']); bgn.inputs['Strength'].default_value = 1; Lk(bgn.outputs[0], wo.inputs[0])
 BG = SH['background'] or [0.05, 0.05, 0.06]
+BGI = None
+if SH.get('backgroundImg') and os.path.exists(os.path.join(D, SH['backgroundImg'])):   # three's screen-space background (sky gradient texture)
+    tcw = N.new('ShaderNodeTexCoord'); bgt = N.new('ShaderNodeTexImage'); bgt.image = bpy.data.images.load(os.path.join(D, SH['backgroundImg'])); bgt.image.colorspace_settings.name = 'sRGB'; bgt.extension = 'EXTEND'
+    Lk(tcw.outputs['Window'], bgt.inputs[0]); BGI = N.new('ShaderNodeMix'); BGI.data_type = 'RGBA'; Lk(bgt.outputs['Color'], BGI.inputs[6]); Lk(BGI.outputs[2], N['bg'].inputs[7])
 
 # ---------------- camera + render settings ----------------
 cam = bpy.data.cameras.new('cam'); co = bpy.data.objects.new('cam', cam); sc.collection.objects.link(co); sc.camera = co; cam.sensor_fit = 'VERTICAL'
@@ -367,7 +382,7 @@ sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'; sc.cycles.samples = A.sam
 try: sc.cycles.denoiser = 'OPENIMAGEDENOISE'
 except Exception: pass
 sc.cycles.use_adaptive_sampling = True; sc.cycles.adaptive_threshold = A.adaptive
-sc.cycles.max_bounces = A.bounces + 1; sc.cycles.diffuse_bounces = A.bounces; sc.cycles.glossy_bounces = A.bounces; sc.cycles.transparent_max_bounces = 24; sc.cycles.caustics_reflective = False; sc.cycles.caustics_refractive = False
+sc.cycles.max_bounces = A.bounces + 1; sc.cycles.diffuse_bounces = A.bounces; sc.cycles.glossy_bounces = A.bounces; sc.cycles.transparent_max_bounces = 128; sc.cycles.caustics_reflective = False; sc.cycles.caustics_refractive = False
 sc.cycles.sample_clamp_indirect = 6
 sc.render.resolution_x = 1080; sc.render.resolution_y = 1920; sc.render.resolution_percentage = A.scale; sc.render.film_transparent = False
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.look = 'None'; sc.view_settings.exposure = 0
@@ -396,7 +411,7 @@ for f in frames:
             if tx: im = tx.image; im.filepath = os.path.join(D, fl['png']); im.reload()
     cm_ = d['cam']; Mw = C @ M3(cm_['m']); co.matrix_world = Mw; cam.angle_y = math.radians(cm_['fov']); cam.clip_start = max(0.02, cm_['near']); cam.clip_end = cm_['far']
     fo = d.get('focus') or {}; dist = max(0.05, fo.get('dist', 5)); aper = fo.get('aper') or 26 * (fo.get('amt') or 0) * max(0.3, dist) / 5   # film px at 1920 high
-    cam.dof.use_dof = aper > 0.01
+    cam.dof.use_dof = aper > 0.01 and L['dof'] > 0
     if cam.dof.use_dof:
         Ap = L['dof'] * 2 * aper * 2 * math.tan(math.radians(cm_['fov']) / 2) / 1920   # lens diameter (scene units) that gives the film's CoC
         cam.dof.focus_distance = dist; cam.dof.aperture_fstop = (cam.lens * 0.001) / Ap; cam.dof.aperture_blades = 0
@@ -405,6 +420,9 @@ for f in frames:
     if hz and hz.get('den'):
         h = hz.get('max', 0.6) * (1 - math.exp(-max(0, cm_['far'] - hz.get('start', 2)) * hz['den'])); bg = [b * (1 - h) + c * h for b, c in zip(bg, hz.get('col', [1, 0.9, 0.8]))]
     N['bg'].inputs[7].default_value = (*bg, 1)
+    if BGI:
+        hh = (hz.get('max', 0.6) * (1 - math.exp(-max(0, cm_['far'] - hz.get('start', 2)) * hz['den']))) if hz and hz.get('den') else 0
+        BGI.inputs['Factor'].default_value = hh; BGI.inputs[7].default_value = (*(hz.get('col', [1, 0.9, 0.8]) if hz else [1, 1, 1]), 1)
     camq = Mw.to_quaternion()
     for name, (o, rgb, op) in SPR.items():
         s = d['sprites'].get(name)

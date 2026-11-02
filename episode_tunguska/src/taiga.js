@@ -29,13 +29,17 @@ export function buildTaiga(scene) {
   for (let i = 0; i < 9; i++) { const p = new THREE.Mesh(new THREE.CircleGeometry(1 + r() * 2.5, 24), STD(0x3a5a6a, { roughness: 0.1, metalness: 0.2 })); p.rotation.x = -Math.PI / 2; p.position.set((r() - 0.5) * 22, 0.08, (r() - 0.5) * 22); scene.add(p); }
   // trees: trunk + crown instanced; each tree knows its polar position
   const N = 4200 + 160; const trunkG = new THREE.CylinderGeometry(0.12, 0.22, 1, 6); trunkG.translate(0, 0.5, 0);
-  const crownG = new THREE.ConeGeometry(1, 1, 7); crownG.translate(0, 0.5, 0);
+  const crownG = (() => { const parts = [[1.0, 0.5, 0.0], [0.78, 0.45, 0.28], [0.52, 0.4, 0.55]].map(([rad, h, y]) => { const g = new THREE.ConeGeometry(rad, h, 9, 1).toNonIndexed(); g.translate(0, y + h / 2, 0); return g; });
+    const pos = [], nrm = []; for (const g of parts) { pos.push(...g.attributes.position.array); nrm.push(...g.attributes.normal.array); } const m = new THREE.BufferGeometry(); m.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3)); return m; })();
   const trunks = new THREE.InstancedMesh(trunkG, STD(0x5a3a26), N), crowns = new THREE.InstancedMesh(crownG, STD(0xffffff), N); trunks.castShadow = crowns.castShadow = true; trunks.receiveShadow = crowns.receiveShadow = true;
   scene.add(trunks); scene.add(crowns); T.trunks = trunks; T.crowns = crowns;
   const trees = []; for (let i = 0; i < N - 160; i++) { const rr = Math.sqrt(r()) * (R + 60) + 2, a = r() * Math.PI * 2; const x = Math.cos(a) * rr, z = Math.sin(a) * rr; const h = 5 + r() * 4;
     trees.push({ x, z, y: H(x, z), a, rr, h, cw: 0.9 + r() * 0.6, ph: r(), green: new THREE.Color().setHSL(0.27 + r() * 0.06, 0.45, 0.22 + r() * 0.1) }); }
   for (let i = 0; i < 160; i++) { const rr = 1.5 + Math.sqrt(r()) * (CORE - 1.5), a = r() * Math.PI * 2; const x = Math.cos(a) * rr, z = Math.sin(a) * rr; const h = 6 + r() * 4;
     trees.push({ x, z, y: H(x, z), a, rr, h, cw: 0.9 + r() * 0.6, ph: r(), green: new THREE.Color().setHSL(0.27 + r() * 0.06, 0.45, 0.22 + r() * 0.1) }); }
+  const shrubG = new THREE.IcosahedronGeometry(1, 1); shrubG.scale(1, 0.45, 1); const shrubs = new THREE.InstancedMesh(shrubG, STD(0x5a7a3a, { flatShading: true }), 2600); { const m = new THREE.Matrix4(), cc = new THREE.Color();
+    for (let i = 0; i < 2600; i++) { const rr = Math.sqrt(r()) * 260, a = r() * Math.PI * 2; const x = Math.cos(a) * rr, z = Math.sin(a) * rr; const s_ = 0.3 + r() * 0.7; m.compose(V(x, H(x, z), z), new THREE.Quaternion(), V(s_, s_, s_)); shrubs.setMatrixAt(i, m); shrubs.setColorAt(i, cc.setHSL(0.2 + r() * 0.1, 0.35, 0.25 + r() * 0.12)); } }
+  shrubs.receiveShadow = true; scene.add(shrubs); T.shrubs = shrubs;
   T.trees = trees; const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qa = new THREE.Quaternion(), sc = V(1, 1, 1), col = new THREE.Color(), scorched = new THREE.Color(0x7a4a2a), ash = new THREE.Color(0x3a2a20);
   // blast(u): 0 = untouched, u·(R+60) = shock radius; burn(k) browns the crowns of fallen trees
   T.blast = (u, t = 0) => { const front = u * (R + 70);
@@ -57,9 +61,13 @@ export function buildTaiga(scene) {
   // fireball + trail + flash
   const fbT = glowT('rgba(255,255,255,1)', 'rgba(140,190,255,A)'); const fb = new THREE.Sprite(new THREE.SpriteMaterial({ map: fbT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); scene.add(fb); T.fb = fb;
   const trail = []; for (let j = 0; j < 40; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: fbT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, color: 0xbfd8ff })); scene.add(s); trail.push(s); }
+  const smokeT = glowT('rgba(200,200,210,1)', 'rgba(150,150,165,A)'); const smoke = []; for (let j = 0; j < 60; j++) { const s2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeT, transparent: true, depthWrite: false, color: 0xd8dce8 })); scene.add(s2); smoke.push(s2); }
+  const fbL = new THREE.PointLight(0xa8c8ff, 0, 0, 2); scene.add(fbL);
   const START = V(-520, 260, -380); T.START = START;
-  T.fireball = (p, k = 1) => { fb.visible = k > 0 && p < 1; trail.forEach((s) => { s.visible = fb.visible; }); if (!fb.visible) return; const pos = START.clone().lerp(AIR, p); fb.position.copy(pos); fb.scale.setScalar(70 * k * (0.8 + 0.4 * p));
-    trail.forEach((s, j) => { const pp = Math.max(0, p - j * 0.02); s.position.copy(START.clone().lerp(AIR, pp)); s.scale.setScalar(55 * (1 - j / 40) * k); s.material.opacity = 0.85 * (1 - j / 40); }); };
+  T.fireball = (p, k = 1) => { fb.visible = k > 0 && p < 1; trail.forEach((s) => { s.visible = fb.visible; }); smoke.forEach((s2) => { s2.visible = fb.visible; }); fbL.intensity = 0; if (!fb.visible) return; const pos = START.clone().lerp(AIR, p); fb.position.copy(pos); fb.scale.setScalar(70 * k * (0.8 + 0.4 * p));
+    trail.forEach((s, j) => { const pp = Math.max(0, p - j * 0.02); s.position.copy(START.clone().lerp(AIR, pp)); s.scale.setScalar(55 * (1 - j / 40) * k); s.material.opacity = 0.85 * (1 - j / 40); });
+    smoke.forEach((s2, j) => { const pp = Math.max(0, p - 0.03 - j * 0.012); s2.visible = pp > 0; s2.position.copy(START.clone().lerp(AIR, pp)).add(V(Math.sin(j * 1.7) * 3, Math.sin(j * 2.3) * 3 + j * 0.15, 0)); s2.scale.setScalar(18 + j * 1.2); s2.material.opacity = 0.55 * (1 - j / 60); });
+    fbL.position.copy(pos); fbL.intensity = 6e5 * k; };
   const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT('rgba(255,255,255,1)', 'rgba(255,230,190,A)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); flash.position.copy(AIR); scene.add(flash);
   const flashL = new THREE.PointLight(0xfff0e0, 0, 0, 0); flashL.position.copy(AIR); scene.add(flashL);
   T.flash = (k) => { flash.visible = k > 0.01; flash.scale.setScalar(60 + 900 * k); flash.material.opacity = Math.min(1, k * 1.4); flashL.intensity = 40 * k; };
@@ -73,7 +81,7 @@ export function buildTaiga(scene) {
   const door = new THREE.Mesh(new THREE.PlaneGeometry(1, 2), STD(0x5a3a22)); door.position.set(-1.6, 1.25, 0.01); cab.add(door);
   const frame = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.1), STD(0x7a5a3a)); frame.position.set(1.4, 1.8, 0.01); cab.add(frame);
   const glassM = new THREE.MeshStandardMaterial({ color: 0xcfe6ff, roughness: 0.1, metalness: 0.0, emissive: 0x6a90b8, emissiveIntensity: 0.5, transparent: true, opacity: 0.8, side: THREE.DoubleSide }); const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.9), glassM); glass.position.set(1.4, 1.8, 0.03); cab.add(glass);
-  const shards = []; for (let j = 0; j < 22; j++) { const g = new THREE.BufferGeometry(); const a = r() * 6.28; g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0, Math.cos(a + 1) * 0.2, Math.sin(a + 1) * 0.2, 0], 3)); g.computeVertexNormals();
+  const shards = []; for (let j = 0; j < 44; j++) { const g = new THREE.BufferGeometry(); const a = r() * 6.28; g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, Math.cos(a) * 0.4, Math.sin(a) * 0.4, 0, Math.cos(a + 0.9) * 0.3, Math.sin(a + 0.9) * 0.3, 0], 3)); g.computeVertexNormals();
     const s = new THREE.Mesh(g, glassM); s.userData = { o: V(1.4 + (r() - 0.5) * 1.1, 1.8 + (r() - 0.5) * 0.8, 0.05), v: V((r() - 0.5) * 3, 1 + r() * 2.5, 2 + r() * 3), w: V(r() * 9, r() * 9, r() * 9) }; s.visible = false; cab.add(s); shards.push(s); }
   T.shatter = (u) => { glass.visible = u <= 0; shards.forEach((s) => { s.visible = u > 0; if (!s.visible) return; const d = s.userData; const tt = u * 1.2; s.position.copy(d.o).addScaledVector(d.v, tt).add(V(0, -4.9 * tt * tt, 0)); s.position.y = Math.max(0.3, s.position.y); s.rotation.set(d.w.x * tt, d.w.y * tt, d.w.z * tt); }); };
   const chair = new THREE.Group(); const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.08, 0.6), STD(0x8a5a34)); seat.position.y = 0.5; chair.add(seat); const back = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.08), STD(0x8a5a34)); back.position.set(0, 0.85, -0.28); chair.add(back);
@@ -81,7 +89,7 @@ export function buildTaiga(scene) {
   chair.position.set(0.6, 0.35, 1.0); chair.traverse((o) => { if (o.isMesh) o.castShadow = true; }); cab.add(chair); T.chair = chair;
   const fence = new THREE.Group(); for (let i = 0; i < 14; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.2, 0.12), STD(0x7a5a3a)); p.position.set(-8 + i * 1.3, 0.6, 5); fence.add(p); } const rail = new THREE.Mesh(new THREE.BoxGeometry(17, 0.1, 0.1), STD(0x7a5a3a)); rail.position.set(0.5, 0.9, 5); fence.add(rail); cab.add(fence);
   // ---- calendar flip card (T09)
-  const cal = makeCard(24, 30, 768, () => {}, { transparent: true }); scene.add(cal); T.cal = cal;
+  const cal = makeCard(24, 30, 768, () => {}, { transparent: true }); cal.renderOrder = 2; scene.add(cal); T.cal = cal;
   T.calendar = (year, flip = 0) => { cal.visible = year > 0; if (!cal.visible) return; cal.userData.redraw((g, w, h) => { g.fillStyle = '#f4ede0'; g.strokeStyle = '#2a1a16'; g.lineWidth = 20; g.beginPath(); g.roundRect(20, 60, w - 40, h - 80, 40); g.fill(); g.stroke();
       g.fillStyle = '#c8302a'; g.beginPath(); g.roundRect(20, 60, w - 40, 200, [40, 40, 0, 0]); g.fill(); g.stroke(); for (const x of [0.3, 0.7]) { g.fillStyle = '#2a1a16'; g.beginPath(); g.roundRect(w * x - 18, 20, 36, 90, 18); g.fill(); }
       signText(g, 'ปี', w / 2, 160, 110, '#ffffff', '#5a1a14', 'Kanit, Montserrat'); signText(g, String(year), w / 2, h * 0.6, 250, '#2a1a16', '#f4ede0');

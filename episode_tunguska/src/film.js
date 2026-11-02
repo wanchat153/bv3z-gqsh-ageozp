@@ -43,7 +43,7 @@ let GL = null; function space() { if (GL) return GL; const S = new THREE.Scene()
   G.tail = []; for (let j = 0; j < 24; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tailT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); S.add(s); G.tail.push(s); }
   const label = makeCard(5.2, 1.2, 1024, (g, w, h) => { g.clearRect(0, 0, w, h); signText(g, '54,000 กม./ชม.', w / 2, h / 2, 130, '#ffe9a8', '#1b1420', 'Kanit, Montserrat'); }, { transparent: true }); S.add(label); G.speed = label;
   // energy grid: hundreds of tiny flashes on a black card that fill the frame (T14)
-  const grid = makeCard(8, 14.2, 1024, () => {}, { transparent: true }); S.add(grid); G.grid = grid;
+  const grid = makeCard(8, 14.2, 1024, () => {}, { transparent: true }); grid.renderOrder = 2; S.add(grid); G.grid = grid;
   const full = new THREE.Mesh(new THREE.SphereGeometry(5, 96, 48), G.earth.children[0].material.clone()); full.material.side = THREE.FrontSide; S.add(full); G.full = full;
   const atmo = new THREE.Mesh(new THREE.SphereGeometry(5.25, 64, 32), new THREE.MeshBasicMaterial({ color: 0x7ab8ff, transparent: true, opacity: 0.18, side: THREE.BackSide, depthWrite: false })); S.add(atmo); G.atmo = atmo;
   GL = { S, G }; return GL; }
@@ -67,8 +67,8 @@ SHOT.T03 = (t) => { const W = taiga(); const c = camOf('T03'); const u = loc('T0
     W.q.visible = true; W.q.position.set(0, 12 + Math.sin(t * 3) * 0.5, 0); W.q.quaternion.copy(c.quaternion); W.q.scale.setScalar(0.35 + 0.25 * sst(0.2, 0.8, u)); };
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // T04 — before: the living taiga at morning; a blue-white fireball streaks across the sky
-SHOT.T04 = (t) => { const W = taiga(); const c = camOf('T04'); const u = loc('T04', t); const p = 0.25 + 0.72 * u / DD.T04;
-  const fbp = W.T.START.clone().lerp(AIR, p); const cp = V(110, W.T.H(110, 140) + 13, 140); aim(c, cp, cp.clone().lerp(fbp, 0.35).add(V(0, -14, 0)), 56);
+SHOT.T04 = (t) => { const W = taiga(); const c = camOf('T04'); const u = loc('T04', t); const p = 0.4 + 0.57 * u / DD.T04;
+  const cp = V(-205, W.T.H(-205, 105) + 10, 105); const look = W.T.START.clone().lerp(AIR, 0.68); aim(c, cp, look.add(V(0, -30, 0)), 58);
   const prep = () => { tgReset(W); W.T.blast(0, t); W.T.fireball(p, 1); };
   return { haze: HZA, scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // T05 — 65 km away: a farmer on his porch; the flash, a wave of heat
@@ -99,7 +99,7 @@ SHOT.T08 = (t) => { const W = town(); const c = camOf('T08', 400); const u = loc
 // T09 — 19 years: a calendar card over the flattened forest flips 1908 → 1927
 SHOT.T09 = (t) => { const W = taiga(); const c = camOf('T09'); const u = loc('T09', t); orbit(c, 100, 118, 0.95 + 0.06 * u, V(0, 0, 0), 48);
   const yr = Math.round(mix(1908, 1927, sst(0.2, DD.T09 - 0.3, u)));
-  const prep = () => { tgReset(W); W.T.blast(1); W.T.calendar(yr, (u * 8) % 1 * (yr < 1927 ? 1 : 0)); W.T.cal.position.copy(c.position).add(V(0, 0, 0)).lerp(V(0, 0, 0), 0.35); W.T.cal.quaternion.copy(c.quaternion); W.T.cal.scale.setScalar(0.9); };
+  const prep = () => { tgReset(W); W.T.blast(1); W.T.calendar(yr, (u * 8) % 1 * (yr < 1927 ? 1 : 0)); W.T.cal.position.copy(c.position).lerp(V(0, 0, 0), 0.4).addScaledVector(right(c), -7).add(V(0, 12, 0)); W.T.cal.quaternion.copy(c.quaternion); W.T.cal.scale.setScalar(0.5); };
   return { haze: HZA, scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // T10 — 1927: Kulik and a guide climb through the fallen trunks
 SHOT.T10 = (t) => { const W = taiga(); const c = camOf('T10'); const u = loc('T10', t); const P = V(34, 0, 18); P.y = W.T.H(P.x, P.z);
@@ -116,7 +116,7 @@ SHOT.T11 = (t) => { const W = taiga(); const c = camOf('T11'); const u = loc('T1
   return { haze: HZ, scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // T12 — side-view diagram (a painted card): the burst 5–10 km up; straight down at the centre (trees stand), sideways outside (trees fall)
 SHOT.T12 = (t) => { const W = taiga(); const c = camOf('T12'); const u = loc('T12', t); aim(c, V(0, 400, 60), V(0, 400, 0), 30); const k = sst(0.2, DD.T12 - 0.4, u);
-  const prep = () => { tgReset(W); if (!W.dia) { W.dia = makeCard(18.1, 32.2, 1080, () => {}, {}); W.S.add(W.dia); } W.dia.visible = true; W.dia.position.set(0, 400, 0);
+  const prep = () => { tgReset(W); if (!W.dia) { W.dia = makeCard(18.1, 32.2, 1080, () => {}, {}); W.dia.renderOrder = 2; W.S.add(W.dia); } W.dia.visible = true; W.dia.position.set(0, 400, 0);
     W.dia.userData.redraw((g, w, h) => { const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#6a9ad8'); sky.addColorStop(0.7, '#cfe2f4'); sky.addColorStop(1, '#f4ecd8'); g.fillStyle = sky; g.fillRect(0, 0, w, h);
       const gy = h * 0.74, bx = w / 2, by = h * 0.22; g.fillStyle = '#6a7a42'; g.fillRect(0, gy, w, h - gy); g.fillStyle = '#4a3a2a'; g.fillRect(0, gy + 40, w, h - gy - 40);
       // shock rings
