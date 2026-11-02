@@ -169,7 +169,14 @@ function frame(c, p, body) {
 }
 // (frame() needs the head drawer in the pose; wrap each role)
 const role = (bodyFn, headExtras, defaults) => (c, p0) => { const p = { ...defaults, ...p0 };
-  p.headFn = () => { if (p.hairUp) { for (let k = -5; k <= 5; k++) { line(c, [[k * 30, -440], [k * 44, -560 - Math.abs(k) * -6]], 10); } } head(c, p); face(c, p); headExtras(c, p); };
+  // p.turn (−1..1): the face slides toward that side and narrows (three-quarter view, as in INVENTOR_HAUL); an ear shows on the far side
+  p.faceTx = (fn) => { const t = p.turn || 0; if (!t) return fn(); C(c, () => { c.translate(64 * t, 0); c.scale(1 - 0.2 * Math.abs(t), 1); fn(); }); };
+  p.headFn = () => { if (p.hairUp) { for (let k = -5; k <= 5; k++) { line(c, [[k * 30, -440], [k * 44, -560 - Math.abs(k) * -6]], 10); } } head(c, p);
+    const t = p.turn || 0;
+    if (t) { const sx = -Math.sign(t); ell(c, sx * 150, -290, 30, 44); c.fillStyle = SKIN; c.fill(); c.lineWidth = 9; c.strokeStyle = INK; c.stroke(); ell(c, sx * 150, -290, 12, 20); c.fillStyle = 'rgba(190,120,110,0.5)'; c.fill();
+      C(c, () => { ell(c, 0, -300, 172, 165); c.clip(); p.faceTx(() => face(c, p)); }); }
+    else face(c, p);
+    headExtras(c, p); };
   frame(c, p, () => bodyFn(c, p)); };
 export const INVENTOR = role((c, p) => { robe(c, p, '#2f5fc0'); crossCollar(c); sash(c, 130, '#f0b030', 120); },
   (c, p) => { if (!p.hairUp) topBun(c); else topBun(c, '#1d1a22', false); }, { eyes: 'dash', mouth: 'dot', waistY: 147 });
@@ -258,5 +265,5 @@ export const newspaper = (c, a) => { const [x, y] = a.R; c.save(); c.translate(x
   c.font = '800 34px Montserrat'; c.fillStyle = '#2a1a16'; c.fillText('THE TIMES', -110, -70); for (let k = 0; k < 6; k++) line(c, [[-130, -40 + k * 24], [130 - (k % 2) * 60, -40 + k * 24]], 5, '#7a7a8a'); c.restore(); };
 export const SCIENTIST = role((c, p) => { robe(c, p, p.col || '#4a5a4a'); if (p.hat === 'cap') tunic(c); else coatFront(c); },
   (c, p) => { if (p.glasses) glasses(c); if (p.hat === 'cap') peakCap(c, p.hatCol); else ushanka(c, p.hatCol, p.fur); }, { eyes: 'dot', mouth: 'smile', waistY: 147 });
-export const FARMER = role((c, p) => { robe(c, p, p.col || '#d8c8a0'); tunic(c); },
-  (c, p) => { if (p.beard !== false) beard(c, p.beardCol); peakCap(c, p.hatCol || '#3a3a32'); }, { eyes: 'dot', mouth: 'line', waistY: 147 });
+export const FARMER = role((c, p) => { robe(c, p, p.col || '#d8c8a0'); C(c, () => { c.translate(30 * (p.turn || 0), 0); tunic(c); }); },
+  (c, p) => { if (p.beard !== false) p.faceTx(() => beard(c, p.beardCol)); C(c, () => { c.translate(22 * (p.turn || 0), 0); peakCap(c, p.hatCol || '#3a3a32'); }); }, { eyes: 'dot', mouth: 'line', waistY: 147 });
