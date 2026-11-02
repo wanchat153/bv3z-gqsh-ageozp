@@ -33,6 +33,10 @@ function robe(c, p, col, w = 118) {
     const b = W + 26; const path = () => { c.beginPath(); c.moveTo(-w, b); c.lineTo(-w, top + 70); c.quadraticCurveTo(-w, top, -w + 70, top); c.lineTo(w - 70, top); c.quadraticCurveTo(w, top, w, top + 70); c.lineTo(w, b); c.quadraticCurveTo(0, b + 14, -w, b); c.closePath(); };
     robeShade(c, path, col, w, top, b); return { top, bot: b, w }; }
   if (PART === 'lower') {
+    if (legs === 'sitside') {   // seated, legs to the side (profile chair): hips, then the robe over the thighs out to the knee
+      const h = W + RIG.drop - 12, kx = w + 170, ky = h + 40;
+      const path = () => { c.beginPath(); c.moveTo(-w, h); c.lineTo(-w, h + 70); c.quadraticCurveTo(-w + 10, h + 95, 0, h + 95); c.lineTo(kx - 10, h + 92); c.quadraticCurveTo(kx + 34, h + 88, kx + 30, ky); c.quadraticCurveTo(kx + 26, h - 6, kx - 30, h - 8); c.lineTo(w, h - 6); c.quadraticCurveTo(0, h - 18, -w, h); c.closePath(); };
+      robeShade(c, path, col, kx, h - 10, h + 95); return { top, bot: h + 95, w }; }
     if (legs === 'sit') {   // the lap: hips (dropped) → knees spread → hem at the ankles
       const h = W + RIG.drop - 12, k = h + 64, bot = 424 - (p.hem || 0);
       const path = () => { c.beginPath(); c.moveTo(-w, h); c.quadraticCurveTo(-w - 30, k - 20, -w - 26, k); c.lineTo(-w - 12, bot); c.lineTo(w + 12, bot); c.lineTo(w + 26, k); c.quadraticCurveTo(w + 30, k - 20, w, h); c.closePath(); };
@@ -56,6 +60,10 @@ function robe(c, p, col, w = 118) {
 }
 // legs under the hem: dark trousers + shoes. walk/run: alternate steps (lifted foot), fly: kicked out and bent
 function legsUnder(c, p) { const m = RIG.legs; if (m === 'stand' || m === 'sit') return;
+  if (m === 'sitside') { const h = RIG.W + RIG.drop - 12, kx = 118 + 170, sw = p.swing || 0;
+    for (const [dx, col] of [[-34, '#1e1e2c'], [0, '#2a2a3a']]) { const fx = kx + dx + 18 + sw * 40, fy = 432; line(c, [[kx + dx, h + 60], [fx, fy - 14]], 40, INK); line(c, [[kx + dx, h + 60], [fx, fy - 14]], 26, col);
+      ell(c, fx + 26, fy - 4, 44, 16); c.fillStyle = INK; c.fill(); }
+    return; }
   const ph = p.walk || 0, st = Math.sin(ph); const run = m === 'run' ? 1.6 : 1;
   const feet = m === 'fly' ? [[-120, 400, -0.6], [130, 380, 0.7]] : [[-40 - 14 * st * run, 446 - 22 * run * Math.max(0, st), 0], [40 - 14 * st * run, 446 - 22 * run * Math.max(0, -st), 0]];
   for (const [fx, fy, a] of feet) { const hx = Math.sign(fx) * 34, hy = 360; const kx = (hx + fx) / 2 + (m === 'fly' ? Math.sign(fx) * 40 : 0), ky = (hy + fy) / 2 + (m === 'fly' ? -30 : 0);
@@ -136,11 +144,17 @@ export function drawChair(c) { const wood = '#b07a46', dark = '#7a4e2a';
   c.beginPath(); c.rect(-185, 300, 370, 22); ink(c, dark, 7);
   for (const x of [-170, 170]) { c.beginPath(); c.moveTo(x - 13, 320); c.lineTo(x + 13, 320); c.lineTo(x + 11, 446); c.lineTo(x - 11, 446); c.closePath(); ink(c, wood, 7); }   // front legs
   line(c, [[-165, 392], [165, 392]], 10, dark); }
-export const CHAIR2D = (c) => { c.translate(0, -190); drawChair(c); };
+export function drawChairSide(c) { const wood = '#b07a46', dark = '#7a4e2a';
+  c.beginPath(); c.moveTo(-150, -60); c.lineTo(-118, -60); c.lineTo(-112, 446); c.lineTo(-140, 446); c.closePath(); ink(c, dark, 7);   // back post + back leg
+  for (const y of [-40, 50, 140]) { c.beginPath(); c.roundRect(-160, y, 52, 30, 8); ink(c, wood, 6); }   // slat ends
+  c.beginPath(); c.roundRect(-150, 300, 380, 34, 10); ink(c, wood, 8);   // seat
+  c.beginPath(); c.moveTo(196, 334); c.lineTo(222, 334); c.lineTo(218, 446); c.lineTo(194, 446); c.closePath(); ink(c, wood, 7);   // front leg
+  line(c, [[-120, 396], [204, 396]], 10, dark); }
+export const CHAIR2D = (c, p = {}) => { c.translate(0, -190); if (p.side) drawChairSide(c); else drawChair(c); };
 function frame(c, p, body) {
   const sq = p.sq || [1, 1]; c.translate(0, 448); c.scale(0.94 * sq[0], 0.94 * sq[1]); c.translate(0, -448 + (p.dy || 0));
-  if (p.chair) drawChair(c);
-  const legs = p.legs || 'stand'; RIG = { W: p.waistY ?? 145, drop: legs === 'sit' ? 118 : 0, legs };
+  if (p.chair === 'side') drawChairSide(c); else if (p.chair) drawChair(c);
+  const legs = p.legs || 'stand'; RIG = { W: p.waistY ?? 145, drop: (legs === 'sit' || legs === 'sitside') ? 118 : 0, legs };
   if (legs === 'stand' && !p.lean) {   // the classic single tube (identical to before for standing, upright characters)
     PART = 'all'; if (p.armsBehind) arms(c, p); body();
     C(c, () => { c.translate(0, -150); c.rotate(p.tilt || 0); c.translate(0, 150); p.headFn(); });
