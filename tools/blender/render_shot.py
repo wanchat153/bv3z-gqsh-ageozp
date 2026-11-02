@@ -35,6 +35,13 @@ LOOKS = {
   'night': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=1.0, tint=(1, 1, 1), dof=1.0),
   'space': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.5, tint=(1, 1, 1), dof=1.0),
   'flat': dict(sun=1.0, point=1.0, hemi=1.0, env=1.0, ao=0.3, tint=(1, 1, 1), dof=0.0),
+  # Lake Nyos: skyrefl = the sky seen by glossy rays (water, glass, tin) — 0 keeps the old black-world behaviour
+  'nyos_day': dict(sun=2.0, point=1.0, hemi=0.6, env=0.55, ao=3.0, tint=(0.85, 0.92, 1.1), dof=1.3, skyrefl=1.0),
+  'nyos_dawn': dict(sun=1.6, point=1.0, hemi=0.75, env=0.6, ao=3.0, tint=(0.9, 0.92, 1.08), dof=1.3, skyrefl=1.0),
+  'nyos_dusk': dict(sun=2.0, point=1.6, hemi=0.6, env=0.5, ao=3.0, tint=(0.95, 0.85, 1.0), dof=1.3, skyrefl=1.0),
+  'nyos_night': dict(sun=1.6, point=2.2, hemi=0.9, env=0.8, ao=2.5, tint=(0.75, 0.85, 1.25), dof=1.3, skyrefl=0.8),
+  'room_night': dict(sun=1.0, point=1.0, hemi=0.6, env=0.5, ao=1.0, tint=(0.8, 0.85, 1.1), dof=1.6, skyrefl=0.3),
+  'room_day': dict(sun=1.6, point=1.0, hemi=0.8, env=0.7, ao=1.0, tint=(1.0, 0.97, 0.92), dof=1.6, skyrefl=0.6),
 }
 L = LOOKS.get(A.look, LOOKS['hall'])
 
@@ -225,6 +232,9 @@ def build_mat(uid, flat=False):
         if p.get('normalMap'):
             tx = tex_node(N, Lk, p['normalMap'], uvn)
             if tx: nm = N.new('ShaderNodeNormalMap'); nm.inputs['Strength'].default_value = p.get('ns', 1); Lk(tx.outputs['Color'], nm.inputs['Color']); Lk(nm.outputs[0], bs.inputs['Normal'])
+        if p.get('trans'):   # MeshPhysicalMaterial.transmission → real glass (refracting, sky-reflecting); its fill and fake alpha are dropped
+            bs.inputs['Transmission Weight'].default_value = p['trans']; bs.inputs['IOR'].default_value = p.get('ior', 1.5)
+            ek = N.new('ShaderNodeVectorMath'); ek.operation = 'SCALE'; Lk(e, ek.inputs[0]); ek.inputs['Scale'].default_value = 1 - p['trans']; Lk(ek.outputs[0], bs.inputs['Emission Color']); alpha = None
         sh = bs.outputs[0]
     tr = N.new('ShaderNodeBsdfTransparent')
     if additive:   # additive glow: transparent + emission·α
@@ -363,13 +373,28 @@ for l in SH['lights']:
     elif l['type'] == 'DirectionalLight': ld = bpy.data.lights.new(l['name'], 'SUN'); ld.angle = math.radians(2.5)
     else: continue
     o = bpy.data.objects.new('L_' + l['name'], ld); sc.collection.objects.link(o); LGT[l['name']] = o
+    try: o.visible_camera = False; o.visible_transmission = False   # three's lights are never seen (not even through glass): no glowing light spheres in shot
+    except Exception: pass
+    if l['type'] != 'DirectionalLight' and 0 < (l.get('distance') or 0) <= 12: ld.shadow_soft_size = 0.04   # small practicals (lamps, fires)
 w = bpy.data.worlds.new('w'); sc.world = w
 try: w.use_nodes = True
 except Exception: pass
 N = w.node_tree.nodes; Lk = w.node_tree.links.new
 for x in list(N): N.remove(x)
 wo = N.new('ShaderNodeOutputWorld'); bgn = N.new('ShaderNodeBackground'); lp = N.new('ShaderNodeLightPath'); cm = N.new('ShaderNodeMix'); cm.data_type = 'RGBA'; cm.name = 'bg'
-cm.inputs[6].default_value = (0, 0, 0, 1); Lk(lp.outputs['Is Camera Ray'], cm.inputs['Factor']); Lk(cm.outputs[2], bgn.inputs['Color']); bgn.inputs['Strength'].default_value = 1; Lk(bgn.outputs[0], wo.inputs[0])
+cm.inputs[6].default_value = (0, 0, 0, 1)
+SKYR = L.get('skyrefl', 0)
+if SKYR:   # glossy rays: horizon (haze colour, per frame) → zenith (hemisphere sky), ground below
+    tcg = N.new('ShaderNodeTexCoord'); sz = N.new('ShaderNodeSeparateXYZ'); Lk(tcg.outputs['Generated'], sz.inputs[0])
+    mr = N.new('ShaderNodeMapRange'); mr.inputs['From Min'].default_value = -0.02; mr.inputs['From Max'].default_value = 0.55; Lk(sz.outputs['Z'], mr.inputs['Value'])
+    gm = N.new('ShaderNodeMix'); gm.data_type = 'RGBA'; gm.name = 'skyg'; Lk(mr.outputs['Result'], gm.inputs['Factor'])
+    zen = [c * hs['i'] / math.pi * L['hemi'] * 2.2 for c in hs['sky']]; gm.inputs[7].default_value = (*zen, 1)
+    gd = N.new('ShaderNodeMix'); gd.data_type = 'RGBA'; gd.name = 'skyd'; ltz = N.new('ShaderNodeMath'); ltz.operation = 'LESS_THAN'; ltz.inputs[1].default_value = -0.02; Lk(sz.outputs['Z'], ltz.inputs[0])
+    Lk(ltz.outputs[0], gd.inputs['Factor']); Lk(gm.outputs[2], gd.inputs[6]); gd.inputs[7].default_value = (*[c * hs['i'] / math.pi * L['hemi'] * 0.6 for c in hs['ground']], 1)
+    gt = N.new('ShaderNodeMath'); gt.operation = 'MAXIMUM'; Lk(lp.outputs['Is Glossy Ray'], gt.inputs[0]); Lk(lp.outputs['Is Transmission Ray'], gt.inputs[1])
+    gk = N.new('ShaderNodeMath'); gk.operation = 'MULTIPLY'; Lk(gt.outputs[0], gk.inputs[0]); gk.inputs[1].default_value = SKYR
+    gw = N.new('ShaderNodeMix'); gw.data_type = 'RGBA'; Lk(gk.outputs[0], gw.inputs['Factor']); gw.inputs[6].default_value = (0, 0, 0, 1); Lk(gd.outputs[2], gw.inputs[7]); Lk(gw.outputs[2], cm.inputs[6])
+Lk(lp.outputs['Is Camera Ray'], cm.inputs['Factor']); Lk(cm.outputs[2], bgn.inputs['Color']); bgn.inputs['Strength'].default_value = 1; Lk(bgn.outputs[0], wo.inputs[0])
 BG = SH['background'] or [0.05, 0.05, 0.06]
 BGI = None
 if SH.get('backgroundImg') and os.path.exists(os.path.join(D, SH['backgroundImg'])):   # three's screen-space background (sky gradient texture)
@@ -420,6 +445,7 @@ for f in frames:
     if hz and hz.get('den'):
         h = hz.get('max', 0.6) * (1 - math.exp(-max(0, cm_['far'] - hz.get('start', 2)) * hz['den'])); bg = [b * (1 - h) + c * h for b, c in zip(bg, hz.get('col', [1, 0.9, 0.8]))]
     N['bg'].inputs[7].default_value = (*bg, 1)
+    if SKYR: N['skyg'].inputs[6].default_value = (*((hz or {}).get('col') or bg), 1)
     if BGI:
         hh = (hz.get('max', 0.6) * (1 - math.exp(-max(0, cm_['far'] - hz.get('start', 2)) * hz['den']))) if hz and hz.get('den') else 0
         BGI.inputs['Factor'].default_value = hh; BGI.inputs[7].default_value = (*(hz.get('col', [1, 0.9, 0.8]) if hz else [1, 1, 1]), 1)
