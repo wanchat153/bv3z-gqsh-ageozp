@@ -127,8 +127,19 @@ export function halberd(c, x, yTop, yBot) { if (lower()) return;
 // ---- public drawers: pose = { eyes, mouth, brow, look, stache, blush, tears, sweat, tilt, arms, bend, hold, sq, hairUp, dy } ----
 function face(c, p) { drawEyes(c, p); drawMouth(c, p); tears(c, p);
   if (p.sweat) for (const [x, y, s] of [[-170, -380, 1], [178, -350, 0.8]]) { c.beginPath(); c.moveTo(x, y - 30 * s); c.quadraticCurveTo(x + 18 * s, y + 6, x, y + 12 * s); c.quadraticCurveTo(x - 18 * s, y + 6, x, y - 30 * s); ink(c, '#a9dcff', 6); } }
+// a plain wooden chair in the same ink style, front view, sized to the 'sit' rig (seat under the lap at y≈265, feet at 440)
+export function drawChair(c) { const wood = '#b07a46', dark = '#7a4e2a';
+  for (const x of [-138, 138]) { c.beginPath(); c.roundRect(x - 13, -70, 26, 350, 8); ink(c, dark, 7); }   // back posts
+  for (const y of [-40, 40, 120]) { c.beginPath(); c.roundRect(-138, y, 276, 34, 8); ink(c, wood, 7); }   // back slats
+  for (const x of [-120, 120]) { c.beginPath(); c.moveTo(x - 10, 290); c.lineTo(x + 10, 290); c.lineTo(x + 8, 418); c.lineTo(x - 8, 418); c.closePath(); ink(c, dark, 6); }   // back legs
+  c.beginPath(); c.moveTo(-150, 252); c.lineTo(150, 252); c.lineTo(185, 300); c.lineTo(-185, 300); c.closePath(); ink(c, wood, 8);   // seat (seen slightly from above)
+  c.beginPath(); c.rect(-185, 300, 370, 22); ink(c, dark, 7);
+  for (const x of [-170, 170]) { c.beginPath(); c.moveTo(x - 13, 320); c.lineTo(x + 13, 320); c.lineTo(x + 11, 446); c.lineTo(x - 11, 446); c.closePath(); ink(c, wood, 7); }   // front legs
+  line(c, [[-165, 392], [165, 392]], 10, dark); }
+export const CHAIR2D = (c) => { c.translate(0, -190); drawChair(c); };
 function frame(c, p, body) {
   const sq = p.sq || [1, 1]; c.translate(0, 448); c.scale(0.94 * sq[0], 0.94 * sq[1]); c.translate(0, -448 + (p.dy || 0));
+  if (p.chair) drawChair(c);
   const legs = p.legs || 'stand'; RIG = { W: p.waistY ?? 145, drop: legs === 'sit' ? 118 : 0, legs };
   if (legs === 'stand' && !p.lean) {   // the classic single tube (identical to before for standing, upright characters)
     PART = 'all'; if (p.armsBehind) arms(c, p); body();
