@@ -14,7 +14,7 @@ import { buildTown } from './town.js';
 import { buildGlobe } from './globe.js';
 import { SCIENTIST, FARMER, newspaper, CHAIR2D } from './cast.js';
 
-await Promise.all(['800 40px Montserrat', '800 40px Kanit'].map((f) => document.fonts.load(f)));
+await Promise.all([['800 40px Montserrat', 'Ab1'], ['800 40px Kanit', 'Ab1'], ['800 40px Kanit', 'กขคภูมิ']].map(([f, s]) => document.fonts.load(f, s)));   // the Thai subset loads only for Thai text
 const QS = new URLSearchParams(location.search);
 const E = createEngine({ W: innerWidth, H: innerHeight, clear: 0x8090b0 }); setFlatTarget(E.SH);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
