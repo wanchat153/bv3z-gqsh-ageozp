@@ -232,6 +232,23 @@ def build_mat(uid, flat=False):
         if p.get('normalMap'):
             tx = tex_node(N, Lk, p['normalMap'], uvn)
             if tx: nm = N.new('ShaderNodeNormalMap'); nm.inputs['Strength'].default_value = p.get('ns', 1); Lk(tx.outputs['Color'], nm.inputs['Color']); Lk(nm.outputs[0], bs.inputs['Normal'])
+        if p.get('bkind') in ('water', 'foam'):   # procedural micro-detail Cycles can resolve at any distance (no texture tiling)
+            tco = N.new('ShaderNodeTexCoord'); prev = None
+            spec = [(0.55, 0.32, 0.06), (2.6, 0.18, 0.02), (11.0, 0.08, 0.006)] if p['bkind'] == 'water' else [(3.0, 0.6, 0.05), (14.0, 0.35, 0.01)]
+            for sc_, st, dist in spec:
+                nz = N.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = sc_; nz.inputs['Detail'].default_value = 6; nz.inputs['Roughness'].default_value = 0.55; Lk(tco.outputs['Object'], nz.inputs['Vector'])
+                bp = N.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = st; bp.inputs['Distance'].default_value = dist; Lk(nz.outputs['Fac'], bp.inputs['Height'])
+                if prev: Lk(prev, bp.inputs['Normal'])
+                prev = bp.outputs['Normal']
+            Lk(prev, bs.inputs['Normal'])
+            if p['bkind'] == 'water':
+                bs.inputs['Roughness'].default_value = 0.012; bs.inputs['IOR'].default_value = 1.333
+                try: bs.inputs['Specular IOR Level'].default_value = 0.65
+                except Exception: pass
+            else:
+                bs.inputs['Roughness'].default_value = 0.6
+                try: bs.inputs['Subsurface Weight'].default_value = 0.35; bs.inputs['Subsurface Radius'].default_value = (0.4, 0.5, 0.6)
+                except Exception: pass
         if p.get('trans'):   # MeshPhysicalMaterial.transmission → real glass (refracting, sky-reflecting); its fill and fake alpha are dropped
             bs.inputs['Transmission Weight'].default_value = p['trans']; bs.inputs['IOR'].default_value = p.get('ior', 1.5)
             ek = N.new('ShaderNodeVectorMath'); ek.operation = 'SCALE'; Lk(e, ek.inputs[0]); ek.inputs['Scale'].default_value = 1 - p['trans']; Lk(ek.outputs[0], bs.inputs['Emission Color']); alpha = None

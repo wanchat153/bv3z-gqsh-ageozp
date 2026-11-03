@@ -100,10 +100,10 @@ SHOT.N08 = (t) => { const W = nyos(); const c = camOf('N08'); const u = loc('N08
   return { haze: HZ('moon', 0.8), scene: W.S, camera: c, prep, focus: { amt: 0 } }; };
 // N09 — inside: the lantern by the window gutters out; mist drifts past outside; a sleeper on the mat
 SHOT.N09 = (t) => { const W = room(); const c = camOf('N09', 60); const u = loc('N09', t); const k = u / DD.N09;
-  aim(c, V(-0.5 + 0.05 * k, 1.2, 0.35 - 0.12 * k), V(-0.68, 1.12, -0.95), 34);
+  aim(c, V(-0.44 - 0.08 * k, 1.17 - 0.03 * k, 0.25 - 0.22 * k), V(-0.72, 1.08, -0.95), 34);
   const prep = () => { const R = W.R; R.outside('night'); R.key.intensity = 0; R.hemi.intensity = 0.05; R.bottle(false, 0, 0, 0); R.lantern(1 - sst(0.25, 0.85, k), t); R.mist(1, t);
     W.sleeper.mesh.visible = true; W.sleeper.update(c, V(1.2, 0.3, 0.6), right(c), { col: '#2a4a6a', print: '#e8c040', hair: 'short', eyes: 'closed', mouth: 'line', arms: { L: [-120, 160], R: [120, 160] } }, 0, 0, Math.PI / 2); };
-  return { scene: W.S, camera: c, prep, focus: { dist: 0.5, range: 0.25, amt: 0.6 } }; };
+  return { scene: W.S, camera: c, prep, focus: { dist: mix(1.28, 1.05, k), range: 0.3, amt: 0.6 } }; };
 // N10 — dawn from above: the blue lake has turned a murky red
 SHOT.N10 = (t) => aerial('N10', t, 0.4 + loc('N10', t) / DD.N10 * 0.6, true);
 // N11 — mid-morning: a man who passed out wakes in his doorway; the village is silent

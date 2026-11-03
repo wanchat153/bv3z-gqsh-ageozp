@@ -56,22 +56,49 @@ export function buildRoom(scene) {
       g.strokeStyle = '#2a1a16'; g.lineWidth = 6; for (let y = 0; y < 512; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t; })();
     const cg = new THREE.PlaneGeometry(1.6, 1.25, 40, 30); const A = cg.attributes.position; for (let i = 0; i < A.count; i++) { const x = A.getX(i), y = A.getY(i); const over = Math.max(Math.abs(x) - 0.7, Math.abs(y) - 0.4, 0); A.setZ(i, -over * 1.6 + Math.sin(x * 30) * 0.008 * (over > 0 ? 3 : 0.2)); }
     cg.rotateX(-Math.PI / 2); cg.translate(-0.5, 0.81, -0.75); cg.computeVertexNormals(); const cloth = new THREE.Mesh(cg, STD(0xffffff, { map: CT, side: THREE.DoubleSide, roughness: 1 })); cloth.castShadow = cloth.receiveShadow = true; scene.add(cloth); }
-  // hurricane lantern
-  const lan = new THREE.Group(); lan.position.set(-0.75, 0.81, -0.95); scene.add(lan); R.lan = lan;
-  const tin = STD(0xb8302a, { metalness: 0.5, roughness: 0.45 }), steel = STD(0x8a8a8e, { metalness: 0.8, roughness: 0.35 });
-  const pm = (g, m) => { const o = new THREE.Mesh(g, m); o.castShadow = true; o.receiveShadow = true; lan.add(o); return o; };
-  pm(lathe([[0, 0], [0.11, 0], [0.12, 0.03], [0.12, 0.08], [0.09, 0.11], [0.05, 0.12], [0, 0.12]]), tin);
-  pm(lathe([[0.045, 0.12], [0.055, 0.14], [0.05, 0.15]]), steel);
-  const globe = pm(lathe([[0.04, 0.15], [0.075, 0.2], [0.085, 0.26], [0.07, 0.33], [0.04, 0.37]], 40), new THREE.MeshPhysicalMaterial({ color: 0xfff4e0, roughness: 0.05, transmission: 1, thickness: 0.01, ior: 1.45, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); globe.castShadow = false;
-  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; const g = new THREE.CylinderGeometry(0.004, 0.004, 0.24, 5); g.translate(Math.cos(a) * 0.1, 0.26, Math.sin(a) * 0.1); pm(g, steel); }
-  for (const y of [0.17, 0.26, 0.35]) { const g = new THREE.TorusGeometry(y === 0.26 ? 0.1 : 0.08, 0.004, 5, 32); g.rotateX(Math.PI / 2); g.translate(0, y, 0); pm(g, steel); }
-  pm(lathe([[0.05, 0.37], [0.08, 0.39], [0.07, 0.42], [0.03, 0.45], [0, 0.46]]), tin);
-  { const g = new THREE.TorusGeometry(0.13, 0.005, 6, 32, Math.PI); g.translate(0, 0.4, 0); pm(g, steel); }
-  for (const s of [-1, 1]) { const g = new THREE.CylinderGeometry(0.006, 0.006, 0.36, 5); g.rotateZ(s * 0.05); g.translate(s * 0.125, 0.2, 0); pm(g, tin); }
-  const flame = new THREE.Mesh(lathe([[0, 0], [0.012, 0.01], [0.016, 0.03], [0.01, 0.055], [0, 0.07]], 16), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffb050, emissiveIntensity: 2.2 })); flame.position.y = 0.2; lan.add(flame); R.flame = flame;
-  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT('rgba(255,220,150,1)', 'rgba(255,140,40,A)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.set(0, 0.24, 0); lan.add(halo); R.halo = halo;
-  const L = new THREE.PointLight(0xffa850, 0, 8, 1.6); L.position.set(0, 0.24, 0); L.castShadow = true; lan.add(L); R.L = L;
-  R.lantern = (k, t) => { const f = k * (0.92 + 0.08 * Math.sin(t * 19) * Math.sin(t * 7)); flame.visible = k > 0.02; flame.scale.set(0.6 + 0.4 * f, 0.2 + 0.8 * f, 0.6 + 0.4 * f); L.intensity = 0.45 * f; halo.visible = k > 0.02; halo.scale.setScalar(0.12 + 0.1 * f); halo.material.opacity = 0.12 * f; };
+  // hurricane lantern (tubular 'Dietz' type, ~0.42 m): enamelled tin fount with seams, filler cap and wick knob, brass burner,
+  // a hurricane globe (real glass), wire guard following the globe, two air tubes curving into the top, vented chimney cap,
+  // bail with a wooden grip; flame = blue root + gold teardrop on a flat wick; the light sits in the flame
+  const lan = new THREE.Group(); lan.position.set(-0.75, 0.81, -0.95); lan.rotation.y = 0.5; scene.add(lan); R.lan = lan;
+  const spl = (pts, n = 48) => { const c = new THREE.SplineCurve(pts.map(([a, b]) => new THREE.Vector2(a, b))); return new THREE.LatheGeometry(c.getPoints(n), 64); };
+  const ENM = painted(256, 256, (x, y) => { const n = fbm(x / 40, y / 40, 0, 4), sc = vnoise(x * 0.9, y * 0.05) > 0.93, rust = fbm(x / 18 + 5, y / 18, 2, 3) > 0.7;
+    const c = rust ? [110, 60, 34] : sc ? [200, 190, 180] : [176 - n * 30, 36 + n * 10, 30 + n * 8]; return [c[0], c[1], c[2], n * 0.3 + (sc ? -0.4 : 0) + (rust ? 0.3 : 0)]; }, 2);
+  const tin = new THREE.MeshStandardMaterial({ color: 0xffffff, map: ENM.map, normalMap: ENM.normalMap, metalness: 0.25, roughness: 0.32 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x9a9a9e, metalness: 1, roughness: 0.32 }), brass = new THREE.MeshStandardMaterial({ color: 0xc89a48, metalness: 1, roughness: 0.28 }), dark = STD(0x1a1614, { roughness: 0.6 });
+  const pm = (g, m, sh = true) => { const o = new THREE.Mesh(g, m); o.castShadow = sh; o.receiveShadow = true; lan.add(o); return o; };
+  const tube = (pts, r_, m, seg = 64) => pm(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p))), seg, r_, 12, false), m);
+  // fount
+  pm(spl([[0.0, 0], [0.098, 0], [0.104, 0.004], [0.112, 0.03], [0.114, 0.055], [0.108, 0.085], [0.085, 0.104], [0.06, 0.112], [0.0, 0.114]]), tin);
+  for (const [y, rr] of [[0.004, 0.1], [0.056, 0.114]]) { const g = new THREE.TorusGeometry(rr, 0.0035, 8, 96); g.rotateX(Math.PI / 2); g.translate(0, y, 0); pm(g, tin); }
+  { const g = new THREE.CylinderGeometry(0.016, 0.017, 0.016, 28); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const a = Math.atan2(A.getZ(i), A.getX(i)); const k = 1 + 0.06 * (Math.sin(a * 28) > 0 ? 1 : 0); if (Math.abs(A.getY(i)) < 0.0079) { A.setX(i, A.getX(i) * k); A.setZ(i, A.getZ(i) * k); } } g.computeVertexNormals(); g.rotateZ(-0.5); g.translate(0.075, 0.104, 0); pm(g, brass); }
+  // burner + wick knob
+  pm(spl([[0.0, 0.112], [0.05, 0.112], [0.056, 0.12], [0.05, 0.13], [0.058, 0.142], [0.06, 0.15], [0.045, 0.152], [0.0, 0.152]], 32), brass);
+  { const g = new THREE.CylinderGeometry(0.006, 0.006, 0.05, 12); g.rotateZ(Math.PI / 2); g.translate(0.08, 0.128, 0); pm(g, brass); const k = new THREE.CylinderGeometry(0.016, 0.016, 0.006, 24); k.rotateZ(Math.PI / 2); k.translate(0.106, 0.128, 0); pm(k, brass); }
+  { const g = new THREE.BoxGeometry(0.022, 0.006, 0.004); g.translate(0, 0.156, 0); pm(g, dark); }
+  // globe (glass) — classic hurricane profile
+  const globe = pm(spl([[0.046, 0.15], [0.06, 0.17], [0.082, 0.22], [0.088, 0.255], [0.08, 0.3], [0.062, 0.335], [0.05, 0.355]]), new THREE.MeshPhysicalMaterial({ color: 0xfff8ec, roughness: 0.07, transmission: 1, thickness: 0.003, ior: 1.47, transparent: true, opacity: 0.3, side: THREE.DoubleSide }), false);
+  // guard: 6 wires bowed around the globe + 2 rings
+  for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + 0.26; const P = (r_, y) => [Math.cos(a) * r_, y, Math.sin(a) * r_]; tube([P(0.07, 0.15), P(0.096, 0.2), P(0.104, 0.255), P(0.094, 0.31), P(0.07, 0.35)], 0.0022, steel, 32); }
+  for (const [y, rr] of [[0.2, 0.097], [0.31, 0.095]]) { const g = new THREE.TorusGeometry(rr, 0.0025, 8, 96); g.rotateX(Math.PI / 2); g.translate(0, y, 0); pm(g, steel); }
+  // air tubes from the fount shoulder up and over into the top
+  for (const s of [-1, 1]) tube([[s * 0.104, 0.07], [s * 0.118, 0.12], [s * 0.122, 0.25], [s * 0.12, 0.37], [s * 0.1, 0.41], [s * 0.06, 0.425]], 0.0105, tin, 96);
+  // chimney cap with vents
+  pm(spl([[0.05, 0.352], [0.066, 0.36], [0.094, 0.375], [0.098, 0.385], [0.08, 0.4], [0.062, 0.418], [0.05, 0.43], [0.03, 0.438], [0.0, 0.44]]), tin);
+  for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; const g = new THREE.CylinderGeometry(0.006, 0.006, 0.004, 12); g.rotateX(Math.PI / 2); g.lookAt(new THREE.Vector3(Math.cos(a), 0.6, Math.sin(a))); g.translate(Math.cos(a) * 0.071, 0.406, Math.sin(a) * 0.071); pm(g, dark, false); }
+  { const g = new THREE.SphereGeometry(0.012, 16, 10); g.translate(0, 0.445, 0); pm(g, tin); }
+  // bail + wooden grip
+  { const pts = []; for (let i = 0; i <= 32; i++) { const a = Math.PI * i / 32; pts.push([Math.cos(a) * 0.125, 0.39 + Math.sin(a) * 0.15, 0]); } tube(pts, 0.0025, steel, 64);
+    const g = new THREE.CylinderGeometry(0.008, 0.008, 0.06, 16); g.rotateZ(Math.PI / 2); g.translate(0, 0.54, 0); pm(g, STD(0x8a5a34, { roughness: 0.6 })); }
+  // flame: a blue root and a gold teardrop on the wick
+  const flameG = spl([[0.0, 0.0], [0.006, 0.004], [0.011, 0.014], [0.012, 0.024], [0.008, 0.038], [0.003, 0.05], [0.0, 0.056]], 24);
+  const flame = new THREE.Mesh(flameG, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffa040, emissiveIntensity: 3.2 })); flame.position.y = 0.158; lan.add(flame); R.flame = flame;
+  const core = new THREE.Mesh(spl([[0, 0], [0.004, 0.004], [0.006, 0.012], [0.004, 0.02], [0, 0.026]], 16), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xfff2c8, emissiveIntensity: 4 })); core.position.y = 0.162; lan.add(core);
+  const root = new THREE.Mesh(new THREE.SphereGeometry(0.009, 16, 8).scale(1.2, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x3a6aff, emissiveIntensity: 2 })); root.position.y = 0.16; lan.add(root);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowT('rgba(255,220,150,1)', 'rgba(255,140,40,A)'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); halo.position.set(0, 0.185, 0); lan.add(halo); R.halo = halo;
+  const L = new THREE.PointLight(0xffa850, 0, 8, 1.6); L.position.set(0, 0.185, 0); L.castShadow = true; lan.add(L); R.L = L;
+  R.lantern = (k, t) => { const f = k * (0.92 + 0.08 * Math.sin(t * 19) * Math.sin(t * 7)); const on = k > 0.02; flame.visible = core.visible = root.visible = halo.visible = on;
+    const sway = Math.sin(t * 5.3) * 0.08 * f; flame.scale.set(0.7 + 0.3 * f, 0.25 + 0.75 * f, 0.7 + 0.3 * f); flame.rotation.z = sway; core.scale.set(0.7 + 0.3 * f, 0.3 + 0.7 * f, 0.7 + 0.3 * f); core.rotation.z = sway * 0.6;
+    root.scale.setScalar(0.6 + 0.4 * f); L.intensity = 0.45 * f; halo.scale.setScalar(0.08 + 0.06 * f); halo.material.opacity = 0.1 * f; };
   // enamel cup, matches
   { const cup = lathe([[0, 0], [0.04, 0], [0.045, 0.01], [0.045, 0.09], [0.048, 0.095], [0.041, 0.095], [0.041, 0.012], [0, 0.012]], 28); cup.translate(-0.25, 0.81, -0.6); const o = new THREE.Mesh(cup, STD(0xf0f0e8, { roughness: 0.25 })); o.castShadow = true; scene.add(o);
     const hd = new THREE.TorusGeometry(0.025, 0.006, 6, 16, Math.PI * 1.2); hd.rotateZ(-Math.PI / 2); hd.translate(-0.2, 0.86, -0.6); scene.add(new THREE.Mesh(hd, STD(0xf0f0e8, { roughness: 0.25 })));

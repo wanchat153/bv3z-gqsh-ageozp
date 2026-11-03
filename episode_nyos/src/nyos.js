@@ -56,10 +56,16 @@ export function buildNyos(scene, { keep = [] } = {}) {   // keep: [[x, z, r]] â€
   gg.setAttribute('color', new THREE.BufferAttribute(gcol, 3));
   const ground = new THREE.Mesh(gg, STD(0xffffff, { map: GT.map, normalMap: GT.normalMap, vertexColors: true, roughness: 0.95 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   // ---------------- the lake ----------------
-  const WN = painted(512, 512, (x, y) => { const u = x / 512, v = y / 512; const h = fbm(u * 16, v * 16, 0, 4) * 0.7 + fbm(u * 40 + 3, v * 40, 1, 2) * 0.3; return [128, 128, 255, h]; }, 1.6);
-  WN.normalMap.repeat.set(24, 24);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(LR + 8, 160), STD(0x0e3450, { roughness: 0.05, metalness: 0.0, normalMap: WN.normalMap })); water.rotation.x = -Math.PI / 2; water.position.y = 0; water.receiveShadow = true; scene.add(water); T.water = water;
-  const LAKE = { blue: [0x0e3450, 0.05], night: [0x0c1a2a, 0.05], red: [0x7a3a22, 0.35] };
+  // water: a square sheet (its corners hide under the crater walls), shallows brighter by depth (vertex colours), micro-waves
+  // come from the renderer's water shader (procedural bump, bkind 'water'); a broken foam line along the shore
+  const WG = new THREE.PlaneGeometry(2 * (LR + 16), 2 * (LR + 16), 160, 160); WG.rotateX(-Math.PI / 2); { const A = WG.attributes.position; const wc = new Float32Array(A.count * 3);
+    for (let i = 0; i < A.count; i++) { const d = Math.max(0, -H0(A.getX(i), A.getZ(i))); const sh = Math.exp(-d / 7); wc.set([0.75 + 0.9 * sh, 0.8 + 1.3 * sh, 0.85 + 1.0 * sh], i * 3); } WG.setAttribute('color', new THREE.BufferAttribute(wc, 3)); }
+  const water = new THREE.Mesh(WG, STD(0x10405a, { roughness: 0.03, metalness: 0.0, vertexColors: true })); water.material.userData.bkind = 'water'; water.receiveShadow = true; scene.add(water); T.water = water;
+  { const g = new THREE.RingGeometry(LR + 0.1, LR + 1.8, 400, 2); const A = g.attributes.position; const fc = new Float32Array(A.count * 3);
+    for (let i = 0; i < A.count; i++) { const a_ = Math.atan2(A.getY(i), A.getX(i)); const k = fbm(Math.cos(a_) * 9, Math.sin(a_) * 9, 3, 3); const rr = Math.hypot(A.getX(i), A.getY(i)); const w = (rr - LR - 0.1) / 1.7; A.setXY(i, A.getX(i) * (1 + (k - 0.5) * 0.006), A.getY(i) * (1 + (k - 0.5) * 0.006)); const v = 0.6 + 0.5 * k * (1 - w); fc.set([v, v, v], i * 3); }
+    g.setAttribute('color', new THREE.BufferAttribute(fc, 3)); g.rotateX(-Math.PI / 2); const FA = tex(512, 64, (c, w, h) => { const rr = mulberry(4); for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(255,255,255,${0.3 + rr() * 0.6})`; c.beginPath(); c.ellipse(rr() * w, rr() * h, 2 + rr() * 9, 1 + rr() * 4, 0, 0, 7); c.fill(); } });
+    FA.wrapS = THREE.RepeatWrapping; FA.repeat.set(60, 1); const foam = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xf4f6f6, vertexColors: true, roughness: 0.7, alphaMap: FA, transparent: true, depthWrite: false })); foam.position.y = 0.03; scene.add(foam); T.shoreFoam = foam; }
+  const LAKE = { blue: [0x10405a, 0.03], night: [0x0a1a2c, 0.03], red: [0x8a3a1e, 0.25] };
   T.setLake = (m) => { water.material.color.setHex(LAKE[m][0]); water.material.roughness = LAKE[m][1]; };
   // shore: pebbles + reeds ring
   // ---------------- vegetation ----------------
@@ -182,15 +188,27 @@ export function buildNyos(scene, { keep = [] } = {}) {   // keep: [[x, z, r]] â€
   T.fire = (on, t) => { for (const F of T.fires) { F.fl.visible = on; F.L.intensity = on ? 3 + Math.sin(t * 17 + F.p.x) * 0.6 : 0; F.fl.scale.set(0.7, 0.9 + 0.15 * Math.sin(t * 23 + F.p.z), 1);
       F.sm.forEach((s, j) => { s.visible = on; const u = ((t * 0.25 + j / 8) % 1); s.position.copy(F.p).add(V(Math.sin(j * 1.7 + t) * 0.4 + u * 1.5, 0.6 + u * 7, u * 0.8)); s.scale.setScalar(0.8 + u * 4); s.material.opacity = 0.5 * (1 - u) * Math.min(1, u * 6); }); } };
   T.fire(false, 0);
-  // ---------------- the 1986 eruption column ----------------
-  const foamT = puffT(9, '255,255,255');
-  const colG = (() => { const g = new THREE.CylinderGeometry(0.55, 1, 1, 24, 20, true); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const y = A.getY(i) + 0.5, a = Math.atan2(A.getZ(i), A.getX(i)); const k = 1 + 0.25 * (fbm(Math.cos(a) * 2, y * 5, Math.sin(a) * 2, 3) - 0.5) * 2 + y * 0.6;
-      A.setX(i, A.getX(i) * k); A.setZ(i, A.getZ(i) * k); } g.translate(0, 0.5, 0); g.computeVertexNormals(); return g; })();
-  const column = new THREE.Mesh(colG, STD(0xe8eef2, { roughness: 0.8 })); column.castShadow = true; scene.add(column); T.column = column;
-  const spray = []; for (let j = 0; j < 70; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: foamT, transparent: true, depthWrite: false, color: 0xe8f0f8 })); scene.add(s); spray.push(s); }
-  T.fountain = (k, t, col = 0xe8f0f8) => { column.visible = k > 0.01; const H_ = 60 * k; column.scale.set(5 + 3 * k, Math.max(0.01, H_ * 1.3), 5 + 3 * k);
-    spray.forEach((s, j) => { s.visible = k > 0.01; if (!s.visible) return; const a = j * 2.4, u = ((t * 0.35 + j / 70) % 1); const top = j % 2 === 0; const rad = top ? 3 + u * 18 * k : 6 + u * 26 * k; const y = top ? H_ * 1.3 * (1 - u * u * 0.8) + 2 : 1 + u * 4;
-      s.position.set(Math.cos(a) * rad, y, Math.sin(a) * rad); s.scale.setScalar((top ? 6 + u * 14 : 8 + u * 16) * (0.5 + k * 0.5)); s.material.color.setHex(col); s.material.opacity = 0.6 * (1 - u * 0.7); }); };
+  // ---------------- the 1986 eruption column: a churning foam core, hundreds of foam masses thrown up and raining back,
+  // a ring of surf at its foot, waves running out across the lake, spray haze (foam = bkind 'foam': subsurface + bump)
+  const foamT = puffT(9, '255,255,255'); const foamM = STD(0xeef2f4, { roughness: 0.6 }); foamM.userData.bkind = 'foam';
+  const blobG = [0, 1, 2, 3].map((k) => { const g = new THREE.IcosahedronGeometry(1, 3); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const x = A.getX(i), y = A.getY(i), z = A.getZ(i); const f = 0.7 + 0.6 * fbm(x * 1.6 + k * 5, y * 1.6, z * 1.6, 4); A.setXYZ(i, x * f, y * f * 0.85, z * f); } g.computeVertexNormals(); return g; });
+  const colG = (() => { const g = new THREE.CylinderGeometry(1, 1, 1, 48, 60, true); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const y = A.getY(i) + 0.5, a = Math.atan2(A.getZ(i), A.getX(i));
+      const k = 0.55 + 0.45 * y + 0.5 * (fbm(Math.cos(a) * 1.5 + 2, y * 4, Math.sin(a) * 1.5, 5) - 0.5) * 2 + 0.25 * Math.max(0, y - 0.8) * 4; A.setX(i, A.getX(i) * k); A.setZ(i, A.getZ(i) * k); } g.translate(0, 0.5, 0); g.computeVertexNormals(); return g; })();
+  const erupt = new THREE.Group(); scene.add(erupt); const column = new THREE.Mesh(colG, foamM); column.castShadow = true; erupt.add(column); T.column = column;
+  const er = mulberry(77); const blobs = []; for (let j = 0; j < 240; j++) { const m = new THREE.Mesh(blobG[j % 4], foamM); m.castShadow = true; m.userData = { a: er() * 6.28, sp: 0.5 + er() * 0.9, h: 0.55 + er() * 0.5, s: 0.18 + er() * 0.45, ph: er() }; erupt.add(m); blobs.push(m); }
+  const surf = new THREE.Mesh((() => { const g = new THREE.TorusGeometry(1, 0.35, 24, 96); g.rotateX(Math.PI / 2); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const a = Math.atan2(A.getZ(i), A.getX(i)); const f = 1 + 0.5 * (fbm(Math.cos(a) * 4, A.getY(i) * 3, Math.sin(a) * 4, 4) - 0.5); A.setY(i, A.getY(i) * f * 1.6); } g.computeVertexNormals(); return g; })(), foamM); erupt.add(surf);
+  const waves = [0, 1, 2].map(() => { const g = new THREE.RingGeometry(0.94, 1, 160, 1); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xe8eef0, roughness: 0.6, transparent: true, opacity: 0.7, depthWrite: false })); m.position.y = 0.05; erupt.add(m); return m; });
+  const spray = []; for (let j = 0; j < 130; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: foamT, transparent: true, depthWrite: false, color: 0xe8f0f8 })); scene.add(s); spray.push(s); }
+  T.fountain = (k, t, col = 0xe8f0f8) => { const on = k > 0.01; erupt.visible = on; spray.forEach((s) => { s.visible = on; }); if (!on) return; const H_ = 72 * k, W_ = 5 + 4 * k;
+    column.scale.set(W_, Math.max(0.01, H_), W_); column.rotation.y = t * 0.6;
+    blobs.forEach((b) => { const d = b.userData; const u = (t * 0.32 * d.sp + d.ph) % 1; const r0 = W_ * 0.6; const top = H_ * d.h;
+      const x = r0 + u * (10 + 22 * d.sp) * k, y = top * (1 - u * u) + 14 * k * u * (1 - u) * 2; b.visible = y > 0.3;
+      b.position.set(Math.cos(d.a + t * 0.2) * x, y, Math.sin(d.a + t * 0.2) * x); const sc = d.s * (1 + u * 1.6) * (0.4 + 0.6 * k); b.scale.set(sc, sc * (0.8 + u * 0.5), sc); b.rotation.set(u * 3, d.a, u * 2); });
+    surf.scale.set(W_ * 1.05 + 1.5 * k, 2.5 + 4 * k, W_ * 1.05 + 1.5 * k);
+    waves.forEach((w) => { w.visible = false; });
+    spray.forEach((s, j) => { const a = j * 2.4, u = ((t * 0.3 + j / 130) % 1); const inner = j % 3 !== 0; const rad = inner ? W_ * (0.3 + 0.5 * ((j * 7) % 10) / 10) + u * 4 * k : W_ + u * 26 * k;
+      const y = inner ? H_ * (((j * 13) % 20) / 20) * (1 + 0.1 * u) + 2 : H_ * (0.5 + 0.5 * (1 - u * u)) * ((j % 2) ? 1 : 0.4);
+      s.position.set(Math.cos(a) * rad, y, Math.sin(a) * rad); s.scale.setScalar((inner ? 7 + u * 6 : 12 + u * 22) * (0.5 + k * 0.5)); s.material.color.setHex(col); s.material.opacity = (inner ? 0.42 : 0.26) * (1 - u * 0.6); }); };
   T.fountain(0, 0);
   // ---------------- the gas cloud: puffs flowing along lake â†’ notch â†’ valley â†’ village â†’ beyond ----------------
   const PATH = [V(0, 3, 0), V(VD.x * 90, 6, VD.z * 90), V(VD.x * (RIM + 5), 0, VD.z * (RIM + 5)), V(VD.x * 260, 0, VD.z * 260), VC.clone(), VD.clone().multiplyScalar(560)];
@@ -212,11 +230,20 @@ export function buildNyos(scene, { keep = [] } = {}) {   // keep: [[x, z, r]] â€
     const pp = new THREE.CylinderGeometry(0.22, 0.22, 6, 14); pp.translate(0, -2, 0); parts.push({ g: pp, col: [0.3, 0.3, 0.32] }); const nz = new THREE.CylinderGeometry(0.12, 0.25, 1.4, 14); nz.translate(0, 1.6, 0); parts.push({ g: nz, col: [0.4, 0.4, 0.42] });
     parts.push({ g: box(1.2, 0.8, 0.9, 2.6, 1.4, 1.6), col: [0.25, 0.45, 0.7] });
     const o = new THREE.Mesh(merge(parts), STD(0xffffff, { vertexColors: true, roughness: 0.6, metalness: 0.2 })); o.castShadow = o.receiveShadow = true; raft.add(o); }
-  const jetG = new THREE.CylinderGeometry(0.18, 0.5, 1, 16, 10, true); { const A = jetG.attributes.position; for (let i = 0; i < A.count; i++) { const y = A.getY(i) + 0.5; const k = 1 + y * 2 + (vnoise(i * 0.7, y * 9) - 0.5) * 0.6; A.setX(i, A.getX(i) * k); A.setZ(i, A.getZ(i) * k); } jetG.translate(0, 0.5, 0); jetG.computeVertexNormals(); }
-  const jet = new THREE.Mesh(jetG, STD(0xf4f8ff, { roughness: 0.6, transparent: true, opacity: 0.8 })); jet.position.y = 2.2; raft.add(jet);
-  const jsp = []; for (let j = 0; j < 40; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: foamT, transparent: true, depthWrite: false, color: 0xf0f6ff })); scene.add(s); jsp.push(s); }
-  T.raft = (on, t, hgt = 26) => { raft.visible = on; jet.scale.set(1, hgt, 1); jsp.forEach((s, j) => { s.visible = on; if (!on) return; const u = ((t * 0.5 + j / 40) % 1), a = j * 2.4; const R_ = 1 + u * 7; const y = 2.2 + hgt * (1 - u * u * 0.9);
-      s.position.set(raft.position.x + Math.cos(a) * R_, y, raft.position.z + Math.sin(a) * R_); s.scale.setScalar(2.5 + u * 6); s.material.opacity = 0.55 * (1 - u * 0.8); }); };
+  // the jet: a ragged white core out of the nozzle, water masses fanning out at the top and raining back, spray haze, a splash ring
+  const jetG = (() => { const g = new THREE.CylinderGeometry(1, 1, 1, 32, 48, true); const A = g.attributes.position; for (let i = 0; i < A.count; i++) { const y = A.getY(i) + 0.5, a = Math.atan2(A.getZ(i), A.getX(i));
+      const k = (0.22 + 0.5 * y * y) * (1 + 0.6 * (fbm(Math.cos(a) * 2, y * 12, Math.sin(a) * 2, 4) - 0.5)); A.setX(i, A.getX(i) * k); A.setZ(i, A.getZ(i) * k); } g.translate(0, 0.5, 0); g.computeVertexNormals(); return g; })();
+  const jet = new THREE.Mesh(jetG, foamM); jet.position.y = 2.2; raft.add(jet);
+  const dropG = new THREE.SphereGeometry(1, 14, 10); const drops = []; for (let j = 0; j < 260; j++) { const m = new THREE.Mesh(dropG, foamM); m.userData = { a: er() * 6.28, sp: 0.7 + er() * 0.6, s: 0.025 + er() * 0.045, ph: er(), fan: 0.6 + er() * 0.8 }; raft.add(m); drops.push(m); }
+  const splash = new THREE.Mesh(surf.geometry, foamM); splash.position.y = 0.1; raft.add(splash);
+  const jsp = []; for (let j = 0; j < 50; j++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: foamT, transparent: true, depthWrite: false, color: 0xf0f6ff })); scene.add(s); jsp.push(s); }
+  T.raft = (on, t, hgt = 26) => { raft.visible = on; jsp.forEach((s) => { s.visible = on; }); if (!on) return; jet.scale.set(1.6, hgt, 1.6); jet.rotation.y = t * 2;
+    drops.forEach((m) => { const d = m.userData; const u = (t * 0.45 * d.sp + d.ph) % 1; const top = 2.2 + hgt * 0.97; let x, y;
+      if (u < 0.25) { x = 0.3 + u * 3; y = 2.2 + hgt * (0.7 + u * 1.2); } else { const v = (u - 0.25) / 0.75; x = 1 + v * 9 * d.fan; y = top + hgt * 0.12 * Math.sin(v * Math.PI) - v * v * (hgt + 2); }
+      m.visible = y > 0.2; m.position.set(Math.cos(d.a) * x, y, Math.sin(d.a) * x); const sc = d.s * (1 + u * 0.8); m.scale.set(sc, sc * (2 + u * 4), sc); });
+    splash.visible = false;
+    jsp.forEach((s, j) => { const u = ((t * 0.4 + j / 50) % 1), a = j * 2.4; const R_ = 0.8 + u * 7; const y = 2.2 + hgt * (1 - u * u * 0.85);
+      s.position.set(raft.position.x + Math.cos(a) * R_, y, raft.position.z + Math.sin(a) * R_); s.scale.setScalar(2.5 + u * 6); s.material.opacity = 0.42 * (1 - u * 0.6); }); };
   T.raft(false, 0);
   return T;
 }
